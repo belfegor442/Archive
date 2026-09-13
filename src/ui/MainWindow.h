@@ -18,6 +18,9 @@
 #include "../services/VersionService.h"
 #include "../services/ActivityService.h"
 #include "../services/ProjectDetector.h"
+#include "../services/IntegrityService.h"
+#include "../services/CategoryService.h"
+#include "../services/UpdateService.h"
 #include "../app/AppConfig.h"
 
 #include "SidebarWidget.h"
@@ -32,10 +35,13 @@ public:
     explicit MainWindow(const archive::app::AppConfig& config, QWidget* parent = nullptr);
     ~MainWindow();
 
-private slots:
-    void on_sidebar_item_clicked(const QString& page);
+public slots:
+    void navigate_to(const QString& page);
     void on_item_selected(const QString& item_id);
+
+private slots:
     void on_import_clicked();
+    void on_verify_integrity();
 
 private:
     archive::app::AppConfig config_;
@@ -55,6 +61,9 @@ private:
     std::unique_ptr<archive::services::NoteService> note_svc_;
     std::unique_ptr<archive::services::VersionService> version_svc_;
     std::unique_ptr<archive::services::ActivityService> activity_svc_;
+    std::unique_ptr<archive::services::IntegrityService> integrity_svc_;
+    std::unique_ptr<archive::services::CategoryService> category_svc_;
+    std::unique_ptr<archive::services::UpdateService> update_svc_;
 
     SidebarWidget* sidebar_ = nullptr;
     QStackedWidget* content_ = nullptr;
@@ -64,6 +73,4 @@ private:
 
     void setup_ui();
     void setup_connections();
-    void refresh_dashboard();
-    void refresh_items_list();
 };

@@ -31,10 +31,8 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-# Common sources (core library)
+# Common sources (core library — no Qt)
 set(ARCHIVE_LIB_SOURCES
-    src/app/AppConfig.cpp
-    src/app/Application.cpp
     src/core/models/ArchiveItem.cpp
     src/core/models/Category.cpp
     src/core/models/Tag.cpp
@@ -59,6 +57,9 @@ set(ARCHIVE_LIB_SOURCES
     src/services/NoteService.cpp
     src/services/VersionService.cpp
     src/services/ActivityService.cpp
+    src/services/IntegrityService.cpp
+    src/services/CategoryService.cpp
+    src/services/UpdateService.cpp
 )
 
 # Static library for all core code
@@ -80,8 +81,11 @@ target_link_directories(archive_lib PUBLIC
     ${OPENSSL_LIBRARY_DIRS}
 )
 
-# Qt6 UI sources
+# Qt6 UI sources + app bootstrap
 set(ARCHIVE_UI_SOURCES
+    src/main.cpp
+    src/app/AppConfig.cpp
+    src/app/Application.cpp
     src/ui/MainWindow.cpp
     src/ui/SidebarWidget.cpp
     src/ui/DashboardWidget.cpp

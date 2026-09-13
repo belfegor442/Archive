@@ -11,10 +11,11 @@ class ItemsListWidget : public QWidget {
     Q_OBJECT
 
 public:
+    enum class Mode { All, Favorites, Trash };
+
     explicit ItemsListWidget(archive::services::SearchService& svc, QWidget* parent = nullptr);
     void refresh();
-    void set_filters(const QString& category_id, bool favorites_only);
-    void set_status_filter(archive::core::ItemStatus status);
+    void set_mode(Mode mode);
 
 signals:
     void item_selected(const QString& item_id);
@@ -23,9 +24,7 @@ private:
     archive::services::SearchService& svc_;
     QLineEdit* search_box_ = nullptr;
     QListWidget* list_ = nullptr;
-    QString category_filter_;
-    bool favorites_only_ = false;
-    archive::core::ItemStatus status_filter_ = archive::core::ItemStatus::Archived;
+    Mode mode_ = Mode::All;
 
     void on_search_changed(const QString& text);
     void on_row_changed(int row);

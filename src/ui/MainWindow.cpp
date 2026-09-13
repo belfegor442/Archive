@@ -4,9 +4,8 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QMenuBar>
-#include <QToolBar>
+#include <QMenu>
 #include <QAction>
-#include <QFileDialog>
 #include <QMessageBox>
 
 MainWindow::MainWindow(const archive::app::AppConfig& config, QWidget* parent)
@@ -32,11 +31,14 @@ MainWindow::MainWindow(const archive::app::AppConfig& config, QWidget* parent)
     note_svc_ = std::make_unique<archive::services::NoteService>(*notes_, *items_, *activities_);
     version_svc_ = std::make_unique<archive::services::VersionService>(*versions_, *items_, *activities_, *storage_);
     activity_svc_ = std::make_unique<archive::services::ActivityService>(*activities_);
+    integrity_svc_ = std::make_unique<archive::services::IntegrityService>(*items_);
+    category_svc_ = std::make_unique<archive::services::CategoryService>(*categories_, *items_, *activities_);
+    update_svc_ = std::make_unique<archive::services::UpdateService>(*items_, *activities_, *storage_);
 
     setup_ui();
     setup_connections();
-    refresh_dashboard();
 
+    content_->setCurrentWidget(dashboard_);
     setWindowTitle("Archive");
     resize(1200, 800);
 }
@@ -62,38 +64,51 @@ void MainWindow::setup_ui() {
     items_list_ = new ItemsListWidget(*search_svc_, this);
     content_->addWidget(items_list_);
 
-    item_detail_ = new ItemDetailWidget(*items_, *note_svc_, *version_svc_, *activity_svc_, this);
+    item_detail_ = new ItemDetailWidget(*items_, *note_svc_, *version_svc_, *activity_svc_, *update_svc_, this);
     content_->addWidget(item_detail_);
 
     setCentralWidget(central);
 
-    auto* import_action = new QAction(tr("&Import"), this);
+    auto* file_menu = menuBar()->addMenu(tr("&File"));
+    auto* import_action = file_menu->addAction(tr("&Import..."));
     import_action->setShortcut(QKeySequence::New);
-    menuBar()->addAction(import_action);
     connect(import_action, &QAction::triggered, this, &MainWindow::on_import_clicked);
+
+    file_menu->addSeparator();
+    auto* exit_action = file_menu->addAction(tr("E&xit"));
+    exit_action->setShortcut(QKeySequence::Quit);
+    connect(exit_action, &QAction::triggered, this, &QWidget::close);
+
+    auto* tools_menu = menuBar()->addMenu(tr("&Tools"));
+    auto* verify_action = tools_menu->addAction(tr("&Verify Integrity"));
+    connect(verify_action, &QAction::triggered, this, &MainWindow::on_verify_integrity);
 }
 
 void MainWindow::setup_connections() {
-    connect(sidebar_, &SidebarWidget::item_clicked, this, &MainWindow::on_sidebar_item_clicked);
+    connect(sidebar_, &SidebarWidget::item_clicked, this, &MainWindow::navigate_to);
     connect(items_list_, &ItemsListWidget::item_selected, this, &MainWindow::on_item_selected);
 }
 
-void MainWindow::on_sidebar_item_clicked(const QString& page) {
+void MainWindow::navigate_to(const QString& page) {
     if (page == "dashboard") {
         content_->setCurrentWidget(dashboard_);
-        refresh_dashboard();
+        dashboard_->refresh();
     } else if (page == "all") {
         content_->setCurrentWidget(items_list_);
-        items_list_->set_filters("", false);
-        refresh_items_list();
+        items_list_->set_mode(ItemsListWidget::Mode::All);
+        items_list_->refresh();
     } else if (page == "favorites") {
         content_->setCurrentWidget(items_list_);
-        items_list_->set_filters("", true);
-        refresh_items_list();
+        items_list_->set_mode(ItemsListWidget::Mode::Favorites);
+        items_list_->refresh();
     } else if (page == "trash") {
         content_->setCurrentWidget(items_list_);
-        items_list_->set_status_filter(archive::core::ItemStatus::Deleted);
-        refresh_items_list();
+        items_list_->set_mode(ItemsListWidget::Mode::Trash);
+        items_list_->refresh();
+    } else if (page == "categories") {
+        content_->setCurrentWidget(items_list_);
+        items_list_->set_mode(ItemsListWidget::Mode::All);
+        items_list_->refresh();
     }
 }
 
@@ -105,15 +120,28 @@ void MainWindow::on_item_selected(const QString& item_id) {
 void MainWindow::on_import_clicked() {
     ImportDialog dlg(import_svc_.get(), this);
     if (dlg.exec() == QDialog::Accepted) {
-        refresh_items_list();
-        refresh_dashboard();
+        dashboard_->refresh();
+        items_list_->refresh();
     }
 }
 
-void MainWindow::refresh_dashboard() {
-    dashboard_->refresh();
-}
+void MainWindow::on_verify_integrity() {
+    auto result = integrity_svc_->verify_all();
 
-void MainWindow::refresh_items_list() {
-    items_list_->refresh();
+    QString msg;
+    if (result.all_valid()) {
+        msg = tr("All items verified successfully!\n\n"
+                 "Valid: %1\nTotal: %2")
+              .arg(result.valid_count)
+              .arg(result.items.size());
+    } else {
+        msg = tr("Integrity issues found:\n\n"
+                 "Valid: %1\nModified: %2\nMissing: %3\nCorrupted: %4")
+              .arg(result.valid_count)
+              .arg(result.modified_count)
+              .arg(result.missing_count)
+              .arg(result.corrupted_count);
+    }
+
+    QMessageBox::information(this, tr("Integrity Check"), msg);
 }

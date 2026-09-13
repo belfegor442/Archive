@@ -1,15 +1,47 @@
-node_modules/
-dist/
+# Build directories
 build/
-.env
-.env.local
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
-archive-data/
-.vite/
-*.tsbuildinfo
-coverage/
+cmake-build-*/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Compiled
+*.o
+*.obj
+*.a
+*.lib
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.exp
+
+# Qt
+moc_*
+ui_*
+qrc_*
+
+# OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Archive data
+.archive-data/
+
+# Dependencies
+node_modules/
+
+# Test DB files
+*.db
+*.db-shm
+*.db-wal
+
+# Client/Server (legacy web stack)
+client/
+server/

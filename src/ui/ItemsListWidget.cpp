@@ -61,12 +61,22 @@ ItemsListWidget::ItemsListWidget(archive::services::SearchService& svc, QWidget*
 
 void ItemsListWidget::refresh() {
     list_->clear();
-    auto result = svc_.search(search_box_->text().toStdString());
 
-    for (const auto& item : result.items) {
+    std::vector<archive::core::ArchiveItem> items;
+
+    if (mode_ == Mode::Favorites) {
+        items = svc_.find_favorites();
+    } else if (mode_ == Mode::Trash) {
+        items = svc_.find_by_status(archive::core::ItemStatus::Deleted);
+    } else {
+        auto result = svc_.search(search_box_->text().toStdString());
+        items = std::move(result.items);
+    }
+
+    for (const auto& item : items) {
         QString display = QString::fromStdString(item.name);
-        if (item.is_favorite) display += " ★";
-        display += " [" + QString::fromStdString(archive::core::to_string(item.type)) + "]";
+        if (item.is_favorite) display += "  *";
+        display += "  [" + QString::fromStdString(archive::core::to_string(item.type)) + "]";
 
         auto* list_item = new QListWidgetItem(display);
         list_item->setData(Qt::UserRole, QString::fromStdString(item.id));
@@ -74,15 +84,8 @@ void ItemsListWidget::refresh() {
     }
 }
 
-void ItemsListWidget::set_filters(const QString& category_id, bool favorites_only) {
-    category_filter_ = category_id;
-    favorites_only_ = favorites_only;
-    refresh();
-}
-
-void ItemsListWidget::set_status_filter(archive::core::ItemStatus status) {
-    status_filter_ = status;
-    refresh();
+void ItemsListWidget::set_mode(Mode mode) {
+    mode_ = mode;
 }
 
 void ItemsListWidget::on_search_changed(const QString& text) {
