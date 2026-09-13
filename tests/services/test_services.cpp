@@ -4,6 +4,9 @@
 #include "services/SearchService.h"
 #include "services/DashboardService.h"
 #include "services/ActivityService.h"
+#include "services/IntegrityService.h"
+#include "services/CategoryService.h"
+#include "services/UpdateService.h"
 #include "storage/DatabaseManager.h"
 #include "storage/ArchiveItemRepository.h"
 #include "storage/CategoryRepository.h"
@@ -172,6 +175,213 @@ static void test_activity_log() {
     TEST_PASS();
 }
 
+// --- IntegrityService tests ---
+
+static void test_integrity_verify_item_missing() {
+    TEST_BEGIN("IntegrityService verify_item with missing file");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    IntegrityService integrity(item_repo);
+
+    ArchiveItem item;
+    item.id = "int-missing"; item.name = "Missing"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/nonexistent/file.bin"; item.size = 100;
+    item.checksum = "abc123"; item.created_at = ""; item.archived_at = "";
+    item.last_modified_at = "";
+    item_repo.insert(item);
+
+    auto result = integrity.verify_item("int-missing");
+    ASSERT_EQ(result.items.size(), 1u);
+    ASSERT_EQ(result.missing_count, 1);
+    ASSERT_EQ(result.items[0].state, IntegrityState::Missing);
+    TEST_PASS();
+}
+
+static void test_integrity_verify_item_no_checksum() {
+    TEST_BEGIN("IntegrityService verify_item with no checksum");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    IntegrityService integrity(item_repo);
+
+    ArchiveItem item;
+    item.id = "int-nocs"; item.name = "NoCS"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 0;
+    item.created_at = ""; item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    auto result = integrity.verify_item("int-nocs");
+    ASSERT_EQ(result.items.size(), 1u);
+    ASSERT_EQ(result.corrupted_count, 1);
+    ASSERT_EQ(result.items[0].state, IntegrityState::Unknown);
+    TEST_PASS();
+}
+
+static void test_integrity_verify_all_empty() {
+    TEST_BEGIN("IntegrityService verify_all on empty DB");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    IntegrityService integrity(item_repo);
+
+    auto result = integrity.verify_all();
+    ASSERT_EQ(result.items.size(), 0u);
+    ASSERT_EQ(result.valid_count, 0);
+    TEST_PASS();
+}
+
+// --- CategoryService tests ---
+
+static void test_category_create() {
+    TEST_BEGIN("CategoryService create and get");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    CategoryRepository cat_repo(db);
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    CategoryService svc(cat_repo, item_repo, act_repo);
+
+    auto cat = svc.create("Documents", "#ff0000", "Important docs");
+    ASSERT_TRUE(cat.id.size() > 0);
+    ASSERT_EQ(cat.name, "Documents");
+    ASSERT_EQ(cat.color, "#ff0000");
+
+    auto fetched = svc.get_by_id(cat.id);
+    ASSERT_TRUE(fetched.has_value());
+    ASSERT_EQ(fetched->name, "Documents");
+    TEST_PASS();
+}
+
+static void test_category_update() {
+    TEST_BEGIN("CategoryService update");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    CategoryRepository cat_repo(db);
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    CategoryService svc(cat_repo, item_repo, act_repo);
+
+    auto cat = svc.create("Old Name", "#000000");
+    svc.update(cat.id, "New Name", "#ffffff");
+
+    auto fetched = svc.get_by_id(cat.id);
+    ASSERT_TRUE(fetched.has_value());
+    ASSERT_EQ(fetched->name, "New Name");
+    ASSERT_EQ(fetched->color, "#ffffff");
+    TEST_PASS();
+}
+
+static void test_category_remove() {
+    TEST_BEGIN("CategoryService remove");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    CategoryRepository cat_repo(db);
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    CategoryService svc(cat_repo, item_repo, act_repo);
+
+    auto cat = svc.create("Temp");
+    svc.remove(cat.id);
+    auto fetched = svc.get_by_id(cat.id);
+    ASSERT_TRUE(!fetched.has_value());
+    TEST_PASS();
+}
+
+static void test_category_get_all() {
+    TEST_BEGIN("CategoryService get_all");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    CategoryRepository cat_repo(db);
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    CategoryService svc(cat_repo, item_repo, act_repo);
+
+    svc.create("A");
+    svc.create("B");
+    svc.create("C");
+    auto all = svc.get_all();
+    ASSERT_EQ(all.size(), 3u);
+    TEST_PASS();
+}
+
+// --- UpdateService tests ---
+
+static void test_update_move_to_trash() {
+    TEST_BEGIN("UpdateService move_to_trash");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    StorageManager storage(":", "test-items");
+    UpdateService svc(item_repo, act_repo, storage);
+
+    ArchiveItem item;
+    item.id = "upd-1"; item.name = "TrashMe"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 10; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    svc.move_to_trash("upd-1");
+    auto fetched = item_repo.find_by_id("upd-1");
+    ASSERT_TRUE(fetched.has_value());
+    ASSERT_EQ(fetched->status, ItemStatus::Deleted);
+    TEST_PASS();
+}
+
+static void test_update_restore() {
+    TEST_BEGIN("UpdateService restore_from_trash");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    StorageManager storage(":", "test-items");
+    UpdateService svc(item_repo, act_repo, storage);
+
+    ArchiveItem item;
+    item.id = "upd-2"; item.name = "RestoreMe"; item.type = ItemType::File;
+    item.status = ItemStatus::Deleted; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 10; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    svc.restore_from_trash("upd-2");
+    auto fetched = item_repo.find_by_id("upd-2");
+    ASSERT_TRUE(fetched.has_value());
+    ASSERT_EQ(fetched->status, ItemStatus::Archived);
+    TEST_PASS();
+}
+
+static void test_update_toggle_favorite() {
+    TEST_BEGIN("UpdateService toggle_favorite");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    StorageManager storage(":", "test-items");
+    UpdateService svc(item_repo, act_repo, storage);
+
+    ArchiveItem item;
+    item.id = "upd-3"; item.name = "FavMe"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 10; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    svc.toggle_favorite("upd-3");
+    auto fetched = item_repo.find_by_id("upd-3");
+    ASSERT_TRUE(fetched.has_value());
+    ASSERT_TRUE(fetched->is_favorite);
+
+    svc.toggle_favorite("upd-3");
+    fetched = item_repo.find_by_id("upd-3");
+    ASSERT_TRUE(!fetched->is_favorite);
+    TEST_PASS();
+}
+
 void run_service_tests() {
     std::cout << "=== Service Tests ===" << std::endl;
 
@@ -183,4 +393,14 @@ void run_service_tests() {
     test_search_filter_favorite();
     test_dashboard_stats();
     test_activity_log();
+    test_integrity_verify_item_missing();
+    test_integrity_verify_item_no_checksum();
+    test_integrity_verify_all_empty();
+    test_category_create();
+    test_category_update();
+    test_category_remove();
+    test_category_get_all();
+    test_update_move_to_trash();
+    test_update_restore();
+    test_update_toggle_favorite();
 }
