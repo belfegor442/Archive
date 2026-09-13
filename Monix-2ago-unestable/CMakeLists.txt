@@ -56,9 +56,6 @@ target_compile_definitions(monix_core PRIVATE
 # --- Main executable sources ---
 set(MAIN_SOURCES
     "${MONIX_NATIVE}/main.cpp"
-    "${MONIX_NATIVE}/Draw.cpp"
-    "${MONIX_NATIVE}/Telemetry.cpp"
-    "${MONIX_NATIVE}/Input.cpp"
     "${MONIX_LEAF}/src/native/vulkan_renderer.cpp"
     "${MONIX_LEAF}/src/native/renderer_vk_unity.cpp"
     "${MONIX_LEAF}/src/native/settings/SettingsRegistry.cpp"
@@ -101,7 +98,7 @@ set(SENSOR_SOURCES
 )
 
 # Windows resource file
-set(MONIX_RC "${MONIX_NATIVE}/resources.rc")
+set(MONIX_RC "${MONIX_LEAF}/src/native/resources.rc")
 
 add_executable(monix WIN32
     ${MAIN_SOURCES}
