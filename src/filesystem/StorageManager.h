@@ -14,12 +14,20 @@ public:
 
     std::string create_item_dir(const std::string& item_id);
     std::string store_file(const std::string& item_id, const std::string& source_path);
+    std::string store_file_in_dir(const std::string& item_id, const std::string& source_path,
+                                  const std::string& relative_path);
     std::string store_version(const std::string& item_id, int version, const std::string& source_path);
+    std::string store_folder(const std::string& item_id, const std::string& source_dir);
+
     std::string get_item_dir(const std::string& item_id) const;
     std::string get_item_file_dir(const std::string& item_id) const;
     std::string get_item_versions_dir(const std::string& item_id) const;
+
     void remove_item_dir(const std::string& item_id);
     void remove_version_file(const std::string& item_id, int version);
+
+    bool item_dir_exists(const std::string& item_id) const;
+    bool version_file_exists(const std::string& item_id, int version) const;
 
 private:
     std::string base_dir_;

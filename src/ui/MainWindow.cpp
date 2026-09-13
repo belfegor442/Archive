@@ -23,15 +23,16 @@ MainWindow::MainWindow(const archive::app::AppConfig& config, QWidget* parent)
     versions_ = std::make_unique<archive::storage::VersionRepository>(*db_);
     notes_ = std::make_unique<archive::storage::NoteRepository>(*db_);
     activities_ = std::make_unique<archive::storage::ActivityRepository>(*db_);
+    stored_objects_ = std::make_unique<archive::storage::StoredObjectRepository>(*db_);
     storage_ = std::make_unique<archive::filesystem::StorageManager>(config_.data_dir, config_.items_dir);
     detector_ = std::make_unique<archive::services::ProjectDetector>();
-    import_svc_ = std::make_unique<archive::services::ImportService>(*items_, *categories_, *tags_, *activities_, *versions_, *storage_, *detector_);
+    import_svc_ = std::make_unique<archive::services::ImportService>(*items_, *categories_, *tags_, *activities_, *versions_, *stored_objects_, *storage_, *detector_);
     search_svc_ = std::make_unique<archive::services::SearchService>(*items_);
     dashboard_svc_ = std::make_unique<archive::services::DashboardService>(*items_);
     note_svc_ = std::make_unique<archive::services::NoteService>(*notes_, *items_, *activities_);
-    version_svc_ = std::make_unique<archive::services::VersionService>(*versions_, *items_, *activities_, *storage_);
+    version_svc_ = std::make_unique<archive::services::VersionService>(*versions_, *items_, *activities_, *stored_objects_, *storage_);
     activity_svc_ = std::make_unique<archive::services::ActivityService>(*activities_);
-    integrity_svc_ = std::make_unique<archive::services::IntegrityService>(*items_);
+    integrity_svc_ = std::make_unique<archive::services::IntegrityService>(*items_, *versions_, *stored_objects_, *storage_);
     category_svc_ = std::make_unique<archive::services::CategoryService>(*categories_, *items_, *activities_);
     update_svc_ = std::make_unique<archive::services::UpdateService>(*items_, *activities_, *storage_);
 

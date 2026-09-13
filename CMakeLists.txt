@@ -47,6 +47,7 @@ set(ARCHIVE_LIB_SOURCES
     src/storage/VersionRepository.cpp
     src/storage/NoteRepository.cpp
     src/storage/ActivityRepository.cpp
+    src/storage/StoredObjectRepository.cpp
     src/hashing/FileHasher.cpp
     src/filesystem/FileUtils.cpp
     src/filesystem/StorageManager.cpp

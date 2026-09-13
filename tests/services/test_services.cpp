@@ -17,6 +17,7 @@
 #include "storage/VersionRepository.h"
 #include "storage/NoteRepository.h"
 #include "storage/ActivityRepository.h"
+#include "storage/StoredObjectRepository.h"
 #include "filesystem/StorageManager.h"
 #include "hashing/FileHasher.h"
 #include "core/enums/ItemType.h"
@@ -189,7 +190,10 @@ static void test_integrity_verify_item_missing() {
     DatabaseManager db(":memory:");
     db.initialize();
     ArchiveItemRepository item_repo(db);
-    IntegrityService integrity(item_repo);
+    VersionRepository ver_repo(db);
+    StoredObjectRepository so_repo(db);
+    StorageManager storage(":", "test-items");
+    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
 
     ArchiveItem item;
     item.id = "int-missing"; item.name = "Missing"; item.type = ItemType::File;
@@ -211,7 +215,10 @@ static void test_integrity_verify_item_no_checksum() {
     DatabaseManager db(":memory:");
     db.initialize();
     ArchiveItemRepository item_repo(db);
-    IntegrityService integrity(item_repo);
+    VersionRepository ver_repo(db);
+    StoredObjectRepository so_repo(db);
+    StorageManager storage(":", "test-items");
+    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
 
     ArchiveItem item;
     item.id = "int-nocs"; item.name = "NoCS"; item.type = ItemType::File;
@@ -232,7 +239,10 @@ static void test_integrity_verify_all_empty() {
     DatabaseManager db(":memory:");
     db.initialize();
     ArchiveItemRepository item_repo(db);
-    IntegrityService integrity(item_repo);
+    VersionRepository ver_repo(db);
+    StoredObjectRepository so_repo(db);
+    StorageManager storage(":", "test-items");
+    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
 
     auto result = integrity.verify_all();
     ASSERT_EQ(result.items.size(), 0u);
@@ -560,11 +570,16 @@ static void test_note_update() {
     item_repo.insert(item);
 
     auto note = svc.add("item-n2", "Original");
+
+    auto check1 = note_repo.find_by_note_id(note.id);
+    ASSERT_TRUE(check1.has_value());
+    ASSERT_EQ(check1->content, "Original");
+
     svc.update(note.id, "Updated content");
 
-    auto notes = svc.get_notes("item-n2");
-    ASSERT_EQ(notes.size(), 1u);
-    ASSERT_EQ(notes[0].content, "Updated content");
+    auto check2 = note_repo.find_by_note_id(note.id);
+    ASSERT_TRUE(check2.has_value());
+    ASSERT_EQ(check2->content, "Updated content");
     TEST_PASS();
 }
 
@@ -601,8 +616,9 @@ static void test_version_create_and_get() {
     ArchiveItemRepository item_repo(db);
     VersionRepository ver_repo(db);
     ActivityRepository act_repo(db);
+    StoredObjectRepository so_repo(db);
     StorageManager storage(":", "test-items");
-    VersionService svc(ver_repo, item_repo, act_repo, storage);
+    VersionService svc(ver_repo, item_repo, act_repo, so_repo, storage);
 
     ArchiveItem item;
     item.id = "item-v1"; item.name = "Versioned"; item.type = ItemType::File;

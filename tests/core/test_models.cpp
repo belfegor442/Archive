@@ -130,9 +130,10 @@ static void test_activity() {
 
 static void test_stored_object() {
     TEST_BEGIN("StoredObject construction");
-    StoredObject obj("so-1", "item-1", "/storage/files", 4096, "checksum", "2025-01-01T00:00:00Z");
+    StoredObject obj("so-1", "item-1", "ver-1", "/storage/files", 4096, "checksum", "2025-01-01T00:00:00Z");
     ASSERT_EQ(obj.id, "so-1");
     ASSERT_EQ(obj.item_id, "item-1");
+    ASSERT_EQ(obj.version_id, "ver-1");
     ASSERT_EQ(obj.storage_path, "/storage/files");
     ASSERT_EQ(obj.size, 4096u);
     ASSERT_EQ(obj.checksum, "checksum");

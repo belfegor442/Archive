@@ -8,6 +8,7 @@ add_executable(archive_tests
     storage/test_database.cpp
     hashing/test_hasher.cpp
     services/test_services.cpp
+    integration/test_import_flow.cpp
 )
 
 target_link_libraries(archive_tests PRIVATE archive_lib)

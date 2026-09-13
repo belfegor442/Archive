@@ -10,6 +10,7 @@
 #include "../storage/VersionRepository.h"
 #include "../storage/NoteRepository.h"
 #include "../storage/ActivityRepository.h"
+#include "../storage/StoredObjectRepository.h"
 #include "../filesystem/StorageManager.h"
 #include "../services/ImportService.h"
 #include "../services/SearchService.h"
@@ -53,6 +54,7 @@ private:
     std::unique_ptr<archive::storage::VersionRepository> versions_;
     std::unique_ptr<archive::storage::NoteRepository> notes_;
     std::unique_ptr<archive::storage::ActivityRepository> activities_;
+    std::unique_ptr<archive::storage::StoredObjectRepository> stored_objects_;
     std::unique_ptr<archive::filesystem::StorageManager> storage_;
     std::unique_ptr<archive::services::ProjectDetector> detector_;
     std::unique_ptr<archive::services::ImportService> import_svc_;

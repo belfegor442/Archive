@@ -13,6 +13,7 @@
 #include "../storage/TagRepository.h"
 #include "../storage/ActivityRepository.h"
 #include "../storage/VersionRepository.h"
+#include "../storage/StoredObjectRepository.h"
 #include "../hashing/FileHasher.h"
 #include "../filesystem/StorageManager.h"
 #include "ProjectDetector.h"
@@ -27,6 +28,7 @@ public:
         storage::TagRepository& tags,
         storage::ActivityRepository& activities,
         storage::VersionRepository& versions,
+        storage::StoredObjectRepository& stored_objects,
         filesystem::StorageManager& storage,
         ProjectDetector& detector
     );
@@ -41,10 +43,12 @@ private:
     storage::TagRepository& tags_;
     storage::ActivityRepository& activities_;
     storage::VersionRepository& versions_;
+    storage::StoredObjectRepository& stored_objects_;
     filesystem::StorageManager& storage_;
     ProjectDetector& detector_;
 
     core::ArchiveItem create_item_from_path(const std::string& path, const std::optional<std::string>& category_id);
+    void rollback_filesystem(const std::string& item_id);
 };
 
 } // namespace archive::services

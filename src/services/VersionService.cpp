@@ -10,21 +10,32 @@ VersionService::VersionService(
     storage::VersionRepository& versions,
     storage::ArchiveItemRepository& items,
     storage::ActivityRepository& activities,
+    storage::StoredObjectRepository& stored_objects,
     filesystem::StorageManager& storage
 ) : versions_(versions)
   , items_(items)
   , activities_(activities)
+  , stored_objects_(stored_objects)
   , storage_(storage)
 {}
 
-core::Version VersionService::create_version(const std::string& item_id, const std::string& file_path, const std::string& notes) {
+core::Version VersionService::create_version(const std::string& item_id, const std::string& file_path,
+                                              const std::string& notes) {
     auto item = items_.find_by_id(item_id);
     if (!item) throw std::runtime_error("Item not found: " + item_id);
 
     int new_version = item->current_version + 1;
     std::string stored_path = storage_.store_version(item_id, new_version, file_path);
-    std::string checksum = hashing::FileHasher::hash_file(file_path);
-    uint64_t size = filesystem::FileUtils::file_size(file_path);
+
+    std::string checksum;
+    uint64_t size = 0;
+    if (item->type == core::ItemType::File) {
+        checksum = hashing::FileHasher::hash_file(file_path);
+        size = filesystem::FileUtils::file_size(file_path);
+    } else {
+        checksum = hashing::FileHasher::hash_folder(file_path);
+        size = filesystem::FileUtils::total_size(file_path);
+    }
 
     core::Version ver;
     ver.id = core::utils::generate_id();
@@ -38,6 +49,16 @@ core::Version VersionService::create_version(const std::string& item_id, const s
 
     versions_.insert(ver);
     items_.increment_version(item_id);
+
+    core::StoredObject so;
+    so.id = core::utils::generate_id();
+    so.item_id = item_id;
+    so.version_id = ver.id;
+    so.storage_path = stored_path;
+    so.size = size;
+    so.checksum = checksum;
+    so.created_at = core::utils::now_iso();
+    stored_objects_.insert(so);
 
     core::Activity act;
     act.id = core::utils::generate_id();
@@ -72,7 +93,12 @@ void VersionService::restore(const std::string& item_id, const std::string& vers
     std::string item_file_dir = storage_.get_item_file_dir(item_id);
     std::string original_name = filesystem::FileUtils::file_name(item->original_path);
     std::string dest = item_file_dir + "/" + original_name;
-    std::filesystem::copy_file(ver->storage_path, dest, std::filesystem::copy_options::overwrite_existing);
+    if (std::filesystem::exists(dest)) {
+        dest = filesystem::FileUtils::unique_path(item_file_dir,
+            filesystem::FileUtils::stem(item->original_path) + "_v" + std::to_string(ver->version_number),
+            filesystem::FileUtils::extension(item->original_path));
+    }
+    std::filesystem::copy_file(ver->storage_path, dest);
 
     item->storage_path = dest;
     item->checksum = ver->checksum;
@@ -80,6 +106,16 @@ void VersionService::restore(const std::string& item_id, const std::string& vers
     item->current_version = ver->version_number;
     item->last_modified_at = core::utils::now_iso();
     items_.update(*item);
+
+    core::StoredObject so;
+    so.id = core::utils::generate_id();
+    so.item_id = item_id;
+    so.version_id = ver->id;
+    so.storage_path = dest;
+    so.size = ver->size;
+    so.checksum = ver->checksum;
+    so.created_at = core::utils::now_iso();
+    stored_objects_.insert(so);
 
     core::Activity act;
     act.id = core::utils::generate_id();

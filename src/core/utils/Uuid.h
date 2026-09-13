@@ -6,19 +6,21 @@
 #include <iomanip>
 #include <chrono>
 #include <cstdint>
-#include <limits>
+#include <array>
 
 namespace archive::core::utils {
 
 inline std::string generate_id() {
     static std::random_device rd;
     static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<uint64_t> dis(0, std::numeric_limits<uint64_t>::max());
+    static std::uniform_int_distribution<int> dis(0, 255);
+
     std::ostringstream oss;
-    oss << std::hex << dis(gen) << dis(gen);
-    std::string id = oss.str();
-    id.resize(32);
-    return id;
+    oss << std::hex << std::setfill('0');
+    for (int i = 0; i < 16; i++) {
+        oss << std::setw(2) << dis(gen);
+    }
+    return oss.str();
 }
 
 inline std::string now_iso() {

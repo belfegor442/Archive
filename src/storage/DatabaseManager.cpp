@@ -25,12 +25,17 @@ void DatabaseManager::initialize() {
         throw std::runtime_error(err);
     }
 
+    sqlite3_busy_timeout(db_, 5000);
     enable_wal();
     create_schema();
 }
 
 void DatabaseManager::close() {
     if (db_) {
+        if (txn_depth_ > 0) {
+            sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+            txn_depth_ = 0;
+        }
         sqlite3_close(db_);
         db_ = nullptr;
     }
@@ -41,20 +46,37 @@ void DatabaseManager::execute(const std::string& sql) {
     int rc = sqlite3_exec(db_, sql.c_str(), nullptr, nullptr, &err);
     if (rc != SQLITE_OK) {
         std::string error = err ? err : "Unknown error";
+        int code = rc;
         sqlite3_free(err);
-        throw std::runtime_error("SQL error: " + error);
+        throw std::runtime_error(
+            "SQL error (rc=" + std::to_string(code) + "): " + error
+            + " [SQL: " + sql.substr(0, 120) + "]"
+        );
     }
 }
 
 void DatabaseManager::begin_transaction() {
-    execute("BEGIN TRANSACTION");
+    if (txn_depth_ == 0) {
+        execute("BEGIN IMMEDIATE");
+    }
+    txn_depth_++;
 }
 
 void DatabaseManager::commit() {
-    execute("COMMIT");
+    if (txn_depth_ <= 0) {
+        throw std::runtime_error("commit() called without active transaction");
+    }
+    txn_depth_--;
+    if (txn_depth_ == 0) {
+        execute("COMMIT");
+    }
 }
 
 void DatabaseManager::rollback() {
+    if (txn_depth_ <= 0) {
+        throw std::runtime_error("rollback() called without active transaction");
+    }
+    txn_depth_ = 0;
     execute("ROLLBACK");
 }
 
@@ -63,6 +85,7 @@ void DatabaseManager::enable_wal() {
         execute("PRAGMA journal_mode=WAL");
     }
     execute("PRAGMA foreign_keys=ON");
+    execute("PRAGMA busy_timeout=5000");
 }
 
 void DatabaseManager::create_schema() {
@@ -152,6 +175,7 @@ void DatabaseManager::create_schema() {
         CREATE TABLE IF NOT EXISTS stored_objects (
             id TEXT PRIMARY KEY,
             item_id TEXT NOT NULL REFERENCES archive_items(id) ON DELETE CASCADE,
+            version_id TEXT,
             storage_path TEXT NOT NULL,
             size INTEGER NOT NULL DEFAULT 0,
             checksum TEXT DEFAULT '',
@@ -167,12 +191,17 @@ void DatabaseManager::create_schema() {
     execute("CREATE INDEX IF NOT EXISTS idx_notes_item ON notes(item_id)");
     execute("CREATE INDEX IF NOT EXISTS idx_activity_item ON activity_log(item_id)");
     execute("CREATE INDEX IF NOT EXISTS idx_stored_objects_item ON stored_objects(item_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_stored_objects_version ON stored_objects(version_id)");
 }
 
 DatabaseManager::Statement::Statement(sqlite3* db, const std::string& sql) {
     int rc = sqlite3_prepare_v2(db, sql.c_str(), static_cast<int>(sql.size()), &stmt_, nullptr);
     if (rc != SQLITE_OK) {
-        throw std::runtime_error("Failed to prepare statement: " + std::string(sqlite3_errmsg(db)));
+        throw std::runtime_error(
+            "Failed to prepare statement (rc=" + std::to_string(rc) + "): "
+            + std::string(sqlite3_errmsg(db))
+            + " [SQL: " + sql.substr(0, 120) + "]"
+        );
     }
 }
 
@@ -180,34 +209,78 @@ DatabaseManager::Statement::~Statement() {
     if (stmt_) sqlite3_finalize(stmt_);
 }
 
+DatabaseManager::Statement::Statement(Statement&& other) noexcept
+    : stmt_(other.stmt_)
+    , last_rc_(other.last_rc_)
+{
+    other.stmt_ = nullptr;
+    other.last_rc_ = SQLITE_OK;
+}
+
+DatabaseManager::Statement& DatabaseManager::Statement::operator=(Statement&& other) noexcept {
+    if (this != &other) {
+        if (stmt_) sqlite3_finalize(stmt_);
+        stmt_ = other.stmt_;
+        last_rc_ = other.last_rc_;
+        other.stmt_ = nullptr;
+        other.last_rc_ = SQLITE_OK;
+    }
+    return *this;
+}
+
 void DatabaseManager::Statement::bind_int(int index, int value) {
-    sqlite3_bind_int(stmt_, index, value);
+    int rc = sqlite3_bind_int(stmt_, index, value);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("bind_int failed (rc=" + std::to_string(rc) + ")");
+    }
 }
 
 void DatabaseManager::Statement::bind_int64(int index, int64_t value) {
-    sqlite3_bind_int64(stmt_, index, value);
+    int rc = sqlite3_bind_int64(stmt_, index, value);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("bind_int64 failed (rc=" + std::to_string(rc) + ")");
+    }
 }
 
 void DatabaseManager::Statement::bind_text(int index, const std::string& value) {
-    sqlite3_bind_text(stmt_, index, value.c_str(), static_cast<int>(value.size()), SQLITE_TRANSIENT);
+    int rc = sqlite3_bind_text(stmt_, index, value.c_str(), static_cast<int>(value.size()), SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("bind_text failed (rc=" + std::to_string(rc) + ")");
+    }
 }
 
 void DatabaseManager::Statement::bind_text_null(int index) {
-    sqlite3_bind_null(stmt_, index);
+    int rc = sqlite3_bind_null(stmt_, index);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("bind_text_null failed (rc=" + std::to_string(rc) + ")");
+    }
 }
 
 void DatabaseManager::Statement::bind_blob(int index, const void* data, int size) {
-    sqlite3_bind_blob(stmt_, index, data, size, SQLITE_TRANSIENT);
+    int rc = sqlite3_bind_blob(stmt_, index, data, size, SQLITE_TRANSIENT);
+    if (rc != SQLITE_OK) {
+        throw std::runtime_error("bind_blob failed (rc=" + std::to_string(rc) + ")");
+    }
 }
 
 bool DatabaseManager::Statement::step() {
-    int rc = sqlite3_step(stmt_);
-    return rc == SQLITE_ROW;
+    last_rc_ = sqlite3_step(stmt_);
+    if (last_rc_ == SQLITE_ROW) return true;
+    if (last_rc_ == SQLITE_DONE) return false;
+    throw std::runtime_error(
+        "step() failed (rc=" + std::to_string(last_rc_) + "): "
+        + std::string(sqlite3_errmsg(sqlite3_db_handle(stmt_)))
+    );
 }
 
 bool DatabaseManager::Statement::step_done() {
-    int rc = sqlite3_step(stmt_);
-    return rc == SQLITE_DONE;
+    last_rc_ = sqlite3_step(stmt_);
+    if (last_rc_ == SQLITE_DONE) return true;
+    if (last_rc_ == SQLITE_ROW) return false;
+    throw std::runtime_error(
+        "step_done() failed (rc=" + std::to_string(last_rc_) + "): "
+        + std::string(sqlite3_errmsg(sqlite3_db_handle(stmt_)))
+    );
 }
 
 int DatabaseManager::Statement::column_int(int col) const {
@@ -242,6 +315,52 @@ void DatabaseManager::Statement::reset() {
 
 DatabaseManager::Statement DatabaseManager::prepare(const std::string& sql) {
     return Statement(db_, sql);
+}
+
+void DatabaseManager::check_rc(int rc, const std::string& context) {
+    if (rc != SQLITE_OK && rc != SQLITE_DONE && rc != SQLITE_ROW) {
+        throw std::runtime_error(
+            context + " failed (rc=" + std::to_string(rc) + "): "
+            + std::string(sqlite3_errmsg(db_))
+        );
+    }
+}
+
+std::string DatabaseManager::rc_to_string(int rc) {
+    switch (rc) {
+        case SQLITE_OK:         return "SQLITE_OK";
+        case SQLITE_ERROR:      return "SQLITE_ERROR";
+        case SQLITE_INTERNAL:   return "SQLITE_INTERNAL";
+        case SQLITE_PERM:       return "SQLITE_PERM";
+        case SQLITE_ABORT:      return "SQLITE_ABORT";
+        case SQLITE_BUSY:       return "SQLITE_BUSY";
+        case SQLITE_LOCKED:     return "SQLITE_LOCKED";
+        case SQLITE_NOMEM:      return "SQLITE_NOMEM";
+        case SQLITE_READONLY:   return "SQLITE_READONLY";
+        case SQLITE_INTERRUPT:  return "SQLITE_INTERRUPT";
+        case SQLITE_IOERR:      return "SQLITE_IOERR";
+        case SQLITE_CORRUPT:    return "SQLITE_CORRUPT";
+        case SQLITE_NOTFOUND:   return "SQLITE_NOTFOUND";
+        case SQLITE_FULL:       return "SQLITE_FULL";
+        case SQLITE_CANTOPEN:   return "SQLITE_CANTOPEN";
+        case SQLITE_PROTOCOL:   return "SQLITE_PROTOCOL";
+        case SQLITE_EMPTY:      return "SQLITE_EMPTY";
+        case SQLITE_SCHEMA:     return "SQLITE_SCHEMA";
+        case SQLITE_TOOBIG:     return "SQLITE_TOOBIG";
+        case SQLITE_CONSTRAINT: return "SQLITE_CONSTRAINT";
+        case SQLITE_MISMATCH:   return "SQLITE_MISMATCH";
+        case SQLITE_MISUSE:     return "SQLITE_MISUSE";
+        case SQLITE_NOLFS:      return "SQLITE_NOLFS";
+        case SQLITE_AUTH:       return "SQLITE_AUTH";
+        case SQLITE_FORMAT:     return "SQLITE_FORMAT";
+        case SQLITE_RANGE:      return "SQLITE_RANGE";
+        case SQLITE_NOTADB:     return "SQLITE_NOTADB";
+        case SQLITE_NOTICE:     return "SQLITE_NOTICE";
+        case SQLITE_WARNING:    return "SQLITE_WARNING";
+        case SQLITE_ROW:        return "SQLITE_ROW";
+        case SQLITE_DONE:       return "SQLITE_DONE";
+        default:                return "UNKNOWN(" + std::to_string(rc) + ")";
+    }
 }
 
 } // namespace archive::storage
