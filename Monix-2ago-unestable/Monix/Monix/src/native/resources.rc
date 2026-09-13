@@ -1,0 +1,32 @@
+#include <windows.h>
+
+// The executable icon is applied post-build with rcedit in build.ps1.
+
+VS_VERSION_INFO VERSIONINFO
+  FILEVERSION 1,0,0,0
+  PRODUCTVERSION 1,0,0,0
+  FILEFLAGSMASK 0x3fL
+  FILEFLAGS 0x0L
+  FILEOS VOS__WINDOWS32
+  FILETYPE VFT_APP
+  FILESUBTYPE 0x0L
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "Monix"
+      VALUE "FileDescription", "Monix - Advanced System Monitor"
+      VALUE "FileVersion", "1.0.0.0"
+      VALUE "InternalName", "Monix.exe"
+      VALUE "LegalCopyright", "Copyright (C) 2024"
+      VALUE "OriginalFilename", "Monix.exe"
+      VALUE "ProductName", "Monix"
+      VALUE "ProductVersion", "1.0.0.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

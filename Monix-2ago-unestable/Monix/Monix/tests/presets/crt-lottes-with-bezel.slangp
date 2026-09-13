@@ -1,0 +1,101 @@
+shaders = 8
+
+# ============================================================
+# Pass 0 - Info Cache (computes screen geometry for bezel)
+# ============================================================
+shader0 = ../bezel/base/info-cache.slang
+alias0 = InfoCachePass
+scale_type0 = source
+scale0 = 1
+filter_linear0 = false
+
+# ============================================================
+# Pass 1 - Stock passthrough (original game frame)
+# ============================================================
+shader1 = ../CRT/stock.slang
+alias1 = Reference
+filter_linear1 = false
+
+# ============================================================
+# Pass 2 - Bloom pass
+# ============================================================
+shader2 = ../CRT/shaders/crt-lottes-multipass/bloompass.slang
+alias2 = BloomPass
+filter_linear2 = true
+
+# ============================================================
+# Pass 3 - Scanlines (CRT final output)
+# ============================================================
+shader3 = ../CRT/shaders/crt-lottes-multipass/scanpass.slang
+alias3 = CRTOut
+filter_linear3 = true
+scale_type3 = viewport
+
+# ============================================================
+# Pass 4 - Post CRT Prep (tube, gel, shadow, Sinden border)
+# ============================================================
+shader4 = ../bezel/base/post-crt-prep-no-reflect.slang
+alias4 = PostCRTPass
+filter_linear4 = true
+
+# ============================================================
+# Pass 5 - Bezel layers under CRT
+# ============================================================
+shader5 = ../bezel/base/bezel-images-under-crt.slang
+alias5 = BR_LayersUnderCRTPass
+filter_linear5 = true
+
+# ============================================================
+# Pass 6 - Bezel layers over CRT
+# ============================================================
+shader6 = ../bezel/base/bezel-images-over-crt.slang
+alias6 = BR_LayersOverCRTPass
+filter_linear6 = true
+
+# ============================================================
+# Pass 7 - Combine all layers + SDR output
+# ============================================================
+shader7 = ../bezel/base/combine-passes-no-reflect.slang
+filter_linear7 = true
+scale_type7 = viewport
+
+# ============================================================
+# External textures (aliases start at 8, after last pass)
+# ============================================================
+textures = 9
+
+texture0 = ../bezel/textures/Tube_Diffuse_2390x1792.png
+alias8 = TubeDiffuseImage
+filter_linear8 = true
+
+texture1 = ../bezel/textures/Tube_Shadow_1600x1200.png
+alias9 = TubeShadowImage
+filter_linear9 = true
+
+texture2 = ../bezel/textures/TubeGlassOverlayImage_3840x2160.png
+alias10 = TubeColoredGelImage
+filter_linear10 = true
+
+texture3 = ../bezel/textures/TubeGlassOverlayImage_3840x2160.png
+alias11 = TubeStaticReflectionImage
+filter_linear11 = true
+
+texture4 = ../bezel/textures/BackgroundImage_Carbon_3840x2160.png
+alias12 = BackgroundImage
+filter_linear12 = true
+
+texture5 = ../bezel/textures/BackgroundImage_Carbon_3840x2160.png
+alias13 = BackgroundVertImage
+filter_linear13 = true
+
+texture6 = ../bezel/textures/NightLightingFar_1920x1080.png
+alias14 = NightLightingImage
+filter_linear14 = true
+
+texture7 = ../bezel/textures/NightLightingClose_1920x1080.png
+alias15 = NightLighting2Image
+filter_linear15 = true
+
+texture8 = ../bezel/textures/FrameTexture_2800x2120.png
+alias16 = FrameTextureImage
+filter_linear16 = true

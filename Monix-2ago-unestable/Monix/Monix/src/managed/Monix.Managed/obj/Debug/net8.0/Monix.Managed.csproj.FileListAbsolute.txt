@@ -1,0 +1,12 @@
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\obj\Debug\net8.0\Monix.Managed.csproj.AssemblyReference.cache
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\obj\Debug\net8.0\Monix.Managed.GeneratedMSBuildEditorConfig.editorconfig
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\obj\Debug\net8.0\Monix.Managed.AssemblyInfoInputs.cache
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\obj\Debug\net8.0\Monix.Managed.AssemblyInfo.cs
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\obj\Debug\net8.0\Monix.Managed.csproj.CoreCompileInputs.cache
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\bin\Debug\net8.0\Monix.Managed.deps.json
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\bin\Debug\net8.0\Monix.Managed.dll
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\bin\Debug\net8.0\Monix.Managed.pdb
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\obj\Debug\net8.0\Monix.Managed.dll
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\obj\Debug\net8.0\refint\Monix.Managed.dll
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\obj\Debug\net8.0\Monix.Managed.pdb
+D:\Monix-10sept-stable\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\managed\Monix.Managed\obj\Debug\net8.0\ref\Monix.Managed.dll

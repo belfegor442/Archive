@@ -1,0 +1,7 @@
+shaders = 1
+
+shader0 = tests/test_param.frag
+alias0 = Output
+
+parameters = TEST_EFFECT
+TEST_EFFECT = 1

@@ -1,0 +1,20 @@
+#version 450
+
+layout(location = 0) in vec2 position;
+layout(location = 1) in vec2 texCoord;
+
+layout(push_constant) uniform PushConstants {
+    vec4 SourceSize;
+    vec4 OriginalSize;
+    vec4 OutputSize;
+    vec4 OriginalViewportSize;
+    uint FrameCount;
+    int FrameDirection;
+} pc;
+
+layout(location = 0) out vec2 v_texCoord;
+
+void main() {
+    gl_Position = vec4(position, 0.0, 1.0);
+    v_texCoord = texCoord;
+}

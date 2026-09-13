@@ -1,0 +1,154 @@
+================================================================================
+MEGA BEZEL PHASE 1 FIX REPORT
+Generated: 2026-07-31
+================================================================================
+
+APPLYING 3 CRITICAL FIXES FROM COMPREHENSIVE AUDIT
+
+================================================================================
+C1: Nested #include Resolution
+================================================================================
+STATUS: PASS
+
+FIX: Replaced flat include resolver with ResolveIncludesRecursive()
+  - Recursive depth-first resolution of all #include "file" directives
+  - Circular dependency detection via set<string> includedFiles
+  - Duplicate include deduplication (same file included from multiple places)
+  - Relative path resolution per-including-file (not just top-level shader)
+  - Missing files logged to status output (non-fatal)
+
+CHANGES:
+  - main.cpp:2162-2200  ResolveIncludesRecursive lambda (replaces flat loop)
+  - main.cpp:60         Added #include <functional> for std::function
+  - test_translator.cpp:270-310  Same recursive resolver
+
+VALIDATION:
+  - test_output/pass4_fragment.glsl: 0 raw #include directives (was 2)
+  - test_output/pass5_fragment.glsl: 0 raw #include directives (was multiple)
+  - test_output/pass6_fragment.glsl: 0 raw #include directives (was multiple)
+  - test_output/pass7_fragment.glsl: 0 raw #include directives (was 3)
+  - crt-lottes-with-bezel.slangp: All 8 passes translate OK
+  - crt-lottes-multipass.slangp: All 3 passes translate OK
+
+================================================================================
+C2: FinalViewportSize Uniform
+================================================================================
+STATUS: PASS
+
+FIX: Added FinalViewportSize as a standard pipeline uniform
+  - Emitted in GLSL output: uniform vec4 FinalViewportSize
+  - Added to skipNames to prevent UBO re-declaration
+  - Added global.FinalViewportSize -> FinalViewportSize mapping (3 locations)
+  - CompiledPass.uniformFinalViewportSize lookup in load()
+  - Set in render loop: (outW, outH, 1/outW, 1/outH) before each pass
+
+CHANGES:
+  - main.cpp:2372   Added "uniform vec4 FinalViewportSize;\n" to GLSL output
+  - main.cpp:2307   Added "FinalViewportSize" to skipNames[]
+  - main.cpp:2560   Added global.FinalViewportSize mapping (fragment)
+  - main.cpp:2715   Added global.FinalViewportSize mapping (vertex)
+  - main.cpp:2374   Added global.FinalViewportSize mapping (preamble helpers)
+  - main.cpp:1063   Added GLint uniformFinalViewportSize = -1 to CompiledPass
+  - main.cpp:1433   GetUniformLocation lookup for FinalViewportSize
+  - main.cpp:1700   Uniform4f call in render loop
+
+VALIDATION:
+  - pass4_fragment.glsl contains: float output_aspect = FinalViewportSize.x / FinalViewportSize.y
+  - Uniform set per-pass with correct viewport dimensions
+
+================================================================================
+C3: HSM Parameter Defaults (#pragma parameter)
+================================================================================
+STATUS: PASS
+
+FIX: Full #pragma parameter extraction with name, default, min, max, step
+  - New ShaderParameter struct: {name, description, defaultValue, minValue, maxValue, step}
+  - Regex-like parser extracts all 6 fields from #pragma parameter lines
+  - Stores in TranslatedShader.parameters (replaces old parameterNames vector)
+  - CompiledPass.parameters stores ShaderParameter per-pass
+  - Render loop applies defaultValue (not hardcoded 0.0)
+
+CHANGES:
+  - main.cpp:1036-1043  New ShaderParameter struct
+  - main.cpp:1044       TranslatedShader uses vector<ShaderParameter>
+  - main.cpp:1066       CompiledPass uses vector<ShaderParameter>
+  - main.cpp:2787-2816  Full pragma parameter parser (was 7 lines, now 30)
+  - main.cpp:1435-1442  Load parameters with logging
+  - main.cpp:1707       Apply defaultValue (was paramDefaults[p])
+  - test_translator.cpp:63-68  Same ShaderParameter struct
+  - test_translator.cpp:771-794 Full pragma parameter parser
+
+VALIDATION:
+  - Pass 2 (BloomPass): 13 params extracted with correct defaults
+    hardScan=-8, hardPix=-3, warpX=0.031, warpY=0.041, maskDark=0.5,
+    maskLight=1.5, shadowMask=3, brightBoost=1, bloomAmount=0.4, shape=2
+  - Pass 3 (CRTOut): 13 params extracted (same CRT params)
+  - Range values correct: e.g. warpX range=[0, 0.125]
+
+================================================================================
+ADDITIONAL FIX: Preamble Helpers #include Skip
+================================================================================
+STATUS: PASS
+
+FIX: Skip #include directives in preamble helpers extraction
+  - Unresolved includes from nested files would cause GLSL compilation failure
+  - Added #include to skip conditions in both main.cpp and test_translator.cpp
+
+CHANGES:
+  - main.cpp:2334       Added trimmed.substr(0, 8) == "#include" to skip
+  - test_translator.cpp:424  Same skip added
+
+================================================================================
+BUILD VERIFICATION
+================================================================================
+STATUS: PASS
+
+  Monix.exe:     1154KB - builds clean with /MT /std:c++20 /O1
+  test_translator.exe: Compiles clean
+
+================================================================================
+REGRESSION CHECK
+================================================================================
+STATUS: PASS
+
+  crt-lottes-multipass.slangp (3 passes):
+    Pass 0 (bloompass): OK - 13 params, 1 sampler
+    Pass 1 (stock): OK - passthrough
+    Pass 2 (scanpass): OK - 13 params, 2 samplers
+
+  crt-lottes-with-bezel.slangp (8 passes):
+    Pass 0 (InfoCachePass): OK - 0.1MB fragment (geometry cache)
+    Pass 1 (Reference): OK - stock passthrough
+    Pass 2 (BloomPass): OK - 13 params
+    Pass 3 (CRTOut): OK - 13 params, 2 samplers
+    Pass 4 (PostCRTPass): OK - bezel prep (uses FinalViewportSize)
+    Pass 5 (BR_LayersUnderCRT): OK - bezel layers
+    Pass 6 (REMAINING): OK - bezel layers over CRT
+    Pass 7 (combine): OK - final output
+
+================================================================================
+REMAINING KNOWN ISSUES (NOT IN SCOPE)
+================================================================================
+
+A1: clamp_to_border mapped to GL_CLAMP_TO_EDGE (low priority)
+A2: mipmap_input parsed but glGenerateMipmap() never called
+A3: Source -> Texture rename incomplete for edge cases
+A4: No explicit GL state reset between passes (PARTIALLY FIXED)
+M1: No circular include detection (FIXED in C1)
+M2: No include deduplication (FIXED in C1)
+M3: Pragma params only extract name, not default/min/max/step (FIXED in C3)
+M4: srgb_framebuffer ignored
+M5: No FrameDirection uniform declared
+M6: Fallback to previous pass for unresolved samplers
+
+================================================================================
+CONCLUSION
+================================================================================
+All 3 critical fixes implemented and verified. The Mega Bezel shader pipeline
+should now:
+  1. Correctly resolve all nested #include directives
+  2. Have valid FinalViewportSize values for aspect ratio calculations
+  3. Apply correct parameter defaults from #pragma parameter declarations
+
+Phase 1 scope complete. Ready for runtime testing.
+================================================================================

@@ -1,0 +1,10 @@
+shaders = 1
+textures = 1
+
+shader0 = tests/test_external.frag
+alias0 = Output
+
+texture0 = textures/test_lut.png
+filter_linear0 = true
+wrap_mode0 = clamp_to_edge
+mipmap0 = false

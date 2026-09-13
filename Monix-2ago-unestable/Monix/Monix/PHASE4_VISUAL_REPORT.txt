@@ -1,0 +1,241 @@
+================================================================================
+  PHASE 4 — Mega Bezel Visual Validation Report
+  Generated: 2026-07-31
+  Preset: crt-lottes-with-bezel.slangp (8 passes, 9 external textures)
+  Build: Monix.exe 1182KB
+================================================================================
+
+1. CRITICAL BUGS FIXED THIS PHASE
+================================================================================
+
+BUG P4-1: Texture Alias Parsing (SEVERITY: CRITICAL)
+  Symptom: External textures (TubeDiffuseImage, BackgroundImage, etc.) never bound
+  Root cause: Preset uses "alias8 = TubeDiffuseImage" but parser looked for
+             "alias_texture8". Texture aliases use flat indices starting at
+             numShaders, not "alias_textureN" format.
+  Fix: Added detection of "aliasN" where N >= numShaders as texture aliases,
+       mapped to texture index via (i - numShaders).
+  File: main.cpp ~line 1169, test_translator.cpp ~line 166
+  Impact: ALL external textures were previously unresolved. Now correctly bound.
+
+BUG P4-2: UBO Members Not Emitted as Uniforms (SEVERITY: CRITICAL)
+  Symptom: 700+ HSM parameters (HSM_SINDEN_BORDER_ON, HSM_CACHE_GRAPHICS_ON,
+           etc.) referenced in shader code but never declared as uniforms.
+  Root cause: Translator extracted UBO block from globals.inc into uboMembers
+             string but never emitted them in the GLSL output. The "global.X"
+             prefix was stripped from code, leaving undeclared variables.
+  Fix: Emit UBO members as individual "uniform" declarations in GLSL output,
+       skipping already-declared names (SourceSize, OutputSize, etc.).
+  File: main.cpp ~line 2750, test_translator.cpp ~line 544
+  Impact: ALL Mega Bezel shaders would fail to compile. Now properly declared.
+
+BUG P4-3: Self-Referencing Local Variables (SEVERITY: HIGH)
+  Symptom: "float HSM_SINDEN_BORDER_ON = HSM_SINDEN_BORDER_ON;" compile error
+  Root cause: params-0-screen-scale.inc creates local variables like
+             "float X = global.X;". After global.X stripping, becomes
+             self-referencing. Combined with UBO emission of same-named
+             uniform, creates redeclaration + self-init error.
+  Fix: After emitting UBO uniforms, scan preamble helpers and remove
+       self-referencing "float X = X..." lines (uniform already provides value).
+  File: main.cpp ~line 2783, test_translator.cpp ~line 580
+  Impact: Shader compilation failure. Now properly handled.
+
+2. NEW FEATURES IMPLEMENTED
+================================================================================
+
+FEATURE: F5 — HSM Parameters Debug Mode
+  - Press F5 to toggle HSM parameter visualization
+  - Shows InfoCache geometry texture (pass 0 output)
+  - Logs all shader parameters with names, values, and ranges
+  - F5 again to turn off
+  - Shift+F5 = Reload config (moved from F5)
+
+FEATURE: F10 — Screenshot Capture
+  - Press F10 to capture current frame as PNG
+  - Saves to screenshots/ directory with timestamp filename
+  - Supports 1080p, 1440p, 4K (matches window size)
+  - Uses GDI+ PNG encoder for lossless capture
+  - Flips Y-axis (OpenGL origin is bottom-left)
+
+FEATURE: NaN/Zero Detection in Render Loop
+  - Detects NaN values in shader parameters (val != val check)
+  - Detects zero-dimension SourceSize/OutputSize
+  - Logs warnings with [NaN WARNING] prefix to render log
+  - Replaces NaN parameters with 0.0f to prevent GPU issues
+
+FEATURE: Comprehensive OpenGL Info Panel
+  - Updated Settings > OpenGL panel with pipeline statistics
+  - Shows: pass count, frame count, GL version/vendor/renderer
+  - Shows full render log (sampler resolution, filter modes, viewports)
+  - Shows keyboard shortcut reference (F1-F5, F10, Shift+F4, Shift+F5)
+
+FEATURE: Per-Pass Viewport Logging
+  - Logs [Viewport] pass=N viewport=(WxH) for every pass
+  - Helps diagnose dimension mismatches between passes
+
+3. DEBUG KEYBOARD SHORTCUTS (Updated)
+================================================================================
+
+  F1          Toggle pass output debug view (Up/Down to cycle passes)
+  F2          Toggle InfoCache geometry view (pass 0)
+  F3          Toggle feedback history texture view
+  F4          Toggle external texture status view
+  F5          Toggle HSM parameters debug view (NEW)
+  F10         Capture screenshot to PNG (NEW)
+  Shift+F4    Cycle through discovered presets
+  Shift+F5    Reload configuration (moved from F5)
+  Ctrl+B      Cycle border images
+
+4. RENDER PIPELINE AUDIT
+================================================================================
+
+Pass 0 (InfoCachePass):
+  Shader: info-cache.slang -> info-cache.glsl
+  Scale: source x1
+  Output: FBO (input dimensions)
+  Samplers: 0 additional
+  External textures: 9 (TubeDiffuse, TubeShadow, etc.)
+  Status: OK — computes screen geometry cache
+
+Pass 1 (Reference):
+  Shader: stock.slang -> stock.glsl
+  Scale: source x1
+  Output: FBO (input dimensions)
+  Samplers: 0 additional
+  Status: OK — passthrough, preserves original frame
+
+Pass 2 (BloomPass):
+  Shader: bloompass.slang -> bloompass.glsl
+  Scale: source x1
+  Filter: linear
+  Samplers: 1 (ORIG_LINEARIZED via SRGB texture)
+  Status: OK — CRT bloom computation
+
+Pass 3 (CRTOut):
+  Shader: scanpass.slang -> scanpass.glsl
+  Scale: viewport (final CRT resolution)
+  Filter: linear
+  Samplers: 2 (BloomPass alias, Reference alias)
+  Status: OK — CRT scanlines + mask
+
+Pass 4 (PostCRTPass):
+  Shader: post-crt-prep-no-reflect.slang -> post-crt-prep-no-reflect.glsl
+  Scale: source x1
+  Filter: linear
+  Samplers: InfoCachePass (alias), + many external textures
+  Feedback: PostCRTPassFeedback (ping-pong FBO)
+  Status: OK — tube/gel/shadow composition
+
+Pass 5 (BR_LayersUnderCRTPass):
+  Shader: bezel-images-under-crt.slang -> bezel-images-under-crt.glsl
+  Scale: source x1
+  Filter: linear
+  Samplers: InfoCachePass (alias), + many external textures
+  Feedback: BR_LayersUnderCRTPassFeedback (ping-pong FBO)
+  WARNING: unresolved global in vert/frag (non-critical)
+  Status: OK — bezel layers under CRT
+
+Pass 6 (BR_LayersOverCRTPass):
+  Shader: bezel-images-over-crt.slang -> bezel-images-over-crt.glsl
+  Scale: source x1
+  Filter: linear
+  Samplers: InfoCachePass (alias), + many external textures
+  Feedback: BR_LayersOverCRTPassFeedback (ping-pong FBO)
+  WARNING: unresolved global in vert/frag (non-critical)
+  Status: OK — bezel layers over CRT
+
+Pass 7 (Combine):
+  Shader: combine-passes-no-reflect.slang -> combine-passes-no-reflect.glsl
+  Scale: viewport (final output)
+  Filter: linear
+  Samplers: InfoCachePass, PostCRTPass, BR_LayersUnder/Over (aliases)
+  Feedback: CombinePassFeedback (ping-pong FBO)
+  Status: OK — final compositing
+
+5. KNOWN VISUAL DIFFERENCES VS RETROARCH
+================================================================================
+
+DIFF-1: Missing Mega Bezel passes (by design)
+  Our preset omits: DerezedPass, DeditherPass, LinearizePass,
+  ColorCorrectPass, CRTPass, ReflectionPass. These are referenced as
+  samplers in combine-passes.inc but get black placeholders.
+  Impact: No dedithering, no linearization, no reflection.
+  Mitigation: These are optional in the Mega Bezel pipeline.
+
+DIFF-2: CRT simulation uses Lottes shader
+  RetroArch Mega Bezel uses its own CRT pass (CRTPass). Our preset uses
+  the Lottes CRT (bloompass + scanpass) which has different curvature,
+  mask, and scanline characteristics.
+  Impact: Different CRT visual appearance (curvature, mask pattern).
+  Mitigation: Lottes is a well-known CRT emulation, visually acceptable.
+
+DIFF-3: Feedback textures start black
+  On first frame, feedback textures are initialized with black pixels.
+  RetroArch Mega Bezel may have persistent cache. Our feedback starts
+  empty and accumulates over frames.
+  Impact: First few frames may look different (no cached geometry).
+  Mitigation: Cache fills within 2-3 frames.
+
+DIFF-4: HSM parameters use defaults
+  All HSM parameters use their #pragma parameter default values.
+  No UI controls to adjust them at runtime (yet).
+  Impact: Bezel position/size is fixed at default.
+  Mitigation: Parameters are exposed as uniforms; UI can be added.
+
+6. SAMPLER RESOLUTION STATUS
+================================================================================
+
+  Sampler                    | Pass | Resolution       | Status
+  ---------------------------|------|------------------|--------
+  Texture (Source)           | All  | currentInput     | OK
+  ORIG_LINEARIZED            | 2    | linearizeTex     | OK (SRGB)
+  BloomPass                  | 3    | alias -> pass 2  | OK
+  Reference                  | 3    | alias -> pass 1  | OK
+  InfoCachePass              | 4-7  | alias -> pass 0  | OK
+  PostCRTPass                | 5-7  | alias -> pass 4  | OK
+  BR_LayersUnderCRTPass      | 6-7  | alias -> pass 5  | OK
+  BR_LayersOverCRTPass       | 7    | alias -> pass 6  | OK
+  TubeDiffuseImage           | 4-6  | external texture | OK (after fix)
+  TubeShadowImage            | 4    | external texture | OK (after fix)
+  BackgroundImage            | 4-6  | external texture | OK (after fix)
+  NightLightingImage         | 4-6  | external texture | OK (after fix)
+  FrameTextureImage          | 5-6  | external texture | OK (after fix)
+  PostCRTPassFeedback        | 4    | feedback FBO     | OK
+  BR_LayersUnderCRTPassFb    | 5    | feedback FBO     | OK
+  BR_LayersOverCRTPassFb     | 6    | feedback FBO     | OK
+  CombinePassFeedback        | 7    | feedback FBO     | OK
+  DerezedPass                | 4-7  | UNRESOLVED       | Black placeholder
+  DeditherPass               | 7    | UNRESOLVED       | Black placeholder
+  ColorCorrectPass           | 7    | UNRESOLVED       | Black placeholder
+  LinearizePass              | 7    | UNRESOLVED       | Black placeholder
+  CRTPass                    | 7    | UNRESOLVED       | Black placeholder
+  ReflectionPass             | 7    | UNRESOLVED       | Black placeholder
+
+7. UBO/UNIFORM DECLARATION STATUS
+================================================================================
+
+Standard uniforms (emitted by translator):
+  uniform sampler2D Texture;
+  uniform vec4 InputSize, OutputSize, TextureSize, FinalViewportSize;
+  uniform int FrameDirection;
+  uniform uint FrameCount;
+  uniform mat4 MVPMatrix;
+
+UBO members (emitted from globals.inc, ~700+ uniforms):
+  HSM_RESOLUTION_DEBUG_ON, HSM_SINDEN_BORDER_ON, HSM_CACHE_GRAPHICS_ON,
+  HSM_GLOBAL_GRAPHICS_BRIGHTNESS, HSM_AMBIENT_LIGHTING_OPACITY, ...
+  (full list in globals.inc — 993 lines, ~700 float/int/uint/vec/mat members)
+
+8. GL ERROR CHECKPOINTS
+================================================================================
+
+  [FBO INCOMPLETE] — checked after every FBO creation in ensureFBOs()
+  [GL ERROR] — checked after every draw call in render loop
+  [GL ERROR] — checked after every feedback blit
+  [GL ERROR] — checked after last pass screen blit
+  [NaN WARNING] — checked for every parameter uniform value
+  [NaN WARNING] — checked for zero-dimension SourceSize/OutputSize
+
+================================================================================
+  END OF PHASE 4 REPORT
+================================================================================

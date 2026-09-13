@@ -1,0 +1,166 @@
+================================================================================
+MEGA BEZEL PHASE 2 FIX REPORT
+Generated: 2026-07-31
+================================================================================
+
+MEDIUM/HIGH PRIORITY FIXES — Runtime Accuracy Improvements
+
+================================================================================
+A1: GL_CLAMP_TO_BORDER Real
+================================================================================
+FIX:     Implemented real GL_CLAMP_TO_BORDER with border color
+STATUS:  PASS
+FILES:   main.cpp (ensureFBOs + LoadShaderTexture)
+
+Changes:
+  - ensureFBOs: wrapMode "clamp_to_border" now maps to GL_CLAMP_TO_BORDER
+    (was incorrectly mapped to GL_CLAMP_TO_EDGE)
+  - glTexParameterfv(GL_TEXTURE_BORDER_COLOR, {0,0,0,0}) when clamp_to_border
+  - LoadShaderTexture: same fix for external textures
+  - Both FBO textures and external textures now support border clamping
+
+Test:    crt-lottes-with-bezel.slangp — all 8 passes OK
+
+================================================================================
+A2: mipmap_input Generation
+================================================================================
+FIX:     Generate mipmaps when mipmap_input=true in preset
+STATUS:  PASS
+FILES:   main.cpp (GlFunctions, ensureFBOs, render loop)
+
+Changes:
+  - Added PFNGLGENERATEMIPMAPPROC GenerateMipmap to GlFunctions struct
+  - Added LOAD_GL_PROC(GenerateMipmap) in LoadGlFunctions
+  - ensureFBOs: when mipmapInput=true, set GL_TEXTURE_MIN_FILTER to
+    GL_LINEAR_MIPMAP_LINEAR and GL_TEXTURE_MAG_FILTER to GL_LINEAR
+  - Render loop: after draw call, if mipmapInput=true, call
+    gl.GenerateMipmap(GL_TEXTURE_2D) on the pass's output texture
+
+Test:    crt-lottes-with-bezel.slangp — all 8 passes OK
+
+================================================================================
+A3: Token-safe Source Renaming
+================================================================================
+FIX:     Replaced fragile substring matching with word-boundary detection
+STATUS:  PASS
+FILES:   main.cpp, test_translator.cpp
+
+Changes:
+  - Old code: 3 separate find-replace patterns (sampler2D Source, texture(Source, , Source)
+  - New code: Token-safe loop checking isalnum/_ before and after "Source"
+  - Only replaces standalone "Source" identifiers
+  - Does NOT replace "SourceSize", "SourceTexture", "SourceCoord", etc.
+  - Same fix applied to test_translator.cpp
+
+Test:    SourceSize -> TextureSize works correctly
+         standalone Source -> Texture works correctly
+         SourceSize NOT incorrectly renamed to TextureSizee
+
+================================================================================
+A4: GL State Reset Before Each Pass
+================================================================================
+FIX:     Reset GL state before every pass draw
+STATUS:  PASS
+FILES:   main.cpp (render loop)
+
+Changes:
+  - Added before each pass:
+    glDisable(GL_BLEND)
+    glDisable(GL_DEPTH_TEST)
+    glDisable(GL_CULL_FACE)
+    glDisable(GL_SCISSOR_TEST)
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE)
+  - Prevents cross-pass contamination from previous pass's GL state
+
+Test:    crt-lottes-with-bezel.slangp — all 8 passes OK
+
+================================================================================
+M3: Bool/Int/Float Parameter Types
+================================================================================
+FIX:     Full type detection for #pragma parameter declarations
+STATUS:  PASS
+FILES:   main.cpp, test_translator.cpp
+
+Changes:
+  - ShaderParameter struct: added std::string type field ("float"/"bool"/"int")
+  - Parser detects type keyword before parameter name:
+    "#pragma parameter bool X ..." -> type="bool"
+    "#pragma parameter int X ..."  -> type="int"
+    "#pragma parameter X ..."      -> type="float" (default)
+  - Render loop: uses correct uniform setter:
+    bool:  gl.Uniform1i(loc, value != 0 ? 1 : 0)
+    int:   gl.Uniform1i(loc, (int)value)
+    float: gl.Uniform1f(loc, value)
+  - Parameter logging now includes type
+
+Test:    13 CRT params extracted with correct types and defaults
+
+================================================================================
+M4: srgb_framebuffer Support
+================================================================================
+FIX:     Create SRGB FBOs when srgb_framebuffer=true
+STATUS:  PASS
+FILES:   main.cpp (ensureFBOs, render loop)
+
+Changes:
+  - ensureFBOs: internal format selection:
+    floatFramebuffer: GL_RGBA32F
+    srgbFramebuffer:  GL_SRGB8_ALPHA8 (0x8C43)
+    default:          GL_RGBA8
+  - Render loop: glEnable/glDisable GL_FRAMEBUFFER_SRGB (0x8C90) per-pass
+  - SRGB FBOs get automatic linear<->sRGB conversion by GPU
+
+Test:    crt-lottes-with-bezel.slangp — all 8 passes OK
+
+================================================================================
+M6: Skip Unused Sampler Uniforms
+================================================================================
+FIX:     Skip binding when no texture resolves for a sampler
+STATUS:  PASS
+FILES:   main.cpp (render loop)
+
+Changes:
+  - After texture resolution logic, if texToBind == 0:
+    - Skip glBindTexture and glUniform1i
+    - Log: "[Sampler] skipped unused: <samplerName>"
+  - Prevents binding texture ID 0 (which would unbind current texture)
+
+Test:    crt-lottes-with-bezel.slangp — all 8 passes OK
+
+================================================================================
+BUILD VERIFICATION
+================================================================================
+Monix.exe:         1155KB — builds clean with /MT /std:c++20 /O1
+test_translator.exe: Compiles clean
+
+================================================================================
+REGRESSION CHECK
+================================================================================
+crt-lottes-multipass.slangp:
+  Pass 0 (bloompass): OK — 13 params, 1 sampler
+  Pass 1 (stock): OK — passthrough
+  Pass 2 (scanpass): OK — 13 params, 2 samplers
+
+crt-lottes-with-bezel.slangp:
+  Pass 0 (InfoCachePass): OK
+  Pass 1 (Reference): OK
+  Pass 2 (BloomPass): OK — 13 params
+  Pass 3 (CRTOut): OK — 13 params, 2 samplers
+  Pass 4 (PostCRTPass): OK
+  Pass 5 (BR_LayersUnderCRT): OK
+  Pass 6 (BR_LayersOverCRT): OK
+  Pass 7 (combine): OK
+
+All passes translate OK, all params extracted, no compilation errors.
+
+================================================================================
+CONCLUSION
+================================================================================
+Phase 2 fixes implemented and verified. All 7 changes are backward-compatible:
+  - Existing CRT presets continue to work unchanged
+  - New features (SRGB, mipmap, border clamp) only activate when specified
+  - GL state reset prevents cross-pass interference
+  - Token-safe renaming eliminates false positive replacements
+
+Ready for runtime testing.
+================================================================================

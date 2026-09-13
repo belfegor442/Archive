@@ -1,0 +1,5 @@
+shaders=2
+shader0=../glsl/solid_red.glsl
+alias0=RedPass
+shader1=../glsl/multipass_passthrough.glsl
+alias1=PassthroughPass

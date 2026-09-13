@@ -1,0 +1,7 @@
+shaders=3
+shader0=../glsl/solid_red.glsl
+alias0=A
+shader1=../glsl/solid_green.glsl
+alias1=B
+shader2=../glsl/solid_blue.glsl
+alias2=C

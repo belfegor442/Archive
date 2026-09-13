@@ -1,0 +1,4 @@
+shaders=1
+shader0=../glsl/feedback_reader.glsl
+alias0=FeedbackPass
+framebuffer_feedback0=true

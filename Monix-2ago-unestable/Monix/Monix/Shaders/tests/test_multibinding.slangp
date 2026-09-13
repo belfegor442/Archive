@@ -1,0 +1,4 @@
+shaders = 1
+
+shader0 = tests/test_multibinding_pass0.frag
+alias0 = Output

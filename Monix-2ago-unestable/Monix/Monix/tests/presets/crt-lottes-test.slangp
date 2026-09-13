@@ -1,0 +1,10 @@
+shaders = 3
+
+shader0 = ../CRT/stock.slang
+filter_linear0 = false
+
+shader1 = ../CRT/shaders/crt-lottes-multipass/bloompass.slang
+filter_linear1 = true
+
+shader2 = ../CRT/shaders/crt-lottes-multipass/scanpass.slang
+filter_linear2 = true

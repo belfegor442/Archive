@@ -1,0 +1,221 @@
+MEGA BEZEL PHASE 12 - RUNTIME STATE VALIDATION REPORT
+=====================================================
+
+1. EXECUTIVE SUMMARY
+--------------------
+Verdict: FAIL
+Total snapshots: 9
+Total issues: 2
+  Snapshot issues: 0
+  Global issues: 2
+  RetroArch diffs: 0
+  Consistency issues: 0
+
+2. GPU RESOURCE INVENTORY
+-------------------------
+Programs: 3
+Textures: 0
+FBOs: 0
+
+3. PASS STATE SNAPSHOTS
+-----------------------
+
+--- Pass 0:  ---
+  Program: 6 [INVALID]
+  FBO: 0 [INCOMPLETE]
+  Attachments: 0
+  Draw calls: 0
+  Viewport: 0x0
+  Blend: OFF
+  Depth: OFF
+  Stencil: OFF
+  Cull: OFF
+  Scissor: OFF
+  SRGB: OFF
+  Textures bound: 0
+  Uniforms: 0
+
+--- Pass 1:  ---
+  Program: 9 [INVALID]
+  FBO: 0 [INCOMPLETE]
+  Attachments: 0
+  Draw calls: 0
+  Viewport: 0x0
+  Blend: OFF
+  Depth: OFF
+  Stencil: OFF
+  Cull: OFF
+  Scissor: OFF
+  SRGB: OFF
+  Textures bound: 0
+  Uniforms: 0
+
+--- Pass 2:  ---
+  Program: 12 [INVALID]
+  FBO: 0 [INCOMPLETE]
+  Attachments: 0
+  Draw calls: 0
+  Viewport: 0x0
+  Blend: OFF
+  Depth: OFF
+  Stencil: OFF
+  Cull: OFF
+  Scissor: OFF
+  SRGB: OFF
+  Textures bound: 0
+  Uniforms: 0
+
+--- Pass 0:  ---
+  Program: 6 [INVALID]
+  FBO: 0 [INCOMPLETE]
+  Attachments: 0
+  Draw calls: 0
+  Viewport: 0x0
+  Blend: OFF
+  Depth: OFF
+  Stencil: OFF
+  Cull: OFF
+  Scissor: OFF
+  SRGB: OFF
+  Textures bound: 0
+  Uniforms: 0
+
+--- Pass 1:  ---
+  Program: 9 [INVALID]
+  FBO: 0 [INCOMPLETE]
+  Attachments: 0
+  Draw calls: 0
+  Viewport: 0x0
+  Blend: OFF
+  Depth: OFF
+  Stencil: OFF
+  Cull: OFF
+  Scissor: OFF
+  SRGB: OFF
+  Textures bound: 0
+  Uniforms: 0
+
+--- Pass 2:  ---
+  Program: 12 [INVALID]
+  FBO: 0 [INCOMPLETE]
+  Attachments: 0
+  Draw calls: 0
+  Viewport: 0x0
+  Blend: OFF
+  Depth: OFF
+  Stencil: OFF
+  Cull: OFF
+  Scissor: OFF
+  SRGB: OFF
+  Textures bound: 0
+  Uniforms: 0
+
+--- Pass 0:  ---
+  Program: 6 [INVALID]
+  FBO: 0 [INCOMPLETE]
+  Attachments: 0
+  Draw calls: 0
+  Viewport: 0x0
+  Blend: OFF
+  Depth: OFF
+  Stencil: OFF
+  Cull: OFF
+  Scissor: OFF
+  SRGB: OFF
+  Textures bound: 0
+  Uniforms: 0
+
+--- Pass 1:  ---
+  Program: 9 [INVALID]
+  FBO: 0 [INCOMPLETE]
+  Attachments: 0
+  Draw calls: 0
+  Viewport: 0x0
+  Blend: OFF
+  Depth: OFF
+  Stencil: OFF
+  Cull: OFF
+  Scissor: OFF
+  SRGB: OFF
+  Textures bound: 0
+  Uniforms: 0
+
+--- Pass 2:  ---
+  Program: 12 [INVALID]
+  FBO: 0 [INCOMPLETE]
+  Attachments: 0
+  Draw calls: 0
+  Viewport: 0x0
+  Blend: OFF
+  Depth: OFF
+  Stencil: OFF
+  Cull: OFF
+  Scissor: OFF
+  SRGB: OFF
+  Textures bound: 0
+  Uniforms: 0
+
+4. TEXTURE AUDIT
+----------------
+
+5. UNIFORM AUDIT
+----------------
+
+6. SAMPLER AUDIT
+----------------
+
+7. RENDER STATE AUDIT
+---------------------
+  Pass 0 blend=OFF depth=OFF stencil=OFF cull=OFF scissor=OFF srgb=OFF
+  Pass 1 blend=OFF depth=OFF stencil=OFF cull=OFF scissor=OFF srgb=OFF
+  Pass 2 blend=OFF depth=OFF stencil=OFF cull=OFF scissor=OFF srgb=OFF
+  Pass 0 blend=OFF depth=OFF stencil=OFF cull=OFF scissor=OFF srgb=OFF
+  Pass 1 blend=OFF depth=OFF stencil=OFF cull=OFF scissor=OFF srgb=OFF
+  Pass 2 blend=OFF depth=OFF stencil=OFF cull=OFF scissor=OFF srgb=OFF
+  Pass 0 blend=OFF depth=OFF stencil=OFF cull=OFF scissor=OFF srgb=OFF
+  Pass 1 blend=OFF depth=OFF stencil=OFF cull=OFF scissor=OFF srgb=OFF
+  Pass 2 blend=OFF depth=OFF stencil=OFF cull=OFF scissor=OFF srgb=OFF
+
+8. RESOURCE LIFETIME
+--------------------
+  Created: 0
+  Deleted: 0
+  Leaked: 0
+
+9. LEAK DETECTION
+------------------
+  No leaks detected.
+
+10. RETROARCH RUNTIME COMPARISON
+--------------------------------
+  No RetroArch snapshot loaded. Use --retroarch-snapshot <file>.
+
+11. STATE DIFFERENCES
+---------------------
+
+12. CONSISTENCY CHECKS
+----------------------
+  All checks passed.
+
+13. ROOT CAUSE ANALYSIS
+-----------------------
+  Global issues: 2
+    CRITICAL: Failed to load GL functions
+    CRITICAL: Failed to load GL functions
+
+14. GENERIC RECOMMENDATIONS
+---------------------------
+  1. Ensure all FBOs are complete before use.
+  2. Validate uniform uploads against expected values.
+  3. Confirm texture dimensions match render target size.
+  4. Verify feedback textures alternate correctly.
+  5. Track resource lifecycle to detect leaks.
+  6. Compare runtime state against RetroArch reference.
+  7. Maintain per-pass state snapshots for debugging.
+
+15. VERDICT
+----------
+  FAIL
+
+[GLOBAL] CRITICAL: Failed to load GL functions
+[GLOBAL] CRITICAL: Failed to load GL functions

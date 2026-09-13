@@ -1,0 +1,182 @@
+=== MEGA BEZEL PHASE 8 RUNTIME VALIDATION ===
+Generated after frame 21821
+Preset: crt-lottes-test (3 passes)
+Input: 1920x1012
+Viewport: 1920x1012
+
+=== 1. GENERAL RESULT ===
+Result: PASS
+Total passes: 3
+
+=== 2. PASS STATE ===
+Pass 0 (pass0):
+  Program: 6
+  Compiled: YES
+  Validated: YES
+  Uniforms: SourceSize=-1 OutputSize=-1 OriginalSize=-1 InputSize=-1 FrameCount=-1 FrameDirection=-1 FinalViewportSize=-1 MVP=0 Texture=1
+  Uniform values:
+  Samplers: 0 declared
+
+Pass 1 (pass1):
+  Program: 9
+  Compiled: YES
+  Validated: YES
+  Uniforms: SourceSize=1 OutputSize=-1 OriginalSize=-1 InputSize=-1 FrameCount=-1 FrameDirection=-1 FinalViewportSize=-1 MVP=0 Texture=-1
+  Uniform values:
+    SourceSize = (1920,1012,0.000520833,0.000988142)
+  Samplers: 1 declared
+    ORIG_LINEARIZED loc=2
+
+Pass 2 (pass2):
+  Program: 12
+  Compiled: YES
+  Validated: YES
+  Uniforms: SourceSize=2 OutputSize=1 OriginalSize=-1 InputSize=-1 FrameCount=-1 FrameDirection=-1 FinalViewportSize=-1 MVP=0 Texture=-1
+  Uniform values:
+    SourceSize = (1920,1012,0.000520833,0.000988142)
+    OutputSize = (1920,1012,0.000520833,0.000988142)
+  Samplers: 2 declared
+    BloomPass loc=3
+    Reference loc=4
+
+=== 3. FBO STATUS ===
+Pass 0: FBO=5 status=COMPLETE size=1920x1012
+Pass 1: FBO=6 status=COMPLETE size=1920x1012
+Pass 2: FBO=7 status=COMPLETE size=1920x1012
+
+=== 4. TEXTURE DETAILS ===
+Pass 0 output:
+  output: ID=7 1920x1012 fmt=0x8058 min=0x2600 mag=0x2600 wrapS=0x812d wrapT=0x812d levels=1000
+Pass 1 output:
+  output: ID=8 1920x1012 fmt=0x8058 min=0x2601 mag=0x2601 wrapS=0x812d wrapT=0x812d levels=1000
+Pass 2 output:
+  output: ID=9 1920x1012 fmt=0x8058 min=0x2601 mag=0x2601 wrapS=0x812d wrapT=0x812d levels=1000
+
+=== 5. UNIFORM VERIFICATION ===
+Pass 0:
+  SourceSize: LOCATION_INVALID
+  OutputSize: LOCATION_INVALID
+  OriginalSize: LOCATION_INVALID
+  InputSize: LOCATION_INVALID
+  FinalViewportSize: LOCATION_INVALID
+
+Pass 1:
+  SourceSize = (1920, 1012, 0.000520833, 0.000988142)
+  OutputSize: LOCATION_INVALID
+  OriginalSize: LOCATION_INVALID
+  InputSize: LOCATION_INVALID
+  FinalViewportSize: LOCATION_INVALID
+  hardScan: LOCATION_INVALID
+  hardPix = -3
+  warpX: LOCATION_INVALID
+  warpY: LOCATION_INVALID
+  maskDark: LOCATION_INVALID
+  maskLight: LOCATION_INVALID
+  scaleInLinearGamma: LOCATION_INVALID
+  shadowMask: LOCATION_INVALID
+  brightBoost = 1
+  hardBloomPix = -1.5
+  hardBloomScan = -2
+  bloomAmount = 0.4
+  shape = 2
+
+Pass 2:
+  SourceSize = (1920, 1012, 0.000520833, 0.000988142)
+  OutputSize = (1920, 1012, 0.000520833, 0.000988142)
+  OriginalSize: LOCATION_INVALID
+  InputSize: LOCATION_INVALID
+  FinalViewportSize: LOCATION_INVALID
+  hardScan = -8
+  hardPix = -3
+  warpX = 0.031
+  warpY = 0.041
+  maskDark = 0.5
+  maskLight = 1.5
+  scaleInLinearGamma = 1
+  shadowMask = 3
+  brightBoost = 1
+  hardBloomPix: LOCATION_INVALID
+  hardBloomScan: LOCATION_INVALID
+  bloomAmount = 0.4
+  shape = 2
+
+=== 6. SAMPLER INSPECTOR ===
+Pass 0 (pass0):
+Pass 1 (pass1):
+  ORIG_LINEARIZED loc=2 unit=-1 origin=BUILTIN tex=10
+Pass 2 (pass2):
+  BloomPass loc=3 unit=-1 origin=UNRESOLVED->BLACK tex=0
+  Reference loc=4 unit=-1 origin=UNRESOLVED->BLACK tex=0
+
+=== 7. FEEDBACK STATE ===
+Total feedback passes: 0
+
+=== 8. PERFORMANCE ===
+Pass 0: 0.243 ms drawCalls=21822
+Pass 1: 4.502 ms drawCalls=21822
+Pass 2: 5.418 ms drawCalls=21822
+Total pipeline: 10.164 ms
+Program changes: 0
+Texture changes: 0
+FBO changes: 0
+GL errors: 0
+
+=== 9. OPENGL ERRORS ===
+No GL errors detected.
+
+=== 10. RESOURCE TRACKING ===
+Programs:  3
+FBOs:      4
+Textures:  4
+
+Per-pass resources:
+  Pass 0: prog=6 fbo=5 tex=7 ext=0
+  Pass 1: prog=9 fbo=6 tex=8 ext=0
+  Pass 2: prog=12 fbo=7 tex=9 ext=0
+
+
+=== RETROARCH CROSS-CHECK ===
+Comparing Monix pipeline with expected RetroArch Slang behavior.
+
+Pass 0 (pass0):
+  Uniforms: SourceSize MISSING
+           OutputSize MISSING
+           OriginalSize MISSING
+           FrameCount MISSING
+           FinalViewportSize MISSING
+  Samplers: 0 declared
+  Expected FBO format: GL_RGBA8
+  Expected viewport: FBO size (1920x1012)
+  GL state reset: Blend=OFF Depth=OFF Cull=OFF Scissor=OFF (expected per RetroArch)
+
+Pass 1 (pass1):
+  Uniforms: SourceSize OK
+           OutputSize MISSING
+           OriginalSize MISSING
+           FrameCount MISSING
+           FinalViewportSize MISSING
+  Samplers: 1 declared
+  Expected FBO format: GL_RGBA8
+  Expected viewport: FBO size (1920x1012)
+  GL state reset: Blend=OFF Depth=OFF Cull=OFF Scissor=OFF (expected per RetroArch)
+
+Pass 2 (pass2):
+  Uniforms: SourceSize OK
+           OutputSize OK
+           OriginalSize MISSING
+           FrameCount MISSING
+           FinalViewportSize MISSING
+  Samplers: 2 declared
+  Expected FBO format: GL_RGBA8
+  Expected viewport: FBO size (1920x1012)
+  GL state reset: Blend=OFF Depth=OFF Cull=OFF Scissor=OFF (expected per RetroArch)
+
+=== 12. DIFFERENCES FROM EXPECTED BEHAVIOR ===
+  Pass 2 (pass2): UNRESOLVED_SAMPLER BloomPass
+  Pass 2 (pass2): UNRESOLVED_SAMPLER Reference
+
+=== 13. BUG LIST ===
+
+Summary: CRITICAL=0 HIGH=0 MEDIUM=0 LOW=0
+
+=== END OF REPORT ===

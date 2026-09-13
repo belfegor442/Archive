@@ -1,0 +1,2 @@
+[
+  {"timestamp":"2026-08-16T23:48:49.092","level":"CRITICAL","domain":"SCRAM","module":"scram","service":"risk","message":"Integrity check failure. [risk=94 
