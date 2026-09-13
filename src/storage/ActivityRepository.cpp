@@ -18,7 +18,7 @@ std::string ActivityRepository::insert(const core::Activity& activity) {
     stmt.bind_text(3, core::to_string(activity.action));
     stmt.bind_text(4, activity.details);
     stmt.bind_text(5, activity.created_at);
-    stmt.step();
+    stmt.step_done();
     return activity.id;
 }
 
@@ -45,7 +45,7 @@ std::vector<core::Activity> ActivityRepository::find_recent(int limit) {
 void ActivityRepository::remove(const std::string& id) {
     auto stmt = db_.prepare("DELETE FROM activity_log WHERE id=?");
     stmt.bind_text(1, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 core::Activity ActivityRepository::read_activity(DatabaseManager::Statement& stmt) {

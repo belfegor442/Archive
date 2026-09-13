@@ -39,7 +39,7 @@ std::string ArchiveItemRepository::insert(const core::ArchiveItem& item) {
     stmt.bind_int(15, item.current_version);
     stmt.bind_int(16, item.is_favorite ? 1 : 0);
 
-    stmt.step();
+    stmt.step_done();
     return item.id;
 }
 
@@ -71,13 +71,13 @@ void ArchiveItemRepository::update(const core::ArchiveItem& item) {
     stmt.bind_int(13, item.is_favorite ? 1 : 0);
     stmt.bind_text(14, item.id);
 
-    stmt.step();
+    stmt.step_done();
 }
 
 void ArchiveItemRepository::remove(const std::string& id) {
     auto stmt = db_.prepare("DELETE FROM archive_items WHERE id=?");
     stmt.bind_text(1, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 std::optional<core::ArchiveItem> ArchiveItemRepository::find_by_id(const std::string& id) {
@@ -174,27 +174,27 @@ void ArchiveItemRepository::update_status(const std::string& id, core::ItemStatu
     auto stmt = db_.prepare("UPDATE archive_items SET status=? WHERE id=?");
     stmt.bind_text(1, core::to_string(status));
     stmt.bind_text(2, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 void ArchiveItemRepository::set_favorite(const std::string& id, bool favorite) {
     auto stmt = db_.prepare("UPDATE archive_items SET is_favorite=? WHERE id=?");
     stmt.bind_int(1, favorite ? 1 : 0);
     stmt.bind_text(2, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 void ArchiveItemRepository::update_category(const std::string& id, const std::string& category_id) {
     auto stmt = db_.prepare("UPDATE archive_items SET category_id=? WHERE id=?");
     stmt.bind_text(1, category_id);
     stmt.bind_text(2, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 void ArchiveItemRepository::increment_version(const std::string& id) {
     auto stmt = db_.prepare("UPDATE archive_items SET current_version=current_version+1 WHERE id=?");
     stmt.bind_text(1, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 std::vector<core::Tag> ArchiveItemRepository::get_tags(const std::string& item_id) {
@@ -220,14 +220,14 @@ void ArchiveItemRepository::add_tag(const std::string& item_id, const std::strin
     auto stmt = db_.prepare("INSERT OR IGNORE INTO item_tags (item_id, tag_id) VALUES (?, ?)");
     stmt.bind_text(1, item_id);
     stmt.bind_text(2, tag_id);
-    stmt.step();
+    stmt.step_done();
 }
 
 void ArchiveItemRepository::remove_tag(const std::string& item_id, const std::string& tag_id) {
     auto stmt = db_.prepare("DELETE FROM item_tags WHERE item_id=? AND tag_id=?");
     stmt.bind_text(1, item_id);
     stmt.bind_text(2, tag_id);
-    stmt.step();
+    stmt.step_done();
 }
 
 core::DashboardStats ArchiveItemRepository::get_stats() {

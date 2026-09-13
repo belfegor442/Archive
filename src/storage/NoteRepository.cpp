@@ -16,7 +16,7 @@ std::string NoteRepository::insert(const core::Note& note) {
     stmt.bind_text(3, note.content);
     stmt.bind_text(4, note.created_at);
     stmt.bind_text(5, note.updated_at);
-    stmt.step();
+    stmt.step_done();
     return note.id;
 }
 
@@ -25,13 +25,13 @@ void NoteRepository::update(const core::Note& note) {
     stmt.bind_text(1, note.content);
     stmt.bind_text(2, note.updated_at);
     stmt.bind_text(3, note.id);
-    stmt.step();
+    stmt.step_done();
 }
 
 void NoteRepository::remove(const std::string& id) {
     auto stmt = db_.prepare("DELETE FROM notes WHERE id=?");
     stmt.bind_text(1, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 std::vector<core::Note> NoteRepository::find_by_item(const std::string& item_id) {

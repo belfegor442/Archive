@@ -24,7 +24,14 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(SQLITE3 REQUIRED sqlite3)
 pkg_check_modules(OPENSSL REQUIRED openssl)
 
-# Common sources
+# Qt6
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+set(CMAKE_AUTOUIC ON)
+
+# Common sources (core library)
 set(ARCHIVE_LIB_SOURCES
     src/app/AppConfig.cpp
     src/app/Application.cpp
@@ -45,6 +52,13 @@ set(ARCHIVE_LIB_SOURCES
     src/hashing/FileHasher.cpp
     src/filesystem/FileUtils.cpp
     src/filesystem/StorageManager.cpp
+    src/services/ProjectDetector.cpp
+    src/services/ImportService.cpp
+    src/services/SearchService.cpp
+    src/services/DashboardService.cpp
+    src/services/NoteService.cpp
+    src/services/VersionService.cpp
+    src/services/ActivityService.cpp
 )
 
 # Static library for all core code
@@ -66,9 +80,29 @@ target_link_directories(archive_lib PUBLIC
     ${OPENSSL_LIBRARY_DIRS}
 )
 
-# Main executable
-add_executable(archive src/main.cpp)
-target_link_libraries(archive PRIVATE archive_lib)
+# Qt6 UI sources
+set(ARCHIVE_UI_SOURCES
+    src/ui/MainWindow.cpp
+    src/ui/SidebarWidget.cpp
+    src/ui/DashboardWidget.cpp
+    src/ui/ItemsListWidget.cpp
+    src/ui/ItemDetailWidget.cpp
+    src/ui/ImportDialog.cpp
+)
+
+add_executable(archive
+    src/main.cpp
+    ${ARCHIVE_UI_SOURCES}
+)
+
+target_link_libraries(archive PRIVATE
+    archive_lib
+    Qt6::Widgets
+)
+
+target_include_directories(archive PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+)
 
 # Tests
 option(ARCHIVE_BUILD_TESTS "Build tests" ON)

@@ -59,7 +59,9 @@ void DatabaseManager::rollback() {
 }
 
 void DatabaseManager::enable_wal() {
-    execute("PRAGMA journal_mode=WAL");
+    if (db_path_ != ":memory:") {
+        execute("PRAGMA journal_mode=WAL");
+    }
     execute("PRAGMA foreign_keys=ON");
 }
 
@@ -189,6 +191,11 @@ void DatabaseManager::Statement::bind_blob(int index, const void* data, int size
 bool DatabaseManager::Statement::step() {
     int rc = sqlite3_step(stmt_);
     return rc == SQLITE_ROW;
+}
+
+bool DatabaseManager::Statement::step_done() {
+    int rc = sqlite3_step(stmt_);
+    return rc == SQLITE_DONE;
 }
 
 int DatabaseManager::Statement::column_int(int col) const {

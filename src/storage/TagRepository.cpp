@@ -11,7 +11,7 @@ std::string TagRepository::insert(const core::Tag& tag) {
     stmt.bind_text(1, tag.id);
     stmt.bind_text(2, tag.name);
     stmt.bind_text(3, tag.color);
-    stmt.step();
+    stmt.step_done();
     return tag.id;
 }
 
@@ -20,13 +20,13 @@ void TagRepository::update(const core::Tag& tag) {
     stmt.bind_text(1, tag.name);
     stmt.bind_text(2, tag.color);
     stmt.bind_text(3, tag.id);
-    stmt.step();
+    stmt.step_done();
 }
 
 void TagRepository::remove(const std::string& id) {
     auto stmt = db_.prepare("DELETE FROM tags WHERE id=?");
     stmt.bind_text(1, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 std::optional<core::Tag> TagRepository::find_by_id(const std::string& id) {

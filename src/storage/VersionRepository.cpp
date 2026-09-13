@@ -19,7 +19,7 @@ std::string VersionRepository::insert(const core::Version& version) {
     stmt.bind_int64(6, static_cast<int64_t>(version.size));
     stmt.bind_text(7, version.notes);
     stmt.bind_text(8, version.created_at);
-    stmt.step();
+    stmt.step_done();
     return version.id;
 }
 
@@ -43,7 +43,7 @@ std::optional<core::Version> VersionRepository::find_latest(const std::string& i
 void VersionRepository::remove(const std::string& id) {
     auto stmt = db_.prepare("DELETE FROM versions WHERE id=?");
     stmt.bind_text(1, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 core::Version VersionRepository::read_version(DatabaseManager::Statement& stmt) {

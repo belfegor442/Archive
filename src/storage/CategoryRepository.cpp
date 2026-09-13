@@ -21,7 +21,7 @@ std::string CategoryRepository::insert(const core::Category& category) {
     else
         stmt.bind_text_null(6);
     stmt.bind_text(7, category.created_at);
-    stmt.step();
+    stmt.step_done();
     return category.id;
 }
 
@@ -38,13 +38,13 @@ void CategoryRepository::update(const core::Category& category) {
     else
         stmt.bind_text_null(5);
     stmt.bind_text(6, category.id);
-    stmt.step();
+    stmt.step_done();
 }
 
 void CategoryRepository::remove(const std::string& id) {
     auto stmt = db_.prepare("DELETE FROM categories WHERE id=?");
     stmt.bind_text(1, id);
-    stmt.step();
+    stmt.step_done();
 }
 
 std::optional<core::Category> CategoryRepository::find_by_id(const std::string& id) {

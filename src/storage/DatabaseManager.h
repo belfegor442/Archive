@@ -40,6 +40,7 @@ public:
         void bind_blob(int index, const void* data, int size);
 
         bool step();
+        bool step_done();
         int column_int(int col) const;
         int64_t column_int64(int col) const;
         std::string column_text(int col) const;

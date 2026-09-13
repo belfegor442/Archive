@@ -5,6 +5,7 @@ void run_model_tests();
 void run_type_tests();
 void run_storage_tests();
 void run_hashing_tests();
+void run_service_tests();
 
 int main() {
     run_enum_tests();
@@ -12,6 +13,7 @@ int main() {
     run_type_tests();
     run_storage_tests();
     run_hashing_tests();
+    run_service_tests();
 
     return ::test::test_summary();
 }
