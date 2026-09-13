@@ -148,6 +148,17 @@ void DatabaseManager::create_schema() {
         )
     )");
 
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS stored_objects (
+            id TEXT PRIMARY KEY,
+            item_id TEXT NOT NULL REFERENCES archive_items(id) ON DELETE CASCADE,
+            storage_path TEXT NOT NULL,
+            size INTEGER NOT NULL DEFAULT 0,
+            checksum TEXT DEFAULT '',
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+    )");
+
     execute("CREATE INDEX IF NOT EXISTS idx_items_status ON archive_items(status)");
     execute("CREATE INDEX IF NOT EXISTS idx_items_type ON archive_items(type)");
     execute("CREATE INDEX IF NOT EXISTS idx_items_category ON archive_items(category_id)");
@@ -155,6 +166,7 @@ void DatabaseManager::create_schema() {
     execute("CREATE INDEX IF NOT EXISTS idx_versions_item ON versions(item_id)");
     execute("CREATE INDEX IF NOT EXISTS idx_notes_item ON notes(item_id)");
     execute("CREATE INDEX IF NOT EXISTS idx_activity_item ON activity_log(item_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_stored_objects_item ON stored_objects(item_id)");
 }
 
 DatabaseManager::Statement::Statement(sqlite3* db, const std::string& sql) {

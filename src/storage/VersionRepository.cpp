@@ -40,6 +40,13 @@ std::optional<core::Version> VersionRepository::find_latest(const std::string& i
     return std::nullopt;
 }
 
+std::optional<core::Version> VersionRepository::find_by_id(const std::string& id) {
+    auto stmt = db_.prepare("SELECT * FROM versions WHERE id=?");
+    stmt.bind_text(1, id);
+    if (stmt.step()) return read_version(stmt);
+    return std::nullopt;
+}
+
 void VersionRepository::remove(const std::string& id) {
     auto stmt = db_.prepare("DELETE FROM versions WHERE id=?");
     stmt.bind_text(1, id);

@@ -12,6 +12,7 @@
 #include "../storage/CategoryRepository.h"
 #include "../storage/TagRepository.h"
 #include "../storage/ActivityRepository.h"
+#include "../storage/VersionRepository.h"
 #include "../hashing/FileHasher.h"
 #include "../filesystem/StorageManager.h"
 #include "ProjectDetector.h"
@@ -25,6 +26,7 @@ public:
         storage::CategoryRepository& categories,
         storage::TagRepository& tags,
         storage::ActivityRepository& activities,
+        storage::VersionRepository& versions,
         filesystem::StorageManager& storage,
         ProjectDetector& detector
     );
@@ -38,12 +40,11 @@ private:
     storage::CategoryRepository& categories_;
     storage::TagRepository& tags_;
     storage::ActivityRepository& activities_;
+    storage::VersionRepository& versions_;
     filesystem::StorageManager& storage_;
     ProjectDetector& detector_;
 
     core::ArchiveItem create_item_from_path(const std::string& path, const std::optional<std::string>& category_id);
-    std::string generate_id();
-    std::string now_iso();
 };
 
 } // namespace archive::services

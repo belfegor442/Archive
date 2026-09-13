@@ -18,8 +18,6 @@ public:
 
 private:
     storage::ActivityRepository& activities_;
-    std::string generate_id();
-    std::string now_iso();
 };
 
 } // namespace archive::services

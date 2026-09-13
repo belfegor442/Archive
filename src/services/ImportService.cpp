@@ -1,12 +1,8 @@
 #include "ImportService.h"
 #include "../filesystem/FileUtils.h"
+#include "../core/utils/Uuid.h"
 
 #include <filesystem>
-#include <random>
-#include <sstream>
-#include <chrono>
-#include <ctime>
-#include <iomanip>
 #include <algorithm>
 
 namespace archive::services {
@@ -16,12 +12,14 @@ ImportService::ImportService(
     storage::CategoryRepository& categories,
     storage::TagRepository& tags,
     storage::ActivityRepository& activities,
+    storage::VersionRepository& versions,
     filesystem::StorageManager& storage,
     ProjectDetector& detector
 ) : items_(items)
   , categories_(categories)
   , tags_(tags)
   , activities_(activities)
+  , versions_(versions)
   , storage_(storage)
   , detector_(detector)
 {}
@@ -72,12 +70,22 @@ core::ImportResult ImportService::import_single(const std::string& path, const s
         item.checksum = hashing::FileHasher::hash_file(path);
         items_.insert(item);
 
+        core::Version ver;
+        ver.id = core::utils::generate_id();
+        ver.item_id = item.id;
+        ver.version_number = 1;
+        ver.storage_path = stored_path;
+        ver.checksum = item.checksum;
+        ver.size = item.size;
+        ver.created_at = core::utils::now_iso();
+        versions_.insert(ver);
+
         core::Activity act;
-        act.id = generate_id();
+        act.id = core::utils::generate_id();
         act.item_id = item.id;
         act.action = core::ActivityAction::Imported;
         act.details = "Archived from " + path;
-        act.created_at = now_iso();
+        act.created_at = core::utils::now_iso();
         activities_.insert(act);
 
         result.items.push_back(std::move(item));
@@ -107,6 +115,8 @@ core::ImportResult ImportService::import_folder(const std::string& path, const s
     storage_.create_item_dir(item.id);
     item.file_count = filesystem::FileUtils::count_files(path);
     item.size = 0;
+    item.checksum = "";
+
     try {
         for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
             if (entry.is_regular_file()) {
@@ -117,16 +127,47 @@ core::ImportResult ImportService::import_folder(const std::string& path, const s
         item.size = 0;
     }
 
-    item.checksum = "";
+    item.storage_path = storage_.get_item_file_dir(item.id);
     items_.insert(item);
 
+    int files_copied = 0;
+    int files_failed = 0;
+    try {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(path)) {
+            if (entry.is_regular_file()) {
+                try {
+                    std::string relative = std::filesystem::relative(entry.path(), path).string();
+                    std::string dest_dir = storage_.get_item_file_dir(item.id);
+                    std::string dest_path = dest_dir + "/" + relative;
+                    std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
+                    std::filesystem::copy_file(entry.path(), dest_path, std::filesystem::copy_options::overwrite_existing);
+                    files_copied++;
+                } catch (...) {
+                    files_failed++;
+                }
+            }
+        }
+    } catch (...) {
+        files_failed++;
+    }
+
     core::Activity act;
-    act.id = generate_id();
+    act.id = core::utils::generate_id();
     act.item_id = item.id;
     act.action = core::ActivityAction::Imported;
-    act.details = "Archived folder from " + path + (detection.is_project ? " (" + detection.project_type + ")" : "");
-    act.created_at = now_iso();
+    act.details = "Archived folder from " + path
+        + (detection.is_project ? " (" + detection.project_type + ")" : "")
+        + " - " + std::to_string(files_copied) + " files copied"
+        + (files_failed > 0 ? ", " + std::to_string(files_failed) + " failed" : "");
+    act.created_at = core::utils::now_iso();
     activities_.insert(act);
+
+    if (files_failed > 0) {
+        core::ImportError err;
+        err.path = path;
+        err.error = std::to_string(files_failed) + " files failed to copy";
+        result.errors.push_back(std::move(err));
+    }
 
     result.items.push_back(std::move(item));
     return result;
@@ -134,16 +175,16 @@ core::ImportResult ImportService::import_folder(const std::string& path, const s
 
 core::ArchiveItem ImportService::create_item_from_path(const std::string& path, const std::optional<std::string>& category_id) {
     core::ArchiveItem item;
-    item.id = generate_id();
+    item.id = core::utils::generate_id();
     item.name = filesystem::FileUtils::file_name(path);
     item.original_path = path;
     item.storage_path = "";
     item.size = 0;
     item.file_count = 0;
     item.category_id = category_id;
-    item.created_at = now_iso();
-    item.archived_at = now_iso();
-    item.last_modified_at = now_iso();
+    item.created_at = core::utils::now_iso();
+    item.archived_at = core::utils::now_iso();
+    item.last_modified_at = core::utils::now_iso();
     item.current_version = 1;
     item.is_favorite = false;
 
@@ -155,31 +196,6 @@ core::ArchiveItem ImportService::create_item_from_path(const std::string& path, 
     }
 
     return item;
-}
-
-std::string ImportService::generate_id() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<uint64_t> dis(
-        0, std::numeric_limits<uint64_t>::max()
-    );
-
-    std::ostringstream oss;
-    oss << std::hex << dis(gen) << dis(gen);
-    std::string id = oss.str();
-    id.resize(32);
-    return id;
-}
-
-std::string ImportService::now_iso() {
-    auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
-    std::tm utc{};
-    gmtime_s(&utc, &time);
-
-    std::ostringstream oss;
-    oss << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
-    return oss.str();
 }
 
 } // namespace archive::services

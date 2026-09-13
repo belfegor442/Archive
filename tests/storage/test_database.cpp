@@ -375,6 +375,10 @@ static void test_version_crud() {
     ASSERT_TRUE(latest.has_value());
     ASSERT_EQ(latest->version_number, 2);
 
+    auto by_id = ver_repo.find_by_id("ver-001");
+    ASSERT_TRUE(by_id.has_value());
+    ASSERT_EQ(by_id->version_number, 1);
+
     db.close();
     TEST_PASS();
 }
@@ -420,6 +424,10 @@ static void test_note_crud() {
 
     notes = note_repo.find_by_item("item-n1");
     ASSERT_EQ(notes[0].content, "Updated note");
+
+    auto by_id = note_repo.find_by_note_id("note-001");
+    ASSERT_TRUE(by_id.has_value());
+    ASSERT_EQ(by_id->content, "Updated note");
 
     note_repo.remove("note-001");
     notes = note_repo.find_by_item("item-n1");

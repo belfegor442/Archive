@@ -30,9 +30,6 @@ private:
     storage::CategoryRepository& categories_;
     storage::ArchiveItemRepository& items_;
     storage::ActivityRepository& activities_;
-
-    std::string generate_id();
-    std::string now_iso();
 };
 
 } // namespace archive::services

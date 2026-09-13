@@ -59,6 +59,7 @@ set(ARCHIVE_LIB_SOURCES
     src/services/ActivityService.cpp
     src/services/IntegrityService.cpp
     src/services/CategoryService.cpp
+    src/services/TagService.cpp
     src/services/UpdateService.cpp
 )
 
@@ -83,7 +84,6 @@ target_link_directories(archive_lib PUBLIC
 
 # Qt6 UI sources + app bootstrap
 set(ARCHIVE_UI_SOURCES
-    src/main.cpp
     src/app/AppConfig.cpp
     src/app/Application.cpp
     src/ui/MainWindow.cpp

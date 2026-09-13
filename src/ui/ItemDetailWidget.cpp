@@ -76,12 +76,6 @@ void ItemDetailWidget::setup_ui() {
     layout->setSpacing(16);
     layout->setContentsMargins(24, 16, 24, 24);
 
-    auto make_info_row = [&](const QString& label_text, QLabel*& value) -> QGridLayout* {
-        (void)label_text;
-        (void)value;
-        return nullptr;
-    };
-
     auto* info_card = new QFrame();
     info_card->setStyleSheet("background-color: #1e1e2e; border-radius: 12px; padding: 16px;");
     auto* info_layout = new QGridLayout(info_card);

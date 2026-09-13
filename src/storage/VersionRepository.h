@@ -16,6 +16,7 @@ public:
     std::string insert(const core::Version& version);
     std::vector<core::Version> find_by_item(const std::string& item_id);
     std::optional<core::Version> find_latest(const std::string& item_id);
+    std::optional<core::Version> find_by_id(const std::string& id);
     void remove(const std::string& id);
 
 private:

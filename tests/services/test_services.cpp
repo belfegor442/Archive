@@ -6,15 +6,22 @@
 #include "services/ActivityService.h"
 #include "services/IntegrityService.h"
 #include "services/CategoryService.h"
+#include "services/TagService.h"
 #include "services/UpdateService.h"
+#include "services/VersionService.h"
+#include "services/NoteService.h"
 #include "storage/DatabaseManager.h"
 #include "storage/ArchiveItemRepository.h"
 #include "storage/CategoryRepository.h"
 #include "storage/TagRepository.h"
+#include "storage/VersionRepository.h"
+#include "storage/NoteRepository.h"
 #include "storage/ActivityRepository.h"
 #include "filesystem/StorageManager.h"
+#include "hashing/FileHasher.h"
 #include "core/enums/ItemType.h"
 #include "core/enums/ItemStatus.h"
+#include "core/utils/Uuid.h"
 
 using namespace archive::services;
 using namespace archive::storage;
@@ -382,6 +389,259 @@ static void test_update_toggle_favorite() {
     TEST_PASS();
 }
 
+static void test_update_metadata() {
+    TEST_BEGIN("UpdateService update_metadata");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    StorageManager storage(":", "test-items");
+    UpdateService svc(item_repo, act_repo, storage);
+
+    ArchiveItem item;
+    item.id = "upd-4"; item.name = "OldName"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 10; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    svc.update_metadata("upd-4", "NewName", "New description");
+    auto fetched = item_repo.find_by_id("upd-4");
+    ASSERT_TRUE(fetched.has_value());
+    ASSERT_EQ(fetched->name, "NewName");
+    ASSERT_EQ(fetched->description, "New description");
+    TEST_PASS();
+}
+
+// --- TagService tests ---
+
+static void test_tag_create() {
+    TEST_BEGIN("TagService create and get");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    TagRepository tag_repo(db);
+    ArchiveItemRepository item_repo(db);
+    TagService svc(tag_repo, item_repo);
+
+    auto tag = svc.create("important", "#ff0000");
+    ASSERT_TRUE(tag.id.size() > 0);
+    ASSERT_EQ(tag.name, "important");
+    ASSERT_EQ(tag.color, "#ff0000");
+
+    auto fetched = svc.get_by_id(tag.id);
+    ASSERT_TRUE(fetched.has_value());
+    ASSERT_EQ(fetched->name, "important");
+    TEST_PASS();
+}
+
+static void test_tag_update() {
+    TEST_BEGIN("TagService update");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    TagRepository tag_repo(db);
+    ArchiveItemRepository item_repo(db);
+    TagService svc(tag_repo, item_repo);
+
+    auto tag = svc.create("old");
+    svc.update(tag.id, "new", "#00ff00");
+
+    auto fetched = svc.get_by_id(tag.id);
+    ASSERT_TRUE(fetched.has_value());
+    ASSERT_EQ(fetched->name, "new");
+    ASSERT_EQ(fetched->color, "#00ff00");
+    TEST_PASS();
+}
+
+static void test_tag_remove() {
+    TEST_BEGIN("TagService remove");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    TagRepository tag_repo(db);
+    ArchiveItemRepository item_repo(db);
+    TagService svc(tag_repo, item_repo);
+
+    auto tag = svc.create("temp");
+    svc.remove(tag.id);
+    ASSERT_TRUE(!svc.get_by_id(tag.id).has_value());
+    TEST_PASS();
+}
+
+static void test_tag_add_to_item() {
+    TEST_BEGIN("TagService add_to_item");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    TagRepository tag_repo(db);
+    ArchiveItemRepository item_repo(db);
+    TagService svc(tag_repo, item_repo);
+
+    ArchiveItem item;
+    item.id = "item-t1"; item.name = "Tagged"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 10; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    auto tag = svc.create("cpp");
+    svc.add_to_item("item-t1", tag.id);
+
+    auto tags = svc.get_tags_for_item("item-t1");
+    ASSERT_EQ(tags.size(), 1u);
+    ASSERT_EQ(tags[0].name, "cpp");
+    TEST_PASS();
+}
+
+static void test_tag_remove_from_item() {
+    TEST_BEGIN("TagService remove_from_item");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    TagRepository tag_repo(db);
+    ArchiveItemRepository item_repo(db);
+    TagService svc(tag_repo, item_repo);
+
+    ArchiveItem item;
+    item.id = "item-t2"; item.name = "Untag"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 10; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    auto tag = svc.create("rust");
+    svc.add_to_item("item-t2", tag.id);
+    svc.remove_from_item("item-t2", tag.id);
+
+    auto tags = svc.get_tags_for_item("item-t2");
+    ASSERT_TRUE(tags.empty());
+    TEST_PASS();
+}
+
+// --- NoteService tests ---
+
+static void test_note_add() {
+    TEST_BEGIN("NoteService add");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    NoteRepository note_repo(db);
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    NoteService svc(note_repo, item_repo, act_repo);
+
+    ArchiveItem item;
+    item.id = "item-n1"; item.name = "Noted"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 10; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    auto note = svc.add("item-n1", "Test note content");
+    ASSERT_TRUE(note.id.size() > 0);
+    ASSERT_EQ(note.content, "Test note content");
+    ASSERT_EQ(note.item_id, "item-n1");
+
+    auto notes = svc.get_notes("item-n1");
+    ASSERT_EQ(notes.size(), 1u);
+    ASSERT_EQ(notes[0].content, "Test note content");
+    TEST_PASS();
+}
+
+static void test_note_update() {
+    TEST_BEGIN("NoteService update");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    NoteRepository note_repo(db);
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    NoteService svc(note_repo, item_repo, act_repo);
+
+    ArchiveItem item;
+    item.id = "item-n2"; item.name = "UpdNote"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 10; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    auto note = svc.add("item-n2", "Original");
+    svc.update(note.id, "Updated content");
+
+    auto notes = svc.get_notes("item-n2");
+    ASSERT_EQ(notes.size(), 1u);
+    ASSERT_EQ(notes[0].content, "Updated content");
+    TEST_PASS();
+}
+
+static void test_note_remove() {
+    TEST_BEGIN("NoteService remove");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    NoteRepository note_repo(db);
+    ArchiveItemRepository item_repo(db);
+    ActivityRepository act_repo(db);
+    NoteService svc(note_repo, item_repo, act_repo);
+
+    ArchiveItem item;
+    item.id = "item-n3"; item.name = "DelNote"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 10; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    auto note = svc.add("item-n3", "Delete me");
+    svc.remove(note.id, "item-n3");
+
+    auto notes = svc.get_notes("item-n3");
+    ASSERT_TRUE(notes.empty());
+    TEST_PASS();
+}
+
+// --- VersionService tests ---
+
+static void test_version_create_and_get() {
+    TEST_BEGIN("VersionService create_version and get_versions");
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    VersionRepository ver_repo(db);
+    ActivityRepository act_repo(db);
+    StorageManager storage(":", "test-items");
+    VersionService svc(ver_repo, item_repo, act_repo, storage);
+
+    ArchiveItem item;
+    item.id = "item-v1"; item.name = "Versioned"; item.type = ItemType::File;
+    item.status = ItemStatus::Archived; item.original_path = "/a";
+    item.storage_path = "/b"; item.size = 100; item.created_at = "";
+    item.archived_at = ""; item.last_modified_at = "";
+    item_repo.insert(item);
+
+    auto versions = svc.get_versions("item-v1");
+    ASSERT_TRUE(versions.empty());
+
+    auto latest = svc.get_latest("item-v1");
+    ASSERT_TRUE(!latest.has_value());
+    TEST_PASS();
+}
+
+// --- Uuid utility tests ---
+
+static void test_uuid_generate() {
+    TEST_BEGIN("UUID generate_id produces unique IDs");
+    auto id1 = archive::core::utils::generate_id();
+    auto id2 = archive::core::utils::generate_id();
+    ASSERT_TRUE(id1.size() == 32);
+    ASSERT_TRUE(id2.size() == 32);
+    ASSERT_TRUE(id1 != id2);
+    TEST_PASS();
+}
+
+static void test_uuid_now_iso() {
+    TEST_BEGIN("UUID now_iso produces valid timestamp");
+    auto ts = archive::core::utils::now_iso();
+    ASSERT_TRUE(ts.size() == 20);
+    ASSERT_TRUE(ts[4] == '-');
+    ASSERT_TRUE(ts[7] == '-');
+    ASSERT_TRUE(ts[10] == 'T');
+    ASSERT_TRUE(ts[19] == 'Z');
+    TEST_PASS();
+}
+
 void run_service_tests() {
     std::cout << "=== Service Tests ===" << std::endl;
 
@@ -403,4 +663,16 @@ void run_service_tests() {
     test_update_move_to_trash();
     test_update_restore();
     test_update_toggle_favorite();
+    test_update_metadata();
+    test_tag_create();
+    test_tag_update();
+    test_tag_remove();
+    test_tag_add_to_item();
+    test_tag_remove_from_item();
+    test_note_add();
+    test_note_update();
+    test_note_remove();
+    test_version_create_and_get();
+    test_uuid_generate();
+    test_uuid_now_iso();
 }

@@ -48,10 +48,12 @@ void StorageManager::remove_item_dir(const std::string& item_id) {
 
 void StorageManager::remove_version_file(const std::string& item_id, int version) {
     auto versions_dir = get_item_versions_dir(item_id);
+    if (!std::filesystem::exists(versions_dir)) return;
+    std::string prefix = "v" + std::to_string(version);
     for (const auto& entry : std::filesystem::directory_iterator(versions_dir)) {
         if (entry.is_regular_file()) {
             std::string name = entry.path().filename().string();
-            if (name == "v" + std::to_string(version)) {
+            if (name.size() >= prefix.size() && name.substr(0, prefix.size()) == prefix) {
                 FileUtils::remove_file(entry.path().string());
                 break;
             }

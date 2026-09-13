@@ -23,7 +23,6 @@ ProjectDetector::DetectionResult ProjectDetector::detect(const std::string& path
 
     if (!std::filesystem::is_directory(path)) return result;
 
-    int match_count = 0;
     std::string best_type;
     int best_score = 0;
 
@@ -38,7 +37,6 @@ ProjectDetector::DetectionResult ProjectDetector::detect(const std::string& path
             best_score = score;
             best_type = pattern.type;
         }
-        match_count += score;
     }
 
     if (best_score > 0) {

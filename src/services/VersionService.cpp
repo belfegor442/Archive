@@ -1,10 +1,8 @@
 #include "VersionService.h"
 #include "../filesystem/FileUtils.h"
+#include "../core/utils/Uuid.h"
 
-#include <random>
-#include <sstream>
-#include <chrono>
-#include <iomanip>
+#include <filesystem>
 
 namespace archive::services {
 
@@ -29,24 +27,24 @@ core::Version VersionService::create_version(const std::string& item_id, const s
     uint64_t size = filesystem::FileUtils::file_size(file_path);
 
     core::Version ver;
-    ver.id = generate_id();
+    ver.id = core::utils::generate_id();
     ver.item_id = item_id;
     ver.version_number = new_version;
     ver.storage_path = stored_path;
     ver.checksum = checksum;
     ver.size = size;
     ver.notes = notes;
-    ver.created_at = now_iso();
+    ver.created_at = core::utils::now_iso();
 
     versions_.insert(ver);
     items_.increment_version(item_id);
 
     core::Activity act;
-    act.id = generate_id();
+    act.id = core::utils::generate_id();
     act.item_id = item_id;
     act.action = core::ActivityAction::VersionCreated;
     act.details = "Version " + std::to_string(new_version) + " created";
-    act.created_at = now_iso();
+    act.created_at = core::utils::now_iso();
     activities_.insert(act);
 
     return ver;
@@ -61,34 +59,35 @@ std::optional<core::Version> VersionService::get_latest(const std::string& item_
 }
 
 void VersionService::restore(const std::string& item_id, const std::string& version_id) {
-    (void)version_id;
+    auto ver = versions_.find_by_id(version_id);
+    if (!ver) throw std::runtime_error("Version not found: " + version_id);
+
+    auto item = items_.find_by_id(item_id);
+    if (!item) throw std::runtime_error("Item not found: " + item_id);
+
+    if (!std::filesystem::exists(ver->storage_path)) {
+        throw std::runtime_error("Version file missing: " + ver->storage_path);
+    }
+
+    std::string item_file_dir = storage_.get_item_file_dir(item_id);
+    std::string original_name = filesystem::FileUtils::file_name(item->original_path);
+    std::string dest = item_file_dir + "/" + original_name;
+    std::filesystem::copy_file(ver->storage_path, dest, std::filesystem::copy_options::overwrite_existing);
+
+    item->storage_path = dest;
+    item->checksum = ver->checksum;
+    item->size = ver->size;
+    item->current_version = ver->version_number;
+    item->last_modified_at = core::utils::now_iso();
+    items_.update(*item);
+
     core::Activity act;
-    act.id = generate_id();
+    act.id = core::utils::generate_id();
     act.item_id = item_id;
     act.action = core::ActivityAction::VersionRestored;
-    act.created_at = now_iso();
+    act.details = "Restored to version " + std::to_string(ver->version_number);
+    act.created_at = core::utils::now_iso();
     activities_.insert(act);
-}
-
-std::string VersionService::generate_id() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<uint64_t> dis(0, std::numeric_limits<uint64_t>::max());
-    std::ostringstream oss;
-    oss << std::hex << dis(gen) << dis(gen);
-    std::string id = oss.str();
-    id.resize(32);
-    return id;
-}
-
-std::string VersionService::now_iso() {
-    auto now = std::chrono::system_clock::now();
-    auto time = std::chrono::system_clock::to_time_t(now);
-    std::tm utc{};
-    gmtime_s(&utc, &time);
-    std::ostringstream oss;
-    oss << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ");
-    return oss.str();
 }
 
 } // namespace archive::services

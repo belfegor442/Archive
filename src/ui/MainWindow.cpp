@@ -25,7 +25,7 @@ MainWindow::MainWindow(const archive::app::AppConfig& config, QWidget* parent)
     activities_ = std::make_unique<archive::storage::ActivityRepository>(*db_);
     storage_ = std::make_unique<archive::filesystem::StorageManager>(config_.data_dir, config_.items_dir);
     detector_ = std::make_unique<archive::services::ProjectDetector>();
-    import_svc_ = std::make_unique<archive::services::ImportService>(*items_, *categories_, *tags_, *activities_, *storage_, *detector_);
+    import_svc_ = std::make_unique<archive::services::ImportService>(*items_, *categories_, *tags_, *activities_, *versions_, *storage_, *detector_);
     search_svc_ = std::make_unique<archive::services::SearchService>(*items_);
     dashboard_svc_ = std::make_unique<archive::services::DashboardService>(*items_);
     note_svc_ = std::make_unique<archive::services::NoteService>(*notes_, *items_, *activities_);

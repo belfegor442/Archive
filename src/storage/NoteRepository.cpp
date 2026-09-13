@@ -44,6 +44,13 @@ std::vector<core::Note> NoteRepository::find_by_item(const std::string& item_id)
     return notes;
 }
 
+std::optional<core::Note> NoteRepository::find_by_note_id(const std::string& note_id) {
+    auto stmt = db_.prepare("SELECT * FROM notes WHERE id=?");
+    stmt.bind_text(1, note_id);
+    if (stmt.step()) return read_note(stmt);
+    return std::nullopt;
+}
+
 core::Note NoteRepository::read_note(DatabaseManager::Statement& stmt) {
     core::Note note;
     note.id = stmt.column_text(0);

@@ -1,5 +1,8 @@
 #include "SearchService.h"
 
+#include <algorithm>
+#include <cctype>
+
 namespace archive::services {
 
 SearchService::SearchService(storage::ArchiveItemRepository& items)
@@ -9,35 +12,40 @@ SearchService::SearchService(storage::ArchiveItemRepository& items)
 core::SearchResult SearchService::search(const std::string& query, const SearchFilters& filters) {
     std::vector<core::ArchiveItem> results;
 
-    if (query.empty() && !filters.category_id && !filters.type && !filters.is_favorite && !filters.tag) {
-        results = items_.find_all();
-    } else if (!query.empty()) {
+    bool has_query = !query.empty();
+
+    if (has_query) {
         results = items_.search(query);
+    } else if (filters.is_favorite.has_value() && *filters.is_favorite) {
+        results = items_.find_favorites();
+    } else if (filters.type.has_value()) {
+        auto status = core::ItemStatus::Archived;
+        results = items_.find_by_status(status);
     } else {
         results = items_.find_all();
     }
 
-    std::vector<core::ArchiveItem> filtered;
-    for (auto& item : results) {
-        bool pass = true;
-
-        if (filters.category_id && item.category_id != filters.category_id) {
-            pass = false;
-        }
-        if (filters.type && core::to_string(item.type) != filters.type) {
-            pass = false;
-        }
-        if (filters.is_favorite && item.is_favorite != *filters.is_favorite) {
-            pass = false;
-        }
-
-        if (pass) {
-            filtered.push_back(std::move(item));
-        }
+    if (filters.is_favorite.has_value()) {
+        bool want_fav = *filters.is_favorite;
+        auto it = std::remove_if(results.begin(), results.end(),
+            [want_fav](const core::ArchiveItem& i) { return i.is_favorite != want_fav; });
+        results.erase(it, results.end());
     }
 
-    int total = static_cast<int>(filtered.size());
-    return core::SearchResult(std::move(filtered), total, query);
+    if (filters.type.has_value()) {
+        auto it = std::remove_if(results.begin(), results.end(),
+            [&](const core::ArchiveItem& i) { return core::to_string(i.type) != filters.type; });
+        results.erase(it, results.end());
+    }
+
+    if (filters.category_id.has_value()) {
+        auto it = std::remove_if(results.begin(), results.end(),
+            [&](const core::ArchiveItem& i) { return i.category_id != filters.category_id; });
+        results.erase(it, results.end());
+    }
+
+    int total = static_cast<int>(results.size());
+    return core::SearchResult(std::move(results), total, query);
 }
 
 std::vector<core::ArchiveItem> SearchService::find_by_status(core::ItemStatus status) {

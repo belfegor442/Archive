@@ -81,7 +81,12 @@ void ArchiveItemRepository::remove(const std::string& id) {
 }
 
 std::optional<core::ArchiveItem> ArchiveItemRepository::find_by_id(const std::string& id) {
-    auto stmt = db_.prepare("SELECT * FROM archive_items WHERE id=?");
+    auto stmt = db_.prepare(R"(
+        SELECT id, name, type, status, description, original_path, storage_path,
+               size, file_count, category_id, created_at, archived_at,
+               last_modified_at, checksum, current_version, is_favorite
+        FROM archive_items WHERE id=?
+    )");
     stmt.bind_text(1, id);
 
     if (stmt.step()) {
@@ -94,7 +99,12 @@ std::optional<core::ArchiveItem> ArchiveItemRepository::find_by_id(const std::st
 
 std::vector<core::ArchiveItem> ArchiveItemRepository::find_all() {
     std::vector<core::ArchiveItem> items;
-    auto stmt = db_.prepare("SELECT * FROM archive_items ORDER BY archived_at DESC");
+    auto stmt = db_.prepare(R"(
+        SELECT id, name, type, status, description, original_path, storage_path,
+               size, file_count, category_id, created_at, archived_at,
+               last_modified_at, checksum, current_version, is_favorite
+        FROM archive_items ORDER BY archived_at DESC
+    )");
     while (stmt.step()) {
         auto item = read_item(stmt);
         load_tags(item);
@@ -105,7 +115,12 @@ std::vector<core::ArchiveItem> ArchiveItemRepository::find_all() {
 
 std::vector<core::ArchiveItem> ArchiveItemRepository::find_by_status(core::ItemStatus status) {
     std::vector<core::ArchiveItem> items;
-    auto stmt = db_.prepare("SELECT * FROM archive_items WHERE status=? ORDER BY archived_at DESC");
+    auto stmt = db_.prepare(R"(
+        SELECT id, name, type, status, description, original_path, storage_path,
+               size, file_count, category_id, created_at, archived_at,
+               last_modified_at, checksum, current_version, is_favorite
+        FROM archive_items WHERE status=? ORDER BY archived_at DESC
+    )");
     stmt.bind_text(1, core::to_string(status));
     while (stmt.step()) {
         auto item = read_item(stmt);
@@ -117,7 +132,12 @@ std::vector<core::ArchiveItem> ArchiveItemRepository::find_by_status(core::ItemS
 
 std::vector<core::ArchiveItem> ArchiveItemRepository::find_by_category(const std::string& category_id) {
     std::vector<core::ArchiveItem> items;
-    auto stmt = db_.prepare("SELECT * FROM archive_items WHERE category_id=? ORDER BY archived_at DESC");
+    auto stmt = db_.prepare(R"(
+        SELECT id, name, type, status, description, original_path, storage_path,
+               size, file_count, category_id, created_at, archived_at,
+               last_modified_at, checksum, current_version, is_favorite
+        FROM archive_items WHERE category_id=? ORDER BY archived_at DESC
+    )");
     stmt.bind_text(1, category_id);
     while (stmt.step()) {
         auto item = read_item(stmt);
@@ -129,7 +149,12 @@ std::vector<core::ArchiveItem> ArchiveItemRepository::find_by_category(const std
 
 std::vector<core::ArchiveItem> ArchiveItemRepository::find_favorites() {
     std::vector<core::ArchiveItem> items;
-    auto stmt = db_.prepare("SELECT * FROM archive_items WHERE is_favorite=1 ORDER BY archived_at DESC");
+    auto stmt = db_.prepare(R"(
+        SELECT id, name, type, status, description, original_path, storage_path,
+               size, file_count, category_id, created_at, archived_at,
+               last_modified_at, checksum, current_version, is_favorite
+        FROM archive_items WHERE is_favorite=1 ORDER BY archived_at DESC
+    )");
     while (stmt.step()) {
         auto item = read_item(stmt);
         load_tags(item);
@@ -142,7 +167,10 @@ std::vector<core::ArchiveItem> ArchiveItemRepository::search(const std::string& 
     std::vector<core::ArchiveItem> items;
     std::string pattern = "%" + query + "%";
     auto stmt = db_.prepare(R"(
-        SELECT * FROM archive_items
+        SELECT id, name, type, status, description, original_path, storage_path,
+               size, file_count, category_id, created_at, archived_at,
+               last_modified_at, checksum, current_version, is_favorite
+        FROM archive_items
         WHERE name LIKE ? OR description LIKE ? OR original_path LIKE ?
         ORDER BY archived_at DESC
     )");
@@ -248,9 +276,44 @@ core::DashboardStats ArchiveItemRepository::get_stats() {
     auto stmt_size = db_.prepare("SELECT COALESCE(SUM(size), 0) FROM archive_items WHERE status='archived'");
     if (stmt_size.step()) stats.total_size = static_cast<uint64_t>(stmt_size.column_int64(0));
 
-    auto stmt_recent = db_.prepare("SELECT * FROM archive_items WHERE status='archived' ORDER BY archived_at DESC LIMIT 10");
+    auto stmt_recent = db_.prepare(R"(
+        SELECT id, name, type, status, description, original_path, storage_path,
+               size, file_count, category_id, created_at, archived_at,
+               last_modified_at, checksum, current_version, is_favorite
+        FROM archive_items WHERE status='archived' ORDER BY archived_at DESC LIMIT 10
+    )");
     while (stmt_recent.step()) {
         stats.recent_items.push_back(read_item(stmt_recent));
+    }
+
+    auto stmt_cat = db_.prepare(R"(
+        SELECT c.id, c.name, c.color, COUNT(ai.id) as cnt
+        FROM categories c
+        LEFT JOIN archive_items ai ON ai.category_id = c.id AND ai.status != 'deleted'
+        GROUP BY c.id
+        ORDER BY cnt DESC
+    )");
+    while (stmt_cat.step()) {
+        core::CategoryCount cc;
+        cc.category_id = stmt_cat.column_text(0);
+        cc.name = stmt_cat.column_text(1);
+        cc.color = stmt_cat.column_text(2);
+        cc.count = stmt_cat.column_int(3);
+        stats.category_counts.push_back(std::move(cc));
+    }
+
+    auto stmt_type = db_.prepare(R"(
+        SELECT type, COUNT(*) as cnt
+        FROM archive_items
+        WHERE status != 'deleted'
+        GROUP BY type
+        ORDER BY cnt DESC
+    )");
+    while (stmt_type.step()) {
+        core::TypeCount tc;
+        tc.type = stmt_type.column_text(0);
+        tc.count = stmt_type.column_int(1);
+        stats.type_counts.push_back(std::move(tc));
     }
 
     return stats;
