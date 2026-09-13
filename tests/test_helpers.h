@@ -27,6 +27,13 @@ inline int& tests_passed() {
         std::cout << "OK" << std::endl; \
     } while(0)
 
+#define TEST_FAIL(msg) \
+    do { \
+        std::cout << "FAIL" << std::endl; \
+        std::cerr << "    " << msg << std::endl; \
+        return; \
+    } while(0)
+
 #define ASSERT_EQ(a, b) \
     do { \
         if ((a) != (b)) { \
@@ -52,6 +59,15 @@ inline int& tests_passed() {
         if (!threw) { \
             std::cout << "FAIL" << std::endl; \
             std::cerr << "    Expected exception from: " << #expr << std::endl; \
+            return; \
+        } \
+    } while(0)
+
+#define ASSERT_NO_THROW(expr) \
+    do { \
+        try { expr; } catch (const std::exception& e) { \
+            std::cout << "FAIL" << std::endl; \
+            std::cerr << "    Unexpected exception: " << e.what() << std::endl; \
             return; \
         } \
     } while(0)

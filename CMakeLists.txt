@@ -19,9 +19,13 @@ else()
     add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter)
 endif()
 
-# Sources (core library — no UI yet)
-set(ARCHIVE_SOURCES
-    src/main.cpp
+# Dependencies
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SQLITE3 REQUIRED sqlite3)
+pkg_check_modules(OPENSSL REQUIRED openssl)
+
+# Common sources
+set(ARCHIVE_LIB_SOURCES
     src/app/AppConfig.cpp
     src/app/Application.cpp
     src/core/models/ArchiveItem.cpp
@@ -31,13 +35,40 @@ set(ARCHIVE_SOURCES
     src/core/models/Note.cpp
     src/core/models/Activity.cpp
     src/core/models/StoredObject.cpp
+    src/storage/DatabaseManager.cpp
+    src/storage/ArchiveItemRepository.cpp
+    src/storage/CategoryRepository.cpp
+    src/storage/TagRepository.cpp
+    src/storage/VersionRepository.cpp
+    src/storage/NoteRepository.cpp
+    src/storage/ActivityRepository.cpp
+    src/hashing/FileHasher.cpp
+    src/filesystem/FileUtils.cpp
+    src/filesystem/StorageManager.cpp
 )
 
-add_executable(archive ${ARCHIVE_SOURCES})
+# Static library for all core code
+add_library(archive_lib STATIC ${ARCHIVE_LIB_SOURCES})
 
-target_include_directories(archive PRIVATE
+target_include_directories(archive_lib PUBLIC
     ${CMAKE_SOURCE_DIR}/src
+    ${SQLITE3_INCLUDE_DIRS}
+    ${OPENSSL_INCLUDE_DIRS}
 )
+
+target_link_libraries(archive_lib PUBLIC
+    ${SQLITE3_LIBRARIES}
+    ${OPENSSL_LIBRARIES}
+)
+
+target_link_directories(archive_lib PUBLIC
+    ${SQLITE3_LIBRARY_DIRS}
+    ${OPENSSL_LIBRARY_DIRS}
+)
+
+# Main executable
+add_executable(archive src/main.cpp)
+target_link_libraries(archive PRIVATE archive_lib)
 
 # Tests
 option(ARCHIVE_BUILD_TESTS "Build tests" ON)
