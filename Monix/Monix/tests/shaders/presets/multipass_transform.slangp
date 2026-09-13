@@ -1,0 +1,5 @@
+shaders=2
+shader0=../glsl/solid_red.glsl
+alias0=Source
+shader1=../glsl/color_transform.glsl
+alias1=Transform

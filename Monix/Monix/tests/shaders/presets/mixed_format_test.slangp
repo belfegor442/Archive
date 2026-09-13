@@ -1,0 +1,5 @@
+shaders=2
+shader0=../glsl/solid_red.glsl
+alias0=RedPass
+shader1=../slang/solid_blue.slang
+alias1=BluePass

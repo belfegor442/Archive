@@ -1,0 +1,12 @@
+#include "MonixApp.hpp"
+
+#include "ui/render/primitives/RenderPrimitives.hpp"
+#include "ui/render/overlays/RenderOverlay.hpp"
+#include "ui/render/RenderCoreMonitor.hpp"
+#include "ui/render/RenderDispatcher.hpp"
+#include "ui/render/panels/log/RenderLog.hpp"
+#include "ui/render/panels/tasks/RenderTasks.hpp"
+#include "ui/render/panels/hardware/RenderHardware.hpp"
+#include "ui/render/panels/network/RenderNetwork.hpp"
+#include "ui/render/panels/scram/RenderScram.hpp"
+#include "ui/render/panels/settings/RenderSettings.hpp"

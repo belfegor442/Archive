@@ -1,0 +1,9 @@
+timestamp,level,domain,module,service,event_id,repeat_count,message,metadata
+"2026-07-31T15:36:02.829","WARN","REGISTRY","registry","startup",912668,1,"Startup folder item count changed: 0 -> 2.","event=startup_change"
+"2026-07-31T15:36:02.829","WARN","REGISTRY","registry","run",912667,1,"Run key value count changed: 0 -> 3.","event=run_count"
+"2026-07-31T15:36:02.616","ERROR","FILESYSTEM","filesystem","dirty",912666,1,"Volume dirty bit set on C:.","event=dirty_bit"
+"2026-07-31T15:36:02.526","INFO","KERNEL","os","driver",912665,1,"Driver load: ntoskrnl.exe","event=driver_load"
+"2026-07-31T15:36:02.413","ERROR","KERNEL","scheduler","priority",912664,1,"Thread priority change: RT threads 2104 -> 2132.","event=priority_change"
+"2026-07-31T15:36:02.412","WARN","KERNEL","scheduler","wait",912663,1,"Wait chain anomaly: 2066 ready threads.","event=wait_anomaly"
+"2026-07-31T15:36:02.261","INFO","LOG","log","export",912662,3,"CSV log export generated in exports folder.","format=csv"
+"2026-07-31T15:36:01.673","CRITICAL","SCRAM","scram","risk",912661,1,"Integrity check failure. [risk=93 

@@ -1,0 +1,9 @@
+#reference "test_base.slangp"
+
+shaders = 2
+
+shader0 = tests/test_alias_pass_a.frag
+alias0 = DerivedPass
+
+shader1 = tests/test_alias_pass_b.frag
+alias1 = Output

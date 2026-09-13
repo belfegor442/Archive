@@ -1,0 +1,73 @@
+shaders = 18
+
+// Pass 0: Color tools + NTSC (first pass, reads Original)
+shader0 = Shaders/Effects/colortools_and_ntsc_pass.slang
+alias0 = colortools_and_ntsc_pass
+
+// Pass 1: Average luminance (reads colortools + feedback)
+shader1 = Shaders/Effects/avglum_pass.slang
+alias1 = avglum_pass
+framebuffer_feedback1 = true
+
+// Pass 2: Bloom pass 1 (reads colortools)
+shader2 = Bloom/bloom_pass_1.slang
+alias2 = bloom_pass_1
+
+// Pass 3: Bloom pass 2 (reads bloom_pass_1)
+shader3 = Bloom/bloom_pass_2.slang
+alias3 = bloom_pass_2
+
+// Pass 4: Bloom pass 3 (reads bloom_pass_2)
+shader4 = Bloom/bloom_pass_3.slang
+alias4 = bloom_pass_3
+
+// Pass 5: Bloom pass 4 (reads bloom_pass_3 + colortools + avglum)
+shader5 = Bloom/bloom_pass_4.slang
+alias5 = bloom_pass_final
+
+// Pass 6: Ambient temporal (reads colortools + avglum + backdrop)
+shader6 = Shaders/Effects/ambi_temporal_pass.slang
+alias6 = ambi_temporal_pass
+framebuffer_feedback6 = true
+
+// Pass 7: Helper pass (reads monitor_body_curved + colortools + feedback)
+shader7 = Shaders/Effects/helper_pass.slang
+alias7 = helper_pass
+framebuffer_feedback7 = true
+
+// Pass 8: FXAA (reads colortools + FPS feedback)
+shader8 = Shaders/Effects/fxaa.slang
+alias8 = fxaa_pass
+
+// Pass 9: Halo pre-gamma (reads in_glow_y + feedback)
+shader9 = Shaders/Effects/halo_pre_gamma.slang
+alias9 = halo_pre_gamma_pass
+framebuffer_feedback9 = true
+
+// Pass 10: Halo (reads halo_pre_gamma + in_glow_y)
+shader10 = Shaders/Effects/halo.slang
+alias10 = halo_pass
+
+// Pass 11: Final composite (reads everything)
+shader11 = Shaders/Effects/final_pass.slang
+alias11 = final_pass
+framebuffer_feedback11 = true
+
+// Pass 12-17: Additional passes
+shader12 = Shaders/Effects/shift_and_bleed.slang
+alias12 = shift_and_bleed_pass
+
+shader13 = Shaders/Effects/in_glow_x.slang
+alias13 = in_glow_pass_x
+
+shader14 = Shaders/Effects/in_glow_y.slang
+alias14 = in_glow_pass
+
+shader15 = Shaders/Effects/reflection_blur_pre.slang
+alias15 = reflection_blur_pre_pass
+
+shader16 = Shaders/Effects/reflection_blur.slang
+alias16 = reflected_blurred_pass
+
+shader17 = tests/identity.slang
+alias17 = upscale_pass

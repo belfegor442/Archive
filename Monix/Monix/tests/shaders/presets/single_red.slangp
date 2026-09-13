@@ -1,0 +1,3 @@
+shaders=1
+shader0=../glsl/solid_red.glsl
+alias0=SolidRed

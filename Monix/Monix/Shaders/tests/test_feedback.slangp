@@ -1,0 +1,5 @@
+shaders = 1
+
+shader0 = tests/test_feedback.frag
+alias0 = Pass0
+framebuffer_feedback0 = true

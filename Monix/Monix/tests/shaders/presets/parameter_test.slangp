@@ -1,0 +1,6 @@
+shaders=1
+shader0=../glsl/solid_red.glsl
+alias0=SolidRed
+parameters=Brightness;Contrast
+Brightness=1.5
+Contrast=0.8

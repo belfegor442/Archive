@@ -1,0 +1,64 @@
+# MONIX CRT Preset
+# Professional CRT Monitor Simulation
+# Effects: Scanlines -> Phosphor -> Glow -> Curvature -> Flicker
+# Based on CRT-Royale and CRT-Geom algorithms
+# License: GPL-2.0
+
+shaders = "5"
+
+# Pass 0: Scanlines (Gaussian beam model from crt-royale)
+shader0 = "GLSL/crt/scanlines.glsl"
+alias0 = "Scanlines"
+filter_linear0 = "true"
+scale_type0 = "viewport"
+scale0 = "1.0"
+
+# Pass 1: Phosphor Mask (Aperture grille from crt-royale)
+shader1 = "GLSL/crt/phosphor.glsl"
+alias1 = "Phosphor"
+filter_linear1 = "true"
+scale_type1 = "viewport"
+scale1 = "1.0"
+
+# Pass 2: Glow (Phosphor bloom from crt-royale)
+shader2 = "GLSL/crt/glow.glsl"
+alias2 = "Glow"
+filter_linear2 = "true"
+scale_type2 = "viewport"
+scale2 = "1.0"
+
+# Pass 3: Curvature (Barrel distortion from crt-geom)
+shader3 = "GLSL/crt/curvature.glsl"
+alias3 = "Curvature"
+filter_linear3 = "true"
+scale_type3 = "viewport"
+scale3 = "1.0"
+
+# Pass 4: Flicker (Temporal phosphor modulation)
+shader4 = "GLSL/crt/flicker.glsl"
+alias4 = "Output"
+filter_linear4 = "true"
+scale_type4 = "viewport"
+scale4 = "1.0"
+
+# Parameters for full CRT effect
+# Scanlines: 30% strength, moderate sharpness
+scanline_sigma = 0.3
+scanline_strength = 0.3
+
+# Phosphor: Aperture grille, 18% strength, standard triad size
+phosphor_mask_type = 0.0
+phosphor_strength = 0.18
+phosphor_triad_size = 3.0
+
+# Glow: Subtle bloom, moderate radius
+glow_strength = 0.10
+glow_radius = 4.0
+glow_brightpass = 0.6
+
+# Curvature: Gentle barrel distortion
+curvature_strength = 0.06
+curvature_radius = 12.0
+
+# Flicker: Nearly imperceptible
+flicker_strength = 0.01

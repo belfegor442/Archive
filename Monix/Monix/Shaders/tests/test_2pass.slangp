@@ -1,0 +1,7 @@
+shaders = 2
+
+shader0 = tests/test_2pass_pass0.frag
+alias0 = Pass0
+
+shader1 = tests/test_2pass_pass1.frag
+alias1 = Output

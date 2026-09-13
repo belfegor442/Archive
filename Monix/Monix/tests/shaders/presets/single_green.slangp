@@ -1,0 +1,3 @@
+shaders=1
+shader0=../glsl/solid_green.glsl
+alias0=SolidGreen

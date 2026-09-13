@@ -1,0 +1,37 @@
+#pragma once
+
+#include <array>
+#include <string>
+#include <filesystem>
+
+namespace monix {
+
+inline std::string TrimQuoted(const std::string& s) {
+  size_t start = s.find_first_not_of(" \t\r\n\"");
+  size_t end = s.find_last_not_of(" \t\r\n\"");
+  if (start == std::string::npos) return "";
+  return s.substr(start, end - start + 1);
+}
+
+inline std::wstring JoinPathForCommand(const std::filesystem::path& path) {
+  return L"\"" + path.wstring() + L"\"";
+}
+
+} // namespace monix
+
+namespace monix {
+
+inline std::array<std::wstring, 8> IntroLogo() {
+  return {
+    L" \x2588\x2588\x2588   \x2588\x2588\x2588                      \x2588\x2588\x2588             ",
+    L"\x2591\x2591\x2588\x2588\x2588 \x2588\x2588\x2588                      \x2591\x2591\x2591              ",
+    L" \x2588\x2588\x2588\x2591\x2588\x2588\x2588\x2588\x2588   \x2588\x2588\x2588\x2588  \x2588\x2588\x2588\x2588\x2588 \x2588\x2588\x2588\x2588\x2588",
+    L" \x2588\x2588\x2588\x2591\x2591\x2588\x2588 \x2588\x2588\x2588  \x2588\x2588\x2588\x2591\x2591\x2588\x2588\x2588\x2591\x2591\x2588\x2588\x2588 \x2591\x2591\x2588\x2588\x2588 \x2591\x2591\x2588\x2588\x2588 \x2591\x2591",
+    L" \x2588\x2588\x2588 \x2591\x2591\x2591  \x2588\x2588\x2588 \x2588\x2588\x2588 \x2591\x2588\x2588\x2588 \x2588\x2588\x2588 \x2588\x2588\x2588  \x2591\x2591\x2591  \x2591\x2591\x2591\x2588\x2588\x2588\x2591  ",
+    L" \x2588\x2588\x2588      \x2588\x2588\x2588 \x2588\x2588\x2588 \x2591\x2588\x2588\x2588 \x2588\x2588\x2588  \x2588\x2588\x2588   \x2588\x2588\x2588\x2591\x2591\x2588\x2588\x2588 ",
+    L" \x2588\x2588\x2588\x2588\x2588     \x2588\x2588\x2588\x2588\x2588\x2591\x2591\x2588\x2588\x2588\x2588\x2588  \x2588\x2588\x2588\x2588 \x2588\x2588\x2588\x2588 \x2588\x2588\x2588\x2588 \x2588\x2588\x2588\x2588 \x2588\x2588\x2588\x2588",
+    L"\x2591\x2591\x2591\x2591\x2591     \x2591\x2591\x2591\x2591\x2591  \x2591\x2591\x2591\x2591\x2591  \x2591\x2591\x2591\x2591 \x2591\x2591\x2591\x2591 \x2591\x2591\x2591\x2591 \x2591\x2591\x2591\x2591 \x2591\x2591\x2591\x2591 "
+  };
+}
+
+} // namespace monix

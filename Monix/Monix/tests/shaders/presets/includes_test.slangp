@@ -1,0 +1,3 @@
+shaders=1
+shader0=../glsl/shader_with_includes.glsl
+alias0=IncludeTest

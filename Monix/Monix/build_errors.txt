@@ -1,0 +1,247 @@
+﻿Using vcvarsall: C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvarsall.bat
+Using Windows SDK: 10.0.26100.0
+Compiling resources...
+Microsoft (R) Windows (R) Resource Compiler Version 10.0.10011.16384
+
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+Running build via vcvarsall...
+**********************************************************************
+** Visual Studio 2022 Developer Command Prompt v17.14.39
+** Copyright (c) 2025 Microsoft Corporation
+**********************************************************************
+[vcvarsall.bat] Environment initialized for: 'x64'
+Compiling hardware.c with cl.exe /MT /Zm200...
+powershell : Compilador de optimización de C/C++ de Microsoft (R) versión 19.44.35228 para x64
+En línea: 1 Carácter: 1
++ powershell -ExecutionPolicy Bypass -File "C:\Users\belfegor442\Deskto ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Compilador de o....35228 para x64:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(C) Microsoft Corporation. Todos los derechos reservados.
+
+hardware.c
+Compiling cpu.asm with ml64.exe...
+Microsoft (R) Macro Assembler (x64) Version 14.44.35228.0
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+ Assembling: C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\sensors\cpu.asm
+Compiling main.cpp with cl.exe /MT /std:c++20 /Od /Zm800 /bigobj...
+Compilador de optimización de C/C++ de Microsoft (R) versión 19.44.35228 para x64
+(C) Microsoft Corporation. Todos los derechos reservados.
+
+main.cpp
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui\AppStateGroups.hpp(58): error C2065: 'NotificationItem': identificador no declarado
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui\AppStateGroups.hpp(58): error C2923: 'std::vector': 'NotificationItem' no es un argumento de tipo plantilla válido para el parámetro '_Ty'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui\AppStateGroups.hpp(58): note: vea la declaración de 'NotificationItem'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui\AppStateGroups.hpp(58): error C2976: "std::vector": no hay suficientes argumentos de plantilla
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442): note: vea la declaración de 'std::vector'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui\AppStateGroups.hpp(58): error C2955: 'std::vector': el uso de clase plantilla requiere una lista de argumentos de plantilla
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442): note: vea la declaración de 'std::vector'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(21): error C3646: 'activeTab': especificador de invalidación desconocido
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(21): error C2059: error de sintaxis: '='
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(21): error C2653: 'Tab': no es un nombre de clase o espacio de nombres
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(21): error C2238: símbolos (token) inesperados delante de ';'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(25): error C3646: 'snapshot': especificador de invalidación desconocido
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(25): error C4430: falta el especificador de tipo; se presupone int. Nota: C++ no admite default-int
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(26): error C2065: 'Snapshot': identificador no declarado
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(26): error C2923: 'std::unique_ptr': 'Snapshot' no es un argumento de tipo plantilla válido para el parámetro '_Ty'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(26): note: vea la declaración de 'Snapshot'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(26): error C2976: "std::unique_ptr": no hay suficientes argumentos de plantilla
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\memory(3347): note: vea la declaración de 'std::unique_ptr'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(26): error C2955: 'std::unique_ptr': el uso de clase plantilla requiere una lista de argumentos de plantilla
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\memory(3347): note: vea la declaración de 'std::unique_ptr'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(41): error C2039: "IntroState": no es un miembro de "monix"
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui\AppStateGroups.hpp(15): note: vea la declaración de 'monix'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(41): error C3646: 'intro': especificador de invalidación desconocido
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(41): error C4430: falta el especificador de tipo; se presupone int. Nota: C++ no admite default-int
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(42): error C2039: "ContextMenuState": no es un miembro de "monix"
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui\AppStateGroups.hpp(15): note: vea la declaración de 'monix'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(42): error C3646: 'taskMenu': especificador de invalidación desconocido
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\ui/AppStateData.hpp(42): error C4430: falta el especificador de tipo; se presupone int. Nota: C++ no admite default-int
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(259): error C3861: 'TrimAscii': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(259): error C2593: 'operator =' es ambiguo
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1453): note: puede ser 'std::basic_string<char,std::char_traits<char>,std::allocator<char>> &std::basic_string<char,std::char_traits<char>,std::allocator<char>>::operator =(const _Elem)'
+        with
+        [
+            _Elem=char
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1445): note: o       'std::basic_string<char,std::char_traits<char>,std::allocator<char>> &std::basic_string<char,std::char_traits<char>,std::allocator<char>>::operator =(const _Elem *const )'
+        with
+        [
+            _Elem=char
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1394): note: o       'std::basic_string<char,std::char_traits<char>,std::allocator<char>> &std::basic_string<char,std::char_traits<char>,std::allocator<char>>::operator =(const std::basic_string<char,std::char_traits<char>,std::allocator<char>> &)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1345): note: o       'std::basic_string<char,std::char_traits<char>,std::allocator<char>> &std::basic_string<char,std::char_traits<char>,std::allocator<char>>::operator =(std::initializer_list<_Elem>)'
+        with
+        [
+            _Elem=char
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1224): note: o       'std::basic_string<char,std::char_traits<char>,std::allocator<char>> &std::basic_string<char,std::char_traits<char>,std::allocator<char>>::operator =(std::basic_string<char,std::char_traits<char>,std::allocator<char>> &&) noexcept(<expr>)'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(259): note: al hacer coincidir la lista de argumentos '(std::string, <error type>)'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(264): error C3861: 'TrimAscii': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(264): error C3861: 'ToLowerAscii': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(265): error C3861: 'TrimAscii': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(268): error C3861: 'Utf8ToWide': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(268): error C2593: 'operator =' es ambiguo
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1453): note: puede ser 'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(const _Elem)'
+        with
+        [
+            _Elem=wchar_t
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1445): note: o       'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(const _Elem *const )'
+        with
+        [
+            _Elem=wchar_t
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1394): note: o       'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1345): note: o       'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(std::initializer_list<_Elem>)'
+        with
+        [
+            _Elem=wchar_t
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1224): note: o       'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &&) noexcept'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(268): note: al hacer coincidir la lista de argumentos '(std::wstring, <error type>)'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(271): error C3861: 'TryParseInt': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(276): error C3861: 'TryParseUInt': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(280): error C3861: 'Utf8ToWide': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(280): error C2593: 'operator =' es ambiguo
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1453): note: puede ser 'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(const _Elem)'
+        with
+        [
+            _Elem=wchar_t
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1445): note: o       'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(const _Elem *const )'
+        with
+        [
+            _Elem=wchar_t
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1394): note: o       'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(const std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1345): note: o       'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(std::initializer_list<_Elem>)'
+        with
+        [
+            _Elem=wchar_t
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\xstring(1224): note: o       'std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>>::operator =(std::basic_string<wchar_t,std::char_traits<wchar_t>,std::allocator<wchar_t>> &&) noexcept'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(280): note: al hacer coincidir la lista de argumentos '(std::wstring, <error type>)'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(282): error C3861: 'RegistryLoadSetting': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(295): error C3861: 'GetSettingsRegistry': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(296): error C3312: no se encontró ninguna función 'begin' invocable para el tipo 'const <error type>'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(296): error C3312: no se encontró ninguna función 'end' invocable para el tipo 'const <error type>'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(296): error C2530: 'def': se deben inicializar las referencias
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(296): error C3531: 'def': un símbolo cuyo tipo contiene 'auto' debe tener un inicializador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(296): error C2143: error de sintaxis: falta ';' delante de ':'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(296): error C2143: error de sintaxis: falta ';' delante de ')'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(297): error C3861: 'RegistrySaveSetting': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(300): error C3861: 'WideToUtf8': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(300): error C2593: 'operator <<' es ambiguo
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(480): note: puede ser 'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(std::basic_streambuf<char,std::char_traits<char>> *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(448): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(const void *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(430): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(long double)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(412): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(double)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(394): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(float)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(376): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(unsigned __int64)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(358): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(__int64)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(340): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(unsigned long)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(322): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(long)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(303): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(unsigned int)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(277): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(int)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(258): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(unsigned short)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(224): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(short)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(206): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(bool)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(200): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(std::ios_base &(__cdecl *)(std::ios_base &))'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(194): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(std::basic_ios<char,std::char_traits<char>> &(__cdecl *)(std::basic_ios<char,std::char_traits<char>> &))'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(189): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(std::basic_ostream<char,std::char_traits<char>> &(__cdecl *)(std::basic_ostream<char,std::char_traits<char>> &))'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(475): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<<void>(std::nullptr_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\thread(298): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<char,std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,std::thread::id)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(688): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<char,std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(732): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<char,std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(768): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(813): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(930): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const signed char *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(936): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,signed char)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(941): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const unsigned char *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(947): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,unsigned char)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(955): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char8_t *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(961): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char8_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(969): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,wchar_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(972): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const wchar_t *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(976): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char16_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(978): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char32_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(986): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char16_t *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(988): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char32_t *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(1031): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<char,std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const std::error_code &)'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(300): note: al hacer coincidir la lista de argumentos '(std::basic_ostream<char,std::char_traits<char>>, <error type>)'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(303): error C3861: 'WideToUtf8': no se encontró el identificador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(303): error C2593: 'operator <<' es ambiguo
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(480): note: puede ser 'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(std::basic_streambuf<char,std::char_traits<char>> *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(448): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(const void *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(430): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(long double)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(412): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(double)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(394): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(float)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(376): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(unsigned __int64)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(358): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(__int64)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(340): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(unsigned long)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(322): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(long)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(303): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(unsigned int)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(277): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(int)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(258): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(unsigned short)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(224): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(short)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(206): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(bool)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(200): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(std::ios_base &(__cdecl *)(std::ios_base &))'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(194): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(std::basic_ios<char,std::char_traits<char>> &(__cdecl *)(std::basic_ios<char,std::char_traits<char>> &))'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(189): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<(std::basic_ostream<char,std::char_traits<char>> &(__cdecl *)(std::basic_ostream<char,std::char_traits<char>> &))'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(475): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::basic_ostream<char,std::char_traits<char>>::operator <<<void>(std::nullptr_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\thread(298): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<char,std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,std::thread::id)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(688): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<char,std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(732): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<char,std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(768): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(813): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(930): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const signed char *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(936): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,signed char)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(941): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const unsigned char *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(947): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,unsigned char)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(955): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char8_t *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(961): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char8_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(969): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,wchar_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(972): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const wchar_t *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(976): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char16_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(978): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,char32_t)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(986): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char16_t *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(988): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const char32_t *)'
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\__msvc_ostream.hpp(1031): note: o       'std::basic_ostream<char,std::char_traits<char>> &std::operator <<<char,std::char_traits<char>>(std::basic_ostream<char,std::char_traits<char>> &,const std::error_code &)'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\config/MonixConfig.hpp(303): note: al hacer coincidir la lista de argumentos '(std::basic_ostream<char,std::char_traits<char>>, <error type>)'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\telemetry/TelemetryBaselines.hpp(8): error C2371: 'CpuTimes': nueva definición; tipos básicos distintos
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\../../sensors/sensors.h(128): note: vea la declaración de 'CpuTimes'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\telemetry/TelemetryBaselines.hpp(17): error C2079: 'monix::TelemetryBaselines::cpuTimes' utiliza struct 'CpuTimes' sin definir
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(98): error C4430: falta el especificador de tipo; se presupone int. Nota: C++ no admite default-int
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(98): error C2143: error de sintaxis: falta ',' delante de '&'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(99): error C2061: error de sintaxis: identificador 'LogLevel'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(111): error C4430: falta el especificador de tipo; se presupone int. Nota: C++ no admite default-int
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(111): error C2143: error de sintaxis: falta ';' delante de '&'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(111): error C2334: símbolos (token) inesperados delante de '{'; se pasará por alto el cuerpo de función aparente
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(118): error C2065: 'ProcessInfo': identificador no declarado
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(118): error C2923: 'std::vector': 'ProcessInfo' no es un argumento de tipo plantilla válido para el parámetro '_Ty'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(118): note: vea la declaración de 'ProcessInfo'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(118): error C2976: "std::vector": no hay suficientes argumentos de plantilla
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442): note: vea la declaración de 'std::vector'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(118): error C2955: 'std::vector': el uso de clase plantilla requiere una lista de argumentos de plantilla
+C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC\14.44.35207\include\vector(442): note: vea la declaración de 'std::vector'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(191): error C4430: falta el especificador de tipo; se presupone int. Nota: C++ no admite default-int
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(191): error C2143: error de sintaxis: falta ',' delante de '&'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(220): error C3646: 'paths_': especificador de invalidación desconocido
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(220): error C4430: falta el especificador de tipo; se presupone int. Nota: C++ no admite default-int
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(222): error C2327: 'MonixApp::Config': no es un nombre de tipo, elemento estático o enumerador
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(222): note: vea la declaración de 'MonixApp::Config'
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(222): error C3646: 'config_': especificador de invalidación desconocido
+C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\src\native\MonixApp.hpp(222): error C4430: falta el especificador de tipo; se presupone int. Nota: C++ no admite default-int
+Build failed.
+Build failed with exit code 1
+En C:\Users\belfegor442\Desktop\Monix-31ago-stable\Monix-2ago-unestable\Monix\Monix\build.ps1: 227 Carácter: 28
++ ... EXITCODE -ne 0) { throw "Build failed with exit code $LASTEXITCODE" }
++                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Build failed with exit code 1:String) [], RuntimeException
+    + FullyQualifiedErrorId : Build failed with exit code 1
+ 

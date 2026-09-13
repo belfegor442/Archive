@@ -1,0 +1,6 @@
+#reference "test_cycle_b.slangp"
+
+shaders = 1
+
+shader0 = tests/test_alias_pass_a.frag
+alias0 = Output
