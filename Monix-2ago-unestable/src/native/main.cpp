@@ -2543,7 +2543,7 @@ void MonixApp::StartTelemetry() {
 void MonixApp::StopTelemetry() {
   running_ = false;
   if (telemetryHandle_) {
-    WaitForSingleObject(telemetryHandle_, 5000);
+    WaitForSingleObject(telemetryHandle_, INFINITE);
     CloseHandle(telemetryHandle_);
     telemetryHandle_ = nullptr;
   }
