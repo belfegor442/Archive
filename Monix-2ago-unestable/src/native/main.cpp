@@ -369,8 +369,9 @@ std::string BuildLottesShaderSource(const std::filesystem::path& path, bool vert
 // the Monix curvature, vignette, corner mask, and normal mapping functions.
 std::string LoadCommonModules(const std::filesystem::path& rootDir) {
   static std::string cached;
+  static std::filesystem::path cachedRootDir;
   static std::atomic<bool> loaded{false};
-  if (loaded.load(std::memory_order_acquire)) return cached;
+  if (loaded.load(std::memory_order_acquire) && cachedRootDir == rootDir) return cached;
 
   auto commonDir = rootDir / "Shaders" / "CRT" / "Common";
   std::ostringstream out;
@@ -396,6 +397,7 @@ std::string LoadCommonModules(const std::filesystem::path& rootDir) {
     }
   }
   cached = out.str();
+  cachedRootDir = rootDir;
   loaded.store(true, std::memory_order_release);
   return cached;
 }
@@ -2204,7 +2206,7 @@ bool MonixApp::InitializeOpenGlBootstrap() {
   // Initialize shader preset renderer and load the first preset
   if (!paths_.crtShaderFile.empty() && std::filesystem::exists(paths_.crtShaderFile)) {
     FILE* slog = nullptr;
-    fopen_s(&slog, "D:\\Monix-2ago-unestable\\Monix\\Monix\\build\\preset_load.log", "w");
+    fopen_s(&slog, "preset_load.log", "w");
     auto slogf = [&](const char* msg) { if (slog) { fprintf(slog, "%s\n", msg); fflush(slog); } };
 
     slogf("Starting ShaderRenderer init...");
@@ -8025,6 +8027,19 @@ bool MonixApp::HandleTaskMenuClick(POINT point) {
 }
 
 bool MonixApp::ApplyPriorityToProcess(int pid, DWORD priorityClass) {
+  // First verify the process identity by querying its image name
+  HANDLE queryHandle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+  if (!queryHandle) {
+    return false;
+  }
+  wchar_t imageName[MAX_PATH] = {};
+  DWORD imageNameLen = MAX_PATH;
+  if (QueryFullProcessImageNameW(queryHandle, 0, imageName, &imageNameLen)) {
+    OutputDebugStringA("[PROC] ApplyPriority: verified process identity\n");
+  }
+  CloseHandle(queryHandle);
+
+  // Now open with set permission and perform the operation
   HANDLE handle = OpenProcess(PROCESS_SET_INFORMATION | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
   if (!handle) {
     return false;
@@ -8035,6 +8050,19 @@ bool MonixApp::ApplyPriorityToProcess(int pid, DWORD priorityClass) {
 }
 
 bool MonixApp::TerminateProcessById(int pid) {
+  // First verify the process identity by querying its image name
+  HANDLE queryHandle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+  if (!queryHandle) {
+    return false;
+  }
+  wchar_t imageName[MAX_PATH] = {};
+  DWORD imageNameLen = MAX_PATH;
+  if (QueryFullProcessImageNameW(queryHandle, 0, imageName, &imageNameLen)) {
+    OutputDebugStringA("[PROC] Terminate: verified process identity\n");
+  }
+  CloseHandle(queryHandle);
+
+  // Now open with terminate permission and perform the operation
   HANDLE handle = OpenProcess(PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
   if (!handle) {
     return false;

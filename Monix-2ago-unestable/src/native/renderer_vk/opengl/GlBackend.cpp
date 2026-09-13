@@ -334,7 +334,7 @@ bool GlBackend::splitGlslSource(const std::string& fullSource,
     }
 
     FILE* dbg = nullptr;
-    fopen_s(&dbg, "D:\\Monix-2ago-unestable\\Monix\\Monix\\build\\gl_backend.log", "a");
+    fopen_s(&dbg, "gl_backend.log", "a");
     if (dbg) {
         fprintf(dbg, "splitGlslSource: vertLines=%zu fragLines=%zu\n", vertLines.size(), fragLines.size());
         fclose(dbg);

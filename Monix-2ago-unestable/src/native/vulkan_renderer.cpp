@@ -194,6 +194,7 @@ void VulkanRenderer::clearValidationMessages() {
 // validationErrorCount / validationWarningCount / validationCriticalCount
 // ============================================================================
 uint32_t VulkanRenderer::validationErrorCount() const {
+    std::lock_guard<std::mutex> lock(validationMutex_);
     uint32_t count = 0;
     for (auto& m : validationMessages_) {
         if (m.severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) count++;
@@ -202,6 +203,7 @@ uint32_t VulkanRenderer::validationErrorCount() const {
 }
 
 uint32_t VulkanRenderer::validationWarningCount() const {
+    std::lock_guard<std::mutex> lock(validationMutex_);
     uint32_t count = 0;
     for (auto& m : validationMessages_) {
         if (m.severity == VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) count++;
@@ -210,6 +212,7 @@ uint32_t VulkanRenderer::validationWarningCount() const {
 }
 
 uint32_t VulkanRenderer::validationCriticalCount() const {
+    std::lock_guard<std::mutex> lock(validationMutex_);
     uint32_t count = 0;
     for (auto& m : validationMessages_) {
         if (m.severity >= VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) count++;
@@ -231,6 +234,7 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
         OutputDebugStringA("[VK] Failed to load vulkan-1.dll\n");
         return false;
     }
+    vulkanDll_ = g_vkModule;
 
     pfn_vkGetInstanceProcAddr =
         reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(g_vkModule, "vkGetInstanceProcAddr"));
@@ -243,6 +247,7 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
 
     if (!pfn_vkGetInstanceProcAddr) {
         OutputDebugStringA("[VK] vkGetInstanceProcAddr not found\n");
+        shutdown();
         return false;
     }
 
@@ -257,7 +262,7 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
         GetProcAddress(g_vkModule, "vkEnumeratePhysicalDevices"));
 
     // Create instance
-    if (!createInstance()) return false;
+    if (!createInstance()) { shutdown(); return false; }
     loadInstanceFuncs();
 
     // Create debug messenger (13.B)
@@ -284,32 +289,32 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
     }
 
     // Create surface
-    if (!createSurface(hwnd)) return false;
+    if (!createSurface(hwnd)) { shutdown(); return false; }
 
     // Pick physical device
-    if (!pickPhysicalDevice()) return false;
+    if (!pickPhysicalDevice()) { shutdown(); return false; }
 
     // Create logical device
-    if (!createLogicalDevice()) return false;
+    if (!createLogicalDevice()) { shutdown(); return false; }
     loadDeviceFuncs();
     pfn_vkGetDeviceQueue(device_, graphicsFamily_, 0, &graphicsQueue_);
     pfn_vkGetDeviceQueue(device_, presentFamily_, 0, &presentQueue_);
 
     // Create swapchain
-    if (!createSwapchain(width, height)) return false;
+    if (!createSwapchain(width, height)) { shutdown(); return false; }
 
     // Create sync objects
-    if (!createSyncObjects()) return false;
+    if (!createSyncObjects()) { shutdown(); return false; }
 
     // Create command pool + buffers
-    if (!createCommandPool()) return false;
-    if (!allocateCommandBuffers()) return false;
+    if (!createCommandPool()) { shutdown(); return false; }
+    if (!allocateCommandBuffers()) { shutdown(); return false; }
 
     // Create descriptor pool
-    if (!createDescriptorPool()) return false;
+    if (!createDescriptorPool()) { shutdown(); return false; }
 
     // Create full-screen quad
-    if (!createQuadBuffer()) return false;
+    if (!createQuadBuffer()) { shutdown(); return false; }
 
     initialized_ = true;
     OutputDebugStringA("[VK] VulkanRenderer initialized successfully\n");
@@ -320,7 +325,6 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
 // shutdown
 // ============================================================================
 void VulkanRenderer::shutdown() {
-    if (!initialized_) return;
 
     if (device_) {
         pfn_vkDeviceWaitIdle(device_);
@@ -395,6 +399,99 @@ void VulkanRenderer::shutdown() {
     }
 
     initialized_ = false;
+
+    // Reset all function pointers to prevent stale references
+    pfn_vkGetInstanceProcAddr = nullptr;
+    pfn_vkGetDeviceProcAddr = nullptr;
+    pfn_vkCreateInstance = nullptr;
+    pfn_vkDestroyInstance = nullptr;
+    pfn_vkEnumeratePhysicalDevices = nullptr;
+    pfn_vkGetPhysicalDeviceProperties = nullptr;
+    pfn_vkGetPhysicalDeviceMemoryProperties = nullptr;
+    pfn_vkGetPhysicalDeviceQueueFamilyProperties = nullptr;
+    pfn_vkGetPhysicalDeviceSurfaceSupportKHR = nullptr;
+    pfn_vkGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
+    pfn_vkGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
+    pfn_vkGetPhysicalDeviceSurfacePresentModesKHR = nullptr;
+    pfn_vkCreateWin32SurfaceKHR = nullptr;
+    pfn_vkDestroySurfaceKHR = nullptr;
+    pfn_vkCreateDebugUtilsMessengerEXT = nullptr;
+    pfn_vkDestroyDebugUtilsMessengerEXT = nullptr;
+    pfn_vkEnumerateDeviceExtensionProperties = nullptr;
+    pfn_vkCreateDevice = nullptr;
+    pfn_vkDestroyDevice = nullptr;
+    pfn_vkGetDeviceQueue = nullptr;
+    pfn_vkCreateSwapchainKHR = nullptr;
+    pfn_vkDestroySwapchainKHR = nullptr;
+    pfn_vkGetSwapchainImagesKHR = nullptr;
+    pfn_vkAcquireNextImageKHR = nullptr;
+    pfn_vkQueuePresentKHR = nullptr;
+    pfn_vkQueueWaitIdle = nullptr;
+    pfn_vkDeviceWaitIdle = nullptr;
+    pfn_vkCreateCommandPool = nullptr;
+    pfn_vkDestroyCommandPool = nullptr;
+    pfn_vkAllocateCommandBuffers = nullptr;
+    pfn_vkFreeCommandBuffers = nullptr;
+    pfn_vkBeginCommandBuffer = nullptr;
+    pfn_vkEndCommandBuffer = nullptr;
+    pfn_vkCmdBeginRendering = nullptr;
+    pfn_vkCmdEndRendering = nullptr;
+    pfn_vkCmdBindPipeline = nullptr;
+    pfn_vkCmdSetViewport = nullptr;
+    pfn_vkCmdSetScissor = nullptr;
+    pfn_vkCmdDraw = nullptr;
+    pfn_vkCmdBlitImage = nullptr;
+    pfn_vkCmdCopyImageToBuffer = nullptr;
+    pfn_vkCmdPipelineBarrier = nullptr;
+    pfn_vkCmdBindVertexBuffers = nullptr;
+    pfn_vkCmdPushConstants = nullptr;
+    pfn_vkCmdBindDescriptorSets = nullptr;
+    pfn_vkCreateFence = nullptr;
+    pfn_vkDestroyFence = nullptr;
+    pfn_vkWaitForFences = nullptr;
+    pfn_vkResetFences = nullptr;
+    pfn_vkCreateSemaphore = nullptr;
+    pfn_vkDestroySemaphore = nullptr;
+    pfn_vkCreateImage = nullptr;
+    pfn_vkDestroyImage = nullptr;
+    pfn_vkGetImageMemoryRequirements = nullptr;
+    pfn_vkAllocateMemory = nullptr;
+    pfn_vkFreeMemory = nullptr;
+    pfn_vkBindImageMemory = nullptr;
+    pfn_vkCreateImageView = nullptr;
+    pfn_vkDestroyImageView = nullptr;
+    pfn_vkCreateSampler = nullptr;
+    pfn_vkDestroySampler = nullptr;
+    pfn_vkCreateBuffer = nullptr;
+    pfn_vkDestroyBuffer = nullptr;
+    pfn_vkGetBufferMemoryRequirements = nullptr;
+    pfn_vkBindBufferMemory = nullptr;
+    pfn_vkMapMemory = nullptr;
+    pfn_vkUnmapMemory = nullptr;
+    pfn_vkCreateShaderModule = nullptr;
+    pfn_vkDestroyShaderModule = nullptr;
+    pfn_vkCreatePipelineLayout = nullptr;
+    pfn_vkDestroyPipelineLayout = nullptr;
+    pfn_vkCreateGraphicsPipelines = nullptr;
+    pfn_vkDestroyPipeline = nullptr;
+    pfn_vkCreateDescriptorSetLayout = nullptr;
+    pfn_vkDestroyDescriptorSetLayout = nullptr;
+    pfn_vkCreateDescriptorPool = nullptr;
+    pfn_vkDestroyDescriptorPool = nullptr;
+    pfn_vkAllocateDescriptorSets = nullptr;
+    pfn_vkUpdateDescriptorSets = nullptr;
+    pfn_vkQueueSubmit = nullptr;
+    pfn_vkCmdCopyBufferToImage = nullptr;
+    pfn_vkGetImageSubresourceLayout = nullptr;
+    pfn_vkFlushMappedMemoryRanges = nullptr;
+
+    // Free Vulkan DLL
+    if (g_vkModule) {
+        FreeLibrary(g_vkModule);
+        g_vkModule = nullptr;
+        vulkanDll_ = nullptr;
+    }
+
     OutputDebugStringA("[VK] VulkanRenderer shut down\n");
 }
 
@@ -765,7 +862,9 @@ void VulkanRenderer::resize(uint32_t width, uint32_t height) {
     if (!initialized_ || width == 0 || height == 0) return;
     pfn_vkDeviceWaitIdle(device_);
     destroySwapchain();
-    createSwapchain(width, height);
+    if (!createSwapchain(width, height)) {
+        OutputDebugStringA("[VK] resize: FAILED to recreate swapchain — renderer in degraded state\n");
+    }
 }
 
 // ============================================================================
@@ -1010,7 +1109,11 @@ bool VulkanRenderer::allocateImageMemory(VkImage image, VkMemoryPropertyFlags pr
     VkResult result = pfn_vkAllocateMemory(device_, &allocInfo, nullptr, outMem);
     if (result != VK_SUCCESS) return false;
 
-    pfn_vkBindImageMemory(device_, image, *outMem, 0);
+    if (pfn_vkBindImageMemory(device_, image, *outMem, 0) != VK_SUCCESS) {
+        pfn_vkFreeMemory(device_, *outMem, nullptr);
+        *outMem = VK_NULL_HANDLE;
+        return false;
+    }
     return true;
 }
 
@@ -1264,7 +1367,10 @@ VkBufferResource VulkanRenderer::createBuffer(VkDeviceSize size, VkBufferUsageFl
 
     // Map if host visible
     if (props & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
-        pfn_vkMapMemory(device_, result.memory, 0, size, 0, &result.mapped);
+        if (pfn_vkMapMemory(device_, result.memory, 0, size, 0, &result.mapped) != VK_SUCCESS) {
+            OutputDebugStringA("[VK] createBuffer: vkMapMemory failed\n");
+            result.mapped = nullptr;
+        }
     }
 
     return result;
@@ -1535,7 +1641,7 @@ VkPipeline VulkanRenderer::createGraphicsPipeline(
 
     if (result != VK_SUCCESS) {
         FILE* pf = nullptr;
-        fopen_s(&pf, "D:\\Monix-2ago-unestable\\Monix\\Monix\\build\\vk_pipeline_fail.log", "a");
+        fopen_s(&pf, "vk_pipeline_fail.log", "a");
         if (pf) {
             fprintf(pf, "VkCreateGraphicsPipelines FAILED: VkResult=%d\n", (int)result);
             fclose(pf);
@@ -1572,22 +1678,25 @@ VkShaderModule VulkanRenderer::createShaderModule(std::span<const uint32_t> spir
     createInfo.codeSize = spirv.size() * sizeof(uint32_t);
     createInfo.pCode = spirv.data();
 
-    VkShaderModule mod = VK_NULL_HANDLE;
-    std::atomic<bool> done{false};
-    VkResult createResult = VK_ERROR_UNKNOWN;
+    // Heap-allocate shared state so detached thread never references stack locals
+    auto sharedResult = std::make_shared<std::atomic<VkResult>>(VK_ERROR_UNKNOWN);
+    auto sharedMod = std::make_shared<std::atomic<VkShaderModule>>(VK_NULL_HANDLE);
+    auto sharedDone = std::make_shared<std::atomic<bool>>(false);
 
     // Run vkCreateShaderModule on a background thread with timeout
     // Known driver bug: some drivers hang in vkCreateShaderModule with large SPIR-V
-    std::thread worker([&]() {
+    std::thread worker([this, createInfo, sharedResult, sharedMod, sharedDone]() {
+        VkShaderModule mod = VK_NULL_HANDLE;
         VkResult r = pfn_vkCreateShaderModule(device_, &createInfo, nullptr, &mod);
-        createResult = r;
-        done.store(true, std::memory_order_release);
+        sharedMod->store(mod, std::memory_order_release);
+        sharedResult->store(r, std::memory_order_release);
+        sharedDone->store(true, std::memory_order_release);
     });
 
     // Wait up to 5 seconds for shader module creation
     constexpr int kTimeoutMs = 5000;
     auto start = std::chrono::steady_clock::now();
-    while (!done.load(std::memory_order_acquire)) {
+    while (!sharedDone->load(std::memory_order_acquire)) {
         auto elapsed = std::chrono::steady_clock::now() - start;
         if (std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() >= kTimeoutMs) {
             char buf[256];
@@ -1600,6 +1709,9 @@ VkShaderModule VulkanRenderer::createShaderModule(std::span<const uint32_t> spir
         Sleep(10);
     }
     worker.join();
+
+    VkResult createResult = sharedResult->load(std::memory_order_acquire);
+    VkShaderModule mod = sharedMod->load(std::memory_order_acquire);
 
     char buf[128];
     sprintf_s(buf, "[VK] createShaderModule: result=%d, mod=%p\n", createResult, (void*)mod);
@@ -2282,7 +2394,7 @@ bool VulkanRenderer::loadPreset(
     preset_.passes.resize(passCount);
 
     FILE* logf = nullptr;
-    fopen_s(&logf, "D:\\Monix-2ago-unestable\\Monix\\Monix\\build\\vk_preset.log", "w");
+    fopen_s(&logf, "vk_preset.log", "w");
     if (logf) setvbuf(logf, nullptr, _IONBF, 0);
     if (logf) fprintf(logf, "loadPreset: %zu passes\n", passCount);
 
@@ -2448,7 +2560,7 @@ bool VulkanRenderer::loadPresetReflection(
     preset_.passes.resize(passCount);
 
     FILE* logf = nullptr;
-    fopen_s(&logf, "D:\\Monix-2ago-unestable\\Monix\\Monix\\build\\vk_preset_reflect.log", "w");
+    fopen_s(&logf, "vk_preset_reflect.log", "w");
     if (logf) fprintf(logf, "loadPresetReflection: %zu passes\n", passCount);
 
     for (size_t i = 0; i < passCount; i++) {
