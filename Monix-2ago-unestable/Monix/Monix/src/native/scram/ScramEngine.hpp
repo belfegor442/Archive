@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -63,6 +64,7 @@ class ScramEngine {
   static constexpr int kCooldownSamples = 5;
 
  private:
+  mutable std::mutex mutex_;
   std::vector<std::unique_ptr<RiskRule>> rules_;
   ScramPhase phase_ = ScramPhase::Uninitialized;
   int calibrationSamples_ = 0;

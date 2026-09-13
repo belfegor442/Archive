@@ -8,6 +8,7 @@ namespace monix {
 ScramEngine::ScramEngine() = default;
 
 void ScramEngine::AddRule(std::unique_ptr<RiskRule> rule) {
+  std::lock_guard<std::mutex> lock(mutex_);
   rules_.push_back(std::move(rule));
 }
 
@@ -18,8 +19,9 @@ static std::size_t HashFindingKey(const std::wstring& headline, int riskDelta) {
 }
 
 ScramResult ScramEngine::Evaluate(const Snapshot& current,
-                                  const Snapshot* previous,
-                                  const std::wstring& previousHeadline) {
+                                   const Snapshot* previous,
+                                   const std::wstring& previousHeadline) {
+  std::lock_guard<std::mutex> lock(mutex_);
   ScramResult result;
   result.riskScore = 0;
   ++totalEvaluations_;

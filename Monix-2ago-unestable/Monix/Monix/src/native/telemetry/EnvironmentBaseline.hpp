@@ -320,22 +320,86 @@ struct EnvironmentBaseline {
 
   void ComputeContentHash() {
     std::size_t h = 0;
-    for (wchar_t c : firmware.biosVersion) h = h * 31 + static_cast<std::size_t>(c);
-    h ^= 0x9e3779b9u + (h << 6) + (h >> 2);
-    for (wchar_t c : firmware.systemProductName) h = h * 31 + static_cast<std::size_t>(c);
-    h ^= 0x9e3779b9u + (h << 6) + (h >> 2);
-    for (const auto& d : driverNameSet) {
-      for (wchar_t c : d) h = h * 31 + static_cast<std::size_t>(c);
+    auto mixString = [&](const std::wstring& s) {
+      for (wchar_t c : s) h = h * 131 + static_cast<std::size_t>(c);
       h ^= 0x9e3779b9u + (h << 6) + (h >> 2);
-    }
-    for (const auto& s : serviceNameSet) {
-      for (wchar_t c : s) h = h * 31 + static_cast<std::size_t>(c);
-      h ^= 0x9e3779b9u + (h << 6) + (h >> 2);
-    }
-    for (const auto& m : modulePathSet) {
-      for (wchar_t c : m) h = h * 31 + static_cast<std::size_t>(c);
-      h ^= 0x9e3779b9u + (h << 6) + (h >> 2);
-    }
+    };
+    auto mixUint64 = [&](std::uint64_t v) {
+      h ^= std::hash<std::uint64_t>{}(v) + 0x9e3779b9u + (h << 6) + (h >> 2);
+    };
+    auto mixInt = [&](int v) {
+      h ^= std::hash<int>{}(v) + 0x9e3779b9u + (h << 6) + (h >> 2);
+    };
+
+    // Firmware
+    mixString(firmware.biosVersion);
+    mixString(firmware.systemProductName);
+    mixString(firmware.biosVendor);
+    mixString(firmware.systemSerialNumber);
+    mixUint64(firmware.smbiosHash);
+
+    // Software
+    mixString(software.osVersion);
+    mixString(software.osBuild);
+    mixUint64(software.lastBootTime);
+
+    // Security state
+    mixInt(security.defenderRealTimeProtection);
+    mixInt(security.uacEnabled);
+    mixInt(security.firewallEnabled);
+    mixInt(security.secureBootEnabled);
+    mixInt(security.hvciEnabled);
+    mixInt(security.codeIntegrityEnabled);
+
+    // Driver name set
+    for (const auto& d : driverNameSet) mixString(d);
+
+    // Service name set
+    for (const auto& s : serviceNameSet) mixString(s);
+
+    // Module path set
+    for (const auto& m : modulePathSet) mixString(m);
+
+    // Process name set (new — was missing)
+    for (const auto& p : processNameSet) mixString(p);
+
+    // Startup item name set (new — was missing)
+    for (const auto& s : startupNameSet) mixString(s);
+
+    // Task name set (new — was missing)
+    for (const auto& t : taskNameSet) mixString(t);
+
+    // Count-based signatures for vector evidence
+    mixUint64(processes.size());
+    mixUint64(drivers.size());
+    mixUint64(pciDevices.size());
+    mixUint64(usbDevices.size());
+    mixUint64(networkInterfaces.size());
+    mixUint64(volumes.size());
+    mixUint64(services.size());
+    mixUint64(startupItems.size());
+    mixUint64(scheduledTasks.size());
+    mixUint64(modules.size());
+
+    // Hash representative entries from large vectors (first 5 + last entry)
+    auto hashEvidenceVector = [&](const auto& vec, auto nameExtractor) {
+      std::size_t count = std::min(vec.size(), std::size_t(5));
+      for (std::size_t i = 0; i < count; ++i) mixString(nameExtractor(vec[i]));
+      if (vec.size() > 5) mixString(nameExtractor(vec.back()));
+    };
+    hashEvidenceVector(processes, [](const ProcessEvidence& e) { return e.name; });
+    hashEvidenceVector(services, [](const ServiceEvidence& e) { return e.name; });
+    hashEvidenceVector(drivers, [](const DriverEvidence& e) { return e.name; });
+    hashEvidenceVector(modules, [](const ModuleEvidence& e) { return e.name; });
+    hashEvidenceVector(startupItems, [](const StartupItemEvidence& e) { return e.name; });
+    hashEvidenceVector(scheduledTasks, [](const ScheduledTaskEvidence& e) { return e.name; });
+
+    // Network interface names
+    for (const auto& ni : networkInterfaces) mixString(ni.name);
+
+    // Volume mount points
+    for (const auto& v : volumes) mixString(v.mountPoint);
+
     contentHash = static_cast<std::uint64_t>(h);
   }
 };
