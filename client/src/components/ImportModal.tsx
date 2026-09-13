@@ -9,8 +9,10 @@ interface ImportModalProps {
 export default function ImportModal({ onClose, onComplete }: ImportModalProps) {
   const [paths, setPaths] = useState("");
   const [description, setDescription] = useState("");
+  const [tags, setTags] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<{ imported: number; errors: { path: string; error: string }[] } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,10 +28,28 @@ export default function ImportModal({ onClose, onComplete }: ImportModalProps) {
 
     setLoading(true);
     setError(null);
+    setResult(null);
 
     try {
-      await api.items.create({ paths: pathList, description });
-      onComplete();
+      const tagList = tags
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean);
+
+      const importResult = await api.items.create({
+        paths: pathList,
+        description,
+        tags: tagList.length > 0 ? tagList : undefined,
+      });
+
+      setResult({
+        imported: importResult.items.length,
+        errors: importResult.errors,
+      });
+
+      if (importResult.items.length > 0) {
+        setTimeout(() => onComplete(), 1500);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
@@ -61,6 +81,7 @@ export default function ImportModal({ onClose, onComplete }: ImportModalProps) {
               onChange={(e) => setPaths(e.target.value)}
               className="input h-32 resize-none font-mono text-xs"
               placeholder="/path/to/project&#10;/path/to/file.zip&#10;/path/to/folder"
+              disabled={loading}
             />
           </div>
 
@@ -74,11 +95,48 @@ export default function ImportModal({ onClose, onComplete }: ImportModalProps) {
               onChange={(e) => setDescription(e.target.value)}
               className="input"
               placeholder="Brief description of what is being archived"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-archive-300 mb-1">
+              Tags (comma separated, optional)
+            </label>
+            <input
+              type="text"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              className="input"
+              placeholder="javascript, react, archived-2024"
+              disabled={loading}
             />
           </div>
 
           {error && (
-            <p className="text-sm text-red-400">{error}</p>
+            <div className="bg-red-900/30 border border-red-800 rounded p-3">
+              <p className="text-sm text-red-400">{error}</p>
+            </div>
+          )}
+
+          {result && (
+            <div className="bg-archive-800 border border-archive-700 rounded p-3 space-y-1">
+              <p className="text-sm text-green-400">
+                Successfully imported {result.imported} item(s)
+              </p>
+              {result.errors.length > 0 && (
+                <div>
+                  <p className="text-sm text-yellow-400">
+                    {result.errors.length} path(s) failed:
+                  </p>
+                  {result.errors.map((err, i) => (
+                    <p key={i} className="text-xs text-archive-500 ml-2">
+                      {err.path}: {err.error}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <div className="flex justify-end gap-2 pt-2">
@@ -86,16 +144,19 @@ export default function ImportModal({ onClose, onComplete }: ImportModalProps) {
               type="button"
               onClick={onClose}
               className="btn-secondary"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
               disabled={loading}
-              className="btn-primary"
             >
-              {loading ? "Importing..." : "Import"}
+              {result ? "Close" : "Cancel"}
             </button>
+            {!result && (
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary"
+              >
+                {loading ? "Importing..." : "Import"}
+              </button>
+            )}
           </div>
         </form>
       </div>

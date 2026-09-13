@@ -7,6 +7,7 @@ import type {
   Note,
   Activity,
   ImportRequest,
+  Tag,
 } from "./types";
 
 const API_BASE = "/api";
@@ -26,6 +27,11 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface ImportResult {
+  items: ArchiveItem[];
+  errors: { path: string; error: string }[];
+}
+
 export const api = {
   items: {
     list: (params?: { status?: string; type?: string; categoryId?: string }) => {
@@ -38,7 +44,7 @@ export const api = {
     },
     get: (id: string) => request<ArchiveItem>(`/items/${id}`),
     create: (data: ImportRequest) =>
-      request<ArchiveItem[]>("/items/import", {
+      request<ImportResult>("/items/import", {
         method: "POST",
         body: JSON.stringify(data),
       }),
@@ -48,7 +54,7 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: string) =>
-      request<void>(`/items/${id}`, { method: "DELETE" }),
+      request<{ message: string }>(`/items/${id}`, { method: "DELETE" }),
     restore: (id: string) =>
       request<ArchiveItem>(`/items/${id}/restore`, { method: "POST" }),
     versions: (id: string) => request<Version[]>(`/items/${id}/versions`),
@@ -62,6 +68,10 @@ export const api = {
       request<Note>(`/items/${id}/notes`, {
         method: "POST",
         body: JSON.stringify({ content }),
+      }),
+    deleteNote: (itemId: string, noteId: string) =>
+      request<{ message: string }>(`/items/${itemId}/notes/${noteId}`, {
+        method: "DELETE",
       }),
     activity: (id: string) => request<Activity[]>(`/items/${id}/activity`),
   },
@@ -78,7 +88,17 @@ export const api = {
         body: JSON.stringify(data),
       }),
     delete: (id: string) =>
-      request<void>(`/categories/${id}`, { method: "DELETE" }),
+      request<{ message: string }>(`/categories/${id}`, { method: "DELETE" }),
+  },
+  tags: {
+    list: () => request<Tag[]>("/tags"),
+    create: (data: { name: string; color?: string }) =>
+      request<Tag>("/tags", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<{ message: string }>(`/tags/${id}`, { method: "DELETE" }),
   },
   search: (query: string, params?: Record<string, string>) => {
     const searchParams = new URLSearchParams({ q: query });

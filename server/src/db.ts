@@ -95,6 +95,35 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_versions_item ON versions(item_id);
   CREATE INDEX IF NOT EXISTS idx_notes_item ON notes(item_id);
   CREATE INDEX IF NOT EXISTS idx_activity_item ON activity(item_id);
+  CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
+`);
+
+// FTS5 virtual table for full-text search
+db.exec(`
+  CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
+    name,
+    description,
+    original_path,
+    content='archive_items',
+    content_rowid='rowid'
+  );
+
+  CREATE TRIGGER IF NOT EXISTS items_ai AFTER INSERT ON archive_items BEGIN
+    INSERT INTO items_fts(rowid, name, description, original_path)
+    VALUES (new.rowid, new.name, new.description, new.original_path);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS items_ad AFTER DELETE ON archive_items BEGIN
+    INSERT INTO items_fts(items_fts, rowid, name, description, original_path)
+    VALUES ('delete', old.rowid, old.name, old.description, old.original_path);
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON archive_items BEGIN
+    INSERT INTO items_fts(items_fts, rowid, name, description, original_path)
+    VALUES ('delete', old.rowid, old.name, old.description, old.original_path);
+    INSERT INTO items_fts(rowid, name, description, original_path)
+    VALUES (new.rowid, new.name, new.description, new.original_path);
+  END;
 `);
 
 export default db;

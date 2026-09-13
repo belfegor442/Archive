@@ -73,6 +73,7 @@ export interface DashboardStats {
   totalSize: number;
   recentItems: ArchiveItem[];
   categoryCounts: { categoryId: string; name: string; count: number; color: string }[];
+  typeCounts: { type: string; count: number }[];
 }
 
 export interface ImportRequest {
