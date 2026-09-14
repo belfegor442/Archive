@@ -3,11 +3,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
-#include "../core/TextUtils.hpp"
-#include "../logging/LogEntry.hpp"
-#include "../settings/MonixConfigTypes.hpp"
-#include "../telemetry/Snapshot.hpp"
-#include "AppState.hpp"
+#include "ThemeTypes.hpp"
+#include "GdiHelpers.hpp"
 
 #include <algorithm>
 #include <array>
@@ -21,45 +18,6 @@
 #include <vector>
 
 namespace monix::ui {
-
-constexpr int kCoreMonitorThemeMode = 3;
-constexpr int kWin98ThemeMode = 4;
-
-struct CoreMonitorThemeFonts {
-  HFONT title = nullptr;
-  HFONT body = nullptr;
-  HFONT smallText = nullptr;
-  HFONT logText = nullptr;
-  int bodyLineHeight = 28;
-  int smallLineHeight = 20;
-  int logLineHeight = 20;
-};
-
-struct CoreMonitorThemeContext {
-  const Snapshot* snapshot = nullptr;
-  const std::vector<LogEntry>* logs = nullptr;
-  const SessionCounters* counters = nullptr;
-  const std::vector<double>* cpuHistory = nullptr;
-  const std::vector<double>* ramHistory = nullptr;
-  const std::vector<double>* gpuHistory = nullptr;
-  const std::vector<double>* netHistory = nullptr;
-  const std::vector<double>* netUploadHistory = nullptr;
-  Config config;
-  CoreMonitorThemeFonts fonts;
-  std::wstring rendererName;
-  std::wstring shaderName;
-  std::wstring fontName;
-  int menuIndex = 0;
-  bool livePaused = false;
-  std::uint64_t frameCount = 0;
-  const UpdateState* updateState = nullptr;
-  int settingsCategory = 0;
-  int pressedButton = -1;
-  int hoveredMenuIndex = -1;
-  int activeFilter = 0;
-  int taskScroll = 0;
-  int selectedTaskPid = 0;
-};
 
 class CoreMonitorTheme {
  public:

@@ -7,14 +7,10 @@
 #include <windows.h>
 #include <gdiplus.h>
 
-#include "../core/TextUtils.hpp"
-#include "../config/MonixConfig.hpp"
-#include "../logging/LogEntry.hpp"
-#include "../settings/MonixConfigTypes.hpp"
-#include "../telemetry/Snapshot.hpp"
-#include "AppState.hpp"
-#include "CoreMonitorTheme.hpp"
+#include "ThemeTypes.hpp"
+#include "GdiHelpers.hpp"
 #include "Win98Types.hpp"
+#include "../config/MonixConfig.hpp"
 
 #include <algorithm>
 #include <array>
@@ -226,18 +222,6 @@ public:
     return out.str();
   }
 
-  static std::wstring Fixed(double value, int decimals) {
-    std::wostringstream out;
-    out << std::fixed << std::setprecision(decimals) << value;
-    return out.str();
-  }
-
-  static std::wstring ShortText(std::wstring value, std::size_t limit) {
-    if (value.size() <= limit) return value;
-    if (limit <= 3) return value.substr(0, limit);
-    return value.substr(0, limit - 3) + L"...";
-  }
-
   static std::wstring FormatBytes(std::uint64_t bytes) {
     if (bytes >= 1073741824ull) {
       return Fixed(static_cast<double>(bytes) / 1073741824.0, 1) + L"GB";
@@ -255,11 +239,6 @@ public:
     std::wostringstream out;
     out << std::setw(width) << std::setfill(L'0') << (std::max)(0, value);
     return out.str();
-  }
-
-  static const Snapshot& SnapshotOrDefault(const CoreMonitorThemeContext& ctx) {
-    static const Snapshot fallback {};
-    return ctx.snapshot ? *ctx.snapshot : fallback;
   }
 
   static COLORREF ThresholdColor(double pct) {
