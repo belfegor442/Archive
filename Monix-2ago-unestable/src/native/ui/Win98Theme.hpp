@@ -1551,15 +1551,16 @@ public:
     const float dy = static_cast<float>(point.y - c.rect.top) / c.scale;
     const int contentY = 96;
     const int tableY = contentY + 42;
-    const int headerH = 20;
+    const int tableH = 810;
     const int rowH = 16;
     const int tableX1 = 16;
     const int tableW = 1480;
-    const int tableH = 810;
+    const int firstRowY = tableY + 22;
+    const int visibleRows = (tableH - 24) / rowH;
     if (dx < tableX1 || dx > tableX1 + tableW) return {};
-    if (dy < tableY + headerH || dy > tableY + headerH + tableH - 24 - headerH) return {};
-    int row = static_cast<int>((dy - tableY - headerH) / rowH);
-    if (row < 0 || row >= 49) return {};
+    if (dy < firstRowY || dy >= firstRowY + visibleRows * rowH) return {};
+    int row = static_cast<int>((dy - firstRowY) / rowH);
+    if (row < 0 || row >= visibleRows) return {};
     return { true, row };
   }
 
