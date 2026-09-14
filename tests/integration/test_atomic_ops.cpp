@@ -2415,6 +2415,308 @@ static void test_backup_journal_roundtrip_special_chars() {
     TEST_PASS();
 }
 
+// === Journal Escape Tests ===
+
+static void test_journal_escape_quotes_and_backslashes() {
+    TEST_BEGIN("Journal: quotes and backslashes roundtrip correctly");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_escape_qb");
+
+    std::string dest_with_quote = TEST_BASE + "/dest/file \"final\".txt";
+    std::string backup_with_bs = TEST_BASE + "/dest/sub\\file.txt";
+    FileUtils::create_directories(TEST_BASE + "/dest/sub");
+
+    std::vector<BackupEntry> entries;
+    entries.push_back({dest_with_quote, backup_with_bs, "created"});
+    staging.write_backup_journal(op_id, entries);
+
+    std::vector<BackupEntry> read_back = staging.read_backup_journal(op_id);
+    ASSERT_EQ(read_back.size(), 1u);
+    ASSERT_EQ(read_back[0].destination, dest_with_quote);
+    ASSERT_EQ(read_back[0].backup_path, backup_with_bs);
+    ASSERT_EQ(read_back[0].state, "created");
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_escape_braces_in_string() {
+    TEST_BEGIN("Journal: braces inside string values roundtrip");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_escape_braces");
+
+    std::string dest = TEST_BASE + "/folder/{test}/file.txt";
+    std::string backup = TEST_BASE + "/backup/{test}/file.txt";
+    FileUtils::create_directories(TEST_BASE + "/folder/{test}");
+    FileUtils::create_directories(TEST_BASE + "/backup/{test}");
+
+    std::vector<BackupEntry> entries;
+    entries.push_back({dest, backup, "created"});
+    staging.write_backup_journal(op_id, entries);
+
+    std::vector<BackupEntry> read_back = staging.read_backup_journal(op_id);
+    ASSERT_EQ(read_back.size(), 1u);
+    ASSERT_EQ(read_back[0].destination, dest);
+    ASSERT_EQ(read_back[0].backup_path, backup);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_escape_windows_paths() {
+    TEST_BEGIN("Journal: Windows-style backslash paths roundtrip");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_escape_windows");
+
+    std::string dest = "C:\\Users\\Test\\file.txt";
+    std::string backup = "C:\\Archive\\.meta\\backups\\file.txt";
+
+    std::vector<BackupEntry> entries;
+    entries.push_back({dest, backup, "created"});
+    staging.write_backup_journal(op_id, entries);
+
+    std::vector<BackupEntry> read_back = staging.read_backup_journal(op_id);
+    ASSERT_EQ(read_back.size(), 1u);
+    ASSERT_EQ(read_back[0].destination, dest);
+    ASSERT_EQ(read_back[0].backup_path, backup);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_escape_newline_and_tab() {
+    TEST_BEGIN("Journal: newline and tab in values roundtrip");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_escape_nl");
+
+    std::string dest = "file\nwith\nnewlines.txt";
+    std::string backup = "file\twith\ttabs.txt";
+
+    std::vector<BackupEntry> entries;
+    entries.push_back({dest, backup, "created"});
+    staging.write_backup_journal(op_id, entries);
+
+    std::vector<BackupEntry> read_back = staging.read_backup_journal(op_id);
+    ASSERT_EQ(read_back.size(), 1u);
+    ASSERT_EQ(read_back[0].destination, dest);
+    ASSERT_EQ(read_back[0].backup_path, backup);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_multiple_entries_append() {
+    TEST_BEGIN("Journal: multiple entries write and append correctly");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_multi_append");
+
+    std::vector<BackupEntry> entries;
+    for (int i = 0; i < 5; i++) {
+        std::string dest = TEST_BASE + "/dest/file_" + std::to_string(i) + ".txt";
+        std::string backup = staging.get_staging_path(op_id) + "/.meta/backups/file_" + std::to_string(i) + ".txt";
+        entries.push_back({dest, backup, "created"});
+    }
+    staging.write_backup_journal(op_id, entries);
+
+    std::string extra_dest = TEST_BASE + "/dest/extra.txt";
+    std::string extra_backup = staging.get_staging_path(op_id) + "/.meta/backups/extra.txt";
+    entries.push_back({extra_dest, extra_backup, "created"});
+    staging.write_backup_journal(op_id, entries);
+
+    std::vector<BackupEntry> read_back = staging.read_backup_journal(op_id);
+    ASSERT_EQ(read_back.size(), 6u);
+    ASSERT_EQ(read_back[5].destination, extra_dest);
+    ASSERT_EQ(read_back[5].backup_path, extra_backup);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Corrupt Journal Tests ===
+
+static void test_journal_corrupt_truncated() {
+    TEST_BEGIN("Journal: truncated JSON throws parse error");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_corrupt_trunc");
+
+    std::string journal = staging.get_staging_path(op_id) + "/.meta/backups.json";
+    {
+        std::ofstream f(journal);
+        f << "[\n  {\n    \"destination\": \"foo.txt\",";
+    }
+
+    bool threw = false;
+    try {
+        staging.read_backup_journal(op_id);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_corrupt_missing_field() {
+    TEST_BEGIN("Journal: missing destination field throws");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_corrupt_nodest");
+
+    std::string journal = staging.get_staging_path(op_id) + "/.meta/backups.json";
+    {
+        std::ofstream f(journal);
+        f << "[\n  {\n    \"backup_path\": \"b.txt\",\n    \"state\": \"created\"\n  }\n]\n";
+    }
+
+    bool threw = false;
+    try {
+        staging.read_backup_journal(op_id);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_corrupt_not_json() {
+    TEST_BEGIN("Journal: non-JSON content throws");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_corrupt_notjson");
+
+    std::string journal = staging.get_staging_path(op_id) + "/.meta/backups.json";
+    {
+        std::ofstream f(journal);
+        f << "this is not json at all";
+    }
+
+    bool threw = false;
+    try {
+        staging.read_backup_journal(op_id);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_empty_array() {
+    TEST_BEGIN("Journal: empty array returns empty vector");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_empty_journal");
+
+    std::string journal = staging.get_staging_path(op_id) + "/.meta/backups.json";
+    {
+        std::ofstream f(journal);
+        f << "[]\n";
+    }
+
+    auto entries = staging.read_backup_journal(op_id);
+    ASSERT_EQ(entries.size(), 0u);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_no_file_returns_empty() {
+    TEST_BEGIN("Journal: missing file returns empty vector");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_no_journal_file");
+
+    auto entries = staging.read_backup_journal(op_id);
+    ASSERT_EQ(entries.size(), 0u);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_atomic_write_no_tmp_left() {
+    TEST_BEGIN("Journal: atomic write leaves no .tmp file");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_atomic_write");
+
+    std::string dest = TEST_BASE + "/dest.txt";
+    std::string backup = staging.get_staging_path(op_id) + "/.meta/backups/dest.txt";
+
+    std::vector<BackupEntry> entries;
+    entries.push_back({dest, backup, "created"});
+    staging.write_backup_journal(op_id, entries);
+
+    std::string tmp_file = staging.get_staging_path(op_id) + "/.meta/backups.json.tmp";
+    ASSERT_TRUE(!std::filesystem::exists(tmp_file));
+
+    std::string journal = staging.get_staging_path(op_id) + "/.meta/backups.json";
+    ASSERT_TRUE(std::filesystem::exists(journal));
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_journal_roundtrip_escape_full() {
+    TEST_BEGIN("Journal: full roundtrip with all escape characters");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_escape_full");
+
+    std::string dest = "path\\with\\\"quotes\" and\nnewlines\ttabs";
+    std::string backup = "backup/{brackets}/[array] (parens).txt";
+
+    std::vector<BackupEntry> entries;
+    entries.push_back({dest, backup, "created"});
+    entries.push_back({backup, dest, "restored"});
+    staging.write_backup_journal(op_id, entries);
+
+    std::vector<BackupEntry> read_back = staging.read_backup_journal(op_id);
+    ASSERT_EQ(read_back.size(), 2u);
+    ASSERT_EQ(read_back[0].destination, dest);
+    ASSERT_EQ(read_back[0].backup_path, backup);
+    ASSERT_EQ(read_back[0].state, "created");
+    ASSERT_EQ(read_back[1].destination, backup);
+    ASSERT_EQ(read_back[1].backup_path, dest);
+    ASSERT_EQ(read_back[1].state, "restored");
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
 void run_atomic_tests() {
     std::cout << "=== Atomic Operations Tests ===" << std::endl;
 
@@ -2493,4 +2795,16 @@ void run_atomic_tests() {
     test_backup_and_replace_collision_accepted();
     test_backup_journal_roundtrip();
     test_backup_journal_roundtrip_special_chars();
+    test_journal_escape_quotes_and_backslashes();
+    test_journal_escape_braces_in_string();
+    test_journal_escape_windows_paths();
+    test_journal_escape_newline_and_tab();
+    test_journal_multiple_entries_append();
+    test_journal_corrupt_truncated();
+    test_journal_corrupt_missing_field();
+    test_journal_corrupt_not_json();
+    test_journal_empty_array();
+    test_journal_no_file_returns_empty();
+    test_journal_atomic_write_no_tmp_left();
+    test_journal_roundtrip_escape_full();
 }

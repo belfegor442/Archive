@@ -1,12 +1,16 @@
-Fix read_backup_journal: single-pass deterministic parser, 175/175 tests
+Fix backup journal: proper JSON escape, string-aware parser, atomic write, 187/187 tests
 
-- read_backup_journal: replaced fragile two-pass line+object parser with
-  single-pass deterministic parser that reads file once, finds {...} objects
-  via brace-depth tracking, extracts quoted string values with backslash
-  escape handling; correctly handles paths containing : , . _ - () [] and spaces
-- Added test_backup_journal_roundtrip: writes two entries with different
-  paths, reads back, verifies all three fields (destination, backup_path,
-  state) match, restores from journal and verifies file content
-- Added test_backup_journal_roundtrip_special_chars: roundtrip test with
-  path containing spaces, parentheses, and dashes
-- 175/175 tests passed, build clean
+- write_backup_journal: json_escape() escapes ", \, \b, \f, \n, \r, \t
+  and control chars < 0x20 as \uXXXX; atomic write via .tmp + rename;
+  flush + error check before rename; cleanup .tmp on failure
+- read_backup_journal: single-pass string-aware parser that respects
+  escaped quotes/backslashes when finding object boundaries; json_unescape()
+  handles all JSON escape sequences including \uXXXX; validates array
+  structure, object boundaries, required fields; throws on truncated JSON,
+  missing destination, non-JSON content
+- append_backup_entry: reads journal, pushes entry, writes atomically
+- 12 new tests: quotes+backslashes, braces in strings, Windows paths,
+  newline+tab, 5→6 entries append, truncated JSON, missing field,
+  non-JSON content, empty array, missing file, no .tmp after write,
+  full escape roundtrip
+- 187/187 tests passed, build clean

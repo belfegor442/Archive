@@ -9,6 +9,122 @@
 
 namespace archive::filesystem {
 
+namespace {
+
+std::string json_escape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + s.size() / 4);
+    for (unsigned char c : s) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (c < 0x20) {
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    out += buf;
+                } else {
+                    out += static_cast<char>(c);
+                }
+        }
+    }
+    return out;
+}
+
+std::string json_unescape(const std::string& s, size_t& pos) {
+    std::string out;
+    while (pos < s.size() && s[pos] != '"') {
+        if (s[pos] == '\\' && pos + 1 < s.size()) {
+            pos++;
+            switch (s[pos]) {
+                case '"':  out += '"'; break;
+                case '\\': out += '\\'; break;
+                case '/':  out += '/'; break;
+                case 'b':  out += '\b'; break;
+                case 'f':  out += '\f'; break;
+                case 'n':  out += '\n'; break;
+                case 'r':  out += '\r'; break;
+                case 't':  out += '\t'; break;
+                case 'u': {
+                    if (pos + 4 < s.size()) {
+                        std::string hex = s.substr(pos + 1, 4);
+                        unsigned int cp = 0;
+                        for (char h : hex) {
+                            cp <<= 4;
+                            if (h >= '0' && h <= '9') cp += h - '0';
+                            else if (h >= 'a' && h <= 'f') cp += 10 + h - 'a';
+                            else if (h >= 'A' && h <= 'F') cp += 10 + h - 'A';
+                        }
+                        if (cp < 0x80) {
+                            out += static_cast<char>(cp);
+                        } else if (cp < 0x800) {
+                            out += static_cast<char>(0xC0 | (cp >> 6));
+                            out += static_cast<char>(0x80 | (cp & 0x3F));
+                        } else {
+                            out += static_cast<char>(0xE0 | (cp >> 12));
+                            out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+                            out += static_cast<char>(0x80 | (cp & 0x3F));
+                        }
+                        pos += 4;
+                    }
+                    break;
+                }
+                default: out += s[pos]; break;
+            }
+        } else {
+            out += s[pos];
+        }
+        pos++;
+    }
+    return out;
+}
+
+void skip_whitespace(const std::string& s, size_t& pos) {
+    while (pos < s.size() && (s[pos] == ' ' || s[pos] == '\n' || s[pos] == '\r' || s[pos] == '\t')) {
+        pos++;
+    }
+}
+
+std::string parse_json_string(const std::string& s, size_t& pos) {
+    skip_whitespace(s, pos);
+    if (pos >= s.size() || s[pos] != '"') {
+        throw std::runtime_error("Journal parse error: expected '\"' at position " + std::to_string(pos));
+    }
+    pos++;
+    std::string value = json_unescape(s, pos);
+    if (pos >= s.size() || s[pos] != '"') {
+        throw std::runtime_error("Journal parse error: unterminated string at position " + std::to_string(pos));
+    }
+    pos++;
+    return value;
+}
+
+std::string find_json_value(const std::string& obj, const std::string& key) {
+    std::string search = "\"" + key + "\"";
+    auto key_pos = obj.find(search);
+    if (key_pos == std::string::npos) {
+        return "";
+    }
+    size_t pos = key_pos + search.size();
+    skip_whitespace(obj, pos);
+    if (pos >= obj.size() || obj[pos] != ':') {
+        return "";
+    }
+    pos++;
+    skip_whitespace(obj, pos);
+    if (pos >= obj.size() || obj[pos] != '"') {
+        return "";
+    }
+    return parse_json_string(obj, pos);
+}
+
+} // anonymous namespace
+
 StagingManager::StagingManager(const std::string& base_dir)
     : staging_base_(base_dir + "/.staging")
 {}
@@ -370,64 +486,63 @@ std::vector<BackupEntry> StagingManager::read_backup_journal(const std::string& 
                         std::istreambuf_iterator<char>());
     f.close();
 
-    auto extract_quoted = [](const std::string& s, size_t start_after) -> std::string {
-        auto q1 = s.find('"', start_after);
-        if (q1 == std::string::npos) return "";
-        size_t i = q1 + 1;
-        std::string result;
-        while (i < s.size()) {
-            if (s[i] == '\\' && i + 1 < s.size()) {
-                result += s[i + 1];
-                i += 2;
-            } else if (s[i] == '"') {
-                return result;
-            } else {
-                result += s[i];
-                i++;
-            }
-        }
-        return result;
-    };
-
     size_t pos = 0;
-    while (pos < content.size()) {
-        auto obj_start = content.find('{', pos);
-        if (obj_start == std::string::npos) break;
+    skip_whitespace(content, pos);
+    if (pos >= content.size() || content[pos] != '[') {
+        throw std::runtime_error("Journal parse error: expected '[' at start");
+    }
+    pos++;
+
+    while (true) {
+        skip_whitespace(content, pos);
+        if (pos >= content.size()) {
+            throw std::runtime_error("Journal parse error: unexpected end of input");
+        }
+        if (content[pos] == ']') {
+            break;
+        }
+        if (content[pos] == ',') {
+            pos++;
+            continue;
+        }
+        if (content[pos] != '{') {
+            throw std::runtime_error("Journal parse error: expected '{' or ']' at position " + std::to_string(pos));
+        }
 
         size_t depth = 1;
-        size_t obj_end = obj_start + 1;
-        while (obj_end < content.size() && depth > 0) {
-            if (content[obj_end] == '{') depth++;
-            else if (content[obj_end] == '}') depth--;
-            obj_end++;
+        size_t obj_start = pos;
+        pos++;
+        while (pos < content.size() && depth > 0) {
+            if (content[pos] == '"') {
+                pos++;
+                while (pos < content.size() && content[pos] != '"') {
+                    if (content[pos] == '\\') pos++;
+                    pos++;
+                }
+                pos++;
+            } else {
+                if (content[pos] == '{') depth++;
+                else if (content[pos] == '}') depth--;
+                pos++;
+            }
         }
-        if (depth != 0) break;
-        obj_end--;
+        if (depth != 0) {
+            throw std::runtime_error("Journal parse error: unterminated object");
+        }
+        size_t obj_end = pos - 1;
 
         std::string obj = content.substr(obj_start + 1, obj_end - obj_start - 1);
 
         BackupEntry be;
+        be.destination = find_json_value(obj, "destination");
+        be.backup_path = find_json_value(obj, "backup_path");
+        be.state = find_json_value(obj, "state");
 
-        auto d_pos = obj.find("\"destination\"");
-        if (d_pos != std::string::npos) {
-            be.destination = extract_quoted(obj, d_pos + 13);
+        if (be.destination.empty()) {
+            throw std::runtime_error("Journal parse error: entry missing required 'destination' field");
         }
 
-        auto b_pos = obj.find("\"backup_path\"");
-        if (b_pos != std::string::npos) {
-            be.backup_path = extract_quoted(obj, b_pos + 13);
-        }
-
-        auto s_pos = obj.find("\"state\"");
-        if (s_pos != std::string::npos) {
-            be.state = extract_quoted(obj, s_pos + 7);
-        }
-
-        if (!be.destination.empty()) {
-            entries.push_back(std::move(be));
-        }
-
-        pos = obj_end + 1;
+        entries.push_back(std::move(be));
     }
 
     return entries;
@@ -436,18 +551,20 @@ std::vector<BackupEntry> StagingManager::read_backup_journal(const std::string& 
 void StagingManager::write_backup_journal(const std::string& operation_id,
                                            const std::vector<BackupEntry>& entries) {
     std::string journal = get_staging_path(operation_id) + "/.meta/backups.json";
-    std::ofstream f(journal);
+    std::string tmp = journal + ".tmp";
+
+    std::ofstream f(tmp);
     if (!f.is_open()) {
-        throw std::runtime_error("Failed to write backup journal: " + journal);
+        throw std::runtime_error("Failed to write backup journal: " + tmp);
     }
 
     f << "[\n";
     for (size_t i = 0; i < entries.size(); i++) {
         const auto& e = entries[i];
         f << "  {\n";
-        f << "    \"destination\": \"" << e.destination << "\",\n";
-        f << "    \"backup_path\": \"" << e.backup_path << "\",\n";
-        f << "    \"state\": \"" << e.state << "\"\n";
+        f << "    \"destination\": \"" << json_escape(e.destination) << "\",\n";
+        f << "    \"backup_path\": \"" << json_escape(e.backup_path) << "\",\n";
+        f << "    \"state\": \"" << json_escape(e.state) << "\"\n";
         f << "  }";
         if (i + 1 < entries.size()) f << ",";
         f << "\n";
@@ -455,7 +572,18 @@ void StagingManager::write_backup_journal(const std::string& operation_id,
     f << "]\n";
     f.flush();
     if (f.fail()) {
-        throw std::runtime_error("Failed to flush backup journal: " + journal);
+        f.close();
+        std::error_code ec;
+        std::filesystem::remove(tmp, ec);
+        throw std::runtime_error("Failed to flush backup journal: " + tmp);
+    }
+    f.close();
+
+    std::error_code ec;
+    std::filesystem::rename(tmp, journal, ec);
+    if (ec) {
+        std::filesystem::remove(tmp, ec);
+        throw std::runtime_error("Failed to atomically write journal: " + journal + " (" + ec.message() + ")");
     }
 }
 
