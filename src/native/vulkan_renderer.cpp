@@ -320,8 +320,6 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
 // shutdown
 // ============================================================================
 void VulkanRenderer::shutdown() {
-    if (!initialized_) return;
-
     if (device_) {
         pfn_vkDeviceWaitIdle(device_);
     }
@@ -392,6 +390,12 @@ void VulkanRenderer::shutdown() {
     if (instance_) {
         pfn_vkDestroyInstance(instance_, nullptr);
         instance_ = VK_NULL_HANDLE;
+    }
+
+    // Free Vulkan DLL
+    if (g_vkModule) {
+        FreeLibrary(g_vkModule);
+        g_vkModule = nullptr;
     }
 
     initialized_ = false;

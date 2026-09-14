@@ -202,8 +202,6 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
 // shutdown
 // ============================================================================
 void VulkanRenderer::shutdown() {
-    if (!initialized_) return;
-
     VkCtx ctx{*this};
 
     if (device_) {
