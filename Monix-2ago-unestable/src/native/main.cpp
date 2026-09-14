@@ -142,6 +142,7 @@ struct OpenGlState {
   // Vulkan renderer
   VulkanRenderer vk;
   bool vkAvailable = false;
+  bool vkFailed = false;
   // Vulkan shader preset renderer
   std::unique_ptr<monix::renderer_vk::ShaderRenderer> shaderRenderer;
   bool presetLoaded = false;
@@ -2161,6 +2162,9 @@ bool MonixApp::InitializeOpenGlBootstrap() {
   if (openGl_.available || openGl_.vkAvailable) {
     return true;
   }
+  if (openGl_.vkFailed) {
+    return false;
+  }
   if (!hwnd_) {
     openGl_.status = L"Window handle is not ready";
     return false;
@@ -2178,7 +2182,8 @@ bool MonixApp::InitializeOpenGlBootstrap() {
   uint32_t height = static_cast<uint32_t>(rc.bottom - rc.top);
 
   if (!openGl_.vk.initialize(hwnd_, width, height)) {
-    openGl_.status = L"Vulkan initialization failed";
+    openGl_.status = L"Vulkan initialization failed — running in GDI-only mode";
+    openGl_.vkFailed = true;
     return false;
   }
 

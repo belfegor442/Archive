@@ -196,6 +196,11 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
     // Create logical device
     if (!createLogicalDevice()) { shutdown(); return false; }
     loadDeviceFuncs();
+    if (!device_ || !vk.getDeviceQueue) {
+        OutputDebugStringA("[VK] device_ or getDeviceQueue is null after createLogicalDevice\n");
+        shutdown();
+        return false;
+    }
     vk.getDeviceQueue(device_, graphicsFamily_, 0, &graphicsQueue_);
     vk.getDeviceQueue(device_, presentFamily_, 0, &presentQueue_);
 
