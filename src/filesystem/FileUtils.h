@@ -27,6 +27,9 @@ public:
 
     static std::string unique_path(const std::string& dir, const std::string& name,
                                    const std::string& ext);
+
+    static std::string sanitize_relative_path(const std::string& relative);
+    static bool is_path_within(const std::string& path, const std::string& base);
 };
 
 } // namespace archive::filesystem

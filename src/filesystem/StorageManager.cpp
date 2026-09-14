@@ -28,8 +28,12 @@ std::string StorageManager::store_file(const std::string& item_id, const std::st
 std::string StorageManager::store_file_in_dir(const std::string& item_id,
                                                const std::string& source_path,
                                                const std::string& relative_path) {
+    std::string sanitized = FileUtils::sanitize_relative_path(relative_path);
     std::string dest_dir = get_item_file_dir(item_id);
-    std::string dest_path = dest_dir + "/" + relative_path;
+    std::string dest_path = dest_dir + "/" + sanitized;
+    if (!FileUtils::is_path_within(dest_path, dest_dir)) {
+        throw std::runtime_error("Path traversal rejected: " + relative_path);
+    }
     std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
     FileUtils::copy_file(source_path, dest_path);
     return dest_path;

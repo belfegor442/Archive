@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdint>
 #include <map>
+#include <mutex>
 
 namespace archive::filesystem {
 
@@ -77,8 +78,14 @@ public:
 
     std::string staging_base() const { return staging_base_; }
 
+    void restore_backups(const std::string& operation_id);
+    void cleanup_backups(const std::string& operation_id);
+    void verify_finalized(const std::string& operation_id, const std::string& dest_dir);
+
 private:
     std::string staging_base_;
+    std::map<std::string, std::map<std::string, std::string>> backup_maps_;
+    std::mutex backup_mutex_;
 
     void write_metadata(const std::string& operation_id, const StagingOperation& meta);
     StagingOperation read_metadata(const std::string& operation_id) const;

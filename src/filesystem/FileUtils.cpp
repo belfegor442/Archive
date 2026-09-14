@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <sstream>
+#include <vector>
 
 namespace archive::filesystem {
 
@@ -124,6 +125,39 @@ std::string FileUtils::unique_path(const std::string& dir, const std::string& na
         }
     }
     throw std::runtime_error("Could not generate unique path for: " + name + ext);
+}
+
+std::string FileUtils::sanitize_relative_path(const std::string& relative) {
+    auto p = std::filesystem::path(relative);
+    std::vector<std::string> parts;
+    for (const auto& part : p) {
+        std::string s = part.string();
+        if (s == "." || s == "") continue;
+        if (s == "..") {
+            throw std::runtime_error("Path traversal detected: " + relative);
+        }
+        parts.push_back(s);
+    }
+    std::string result;
+    for (const auto& part : parts) {
+        if (!result.empty()) result += "/";
+        result += part;
+    }
+    return result;
+}
+
+bool FileUtils::is_path_within(const std::string& path, const std::string& base) {
+    std::error_code ec;
+    auto abs_path = std::filesystem::weakly_canonical(std::filesystem::path(path), ec);
+    if (ec) return false;
+    auto abs_base = std::filesystem::weakly_canonical(std::filesystem::path(base), ec);
+    if (ec) return false;
+
+    auto path_str = abs_path.string();
+    auto base_str = abs_base.string();
+
+    if (path_str.size() < base_str.size()) return false;
+    return path_str.compare(0, base_str.size(), base_str) == 0;
 }
 
 } // namespace archive::filesystem

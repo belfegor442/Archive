@@ -32,14 +32,11 @@ void Application::recover_abandoned_staging() {
         auto abandoned = staging.detect_abandoned_staging();
 
         for (const auto& op : abandoned) {
-            if (op.completed) {
-                staging.cleanup_staging(op.operation_id);
-            } else {
-                std::cerr << "Warning: Abandoned staging operation detected: "
-                          << op.operation_id << " (" << op.operation_type << ")"
-                          << " at " << op.staging_path << std::endl;
-                staging.cleanup_staging(op.operation_id);
+            if (op.state == "finalizing" || op.state == "staged" || op.state == "preparing"
+                || op.state == "corrupted" || op.state == "abandoned") {
+                staging.restore_backups(op.operation_id);
             }
+            staging.cleanup_staging(op.operation_id);
         }
     } catch (const std::exception& e) {
         std::cerr << "Warning: Failed to recover abandoned staging: " << e.what() << std::endl;

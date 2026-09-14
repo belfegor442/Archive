@@ -55,8 +55,12 @@ std::string StagingManager::stage_file(const std::string& operation_id, const st
 std::string StagingManager::stage_file_in_dir(const std::string& operation_id,
                                                const std::string& source_path,
                                                const std::string& relative_path) {
+    std::string sanitized = FileUtils::sanitize_relative_path(relative_path);
     std::string files_dir = get_staging_files_path(operation_id);
-    std::string dest_path = files_dir + "/" + relative_path;
+    std::string dest_path = files_dir + "/" + sanitized;
+    if (!FileUtils::is_path_within(dest_path, files_dir)) {
+        throw std::runtime_error("Path traversal rejected in staging: " + relative_path);
+    }
     std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
     FileUtils::copy_file(source_path, dest_path);
     return dest_path;
@@ -103,7 +107,8 @@ bool StagingManager::validate_staging(const std::string& operation_id, const std
     std::error_code ec;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(staging_files, ec)) {
         if (entry.is_regular_file()) {
-            std::string relative = std::filesystem::relative(entry.path(), staging_files).string();
+            std::string relative = FileUtils::sanitize_relative_path(
+                std::filesystem::relative(entry.path(), staging_files).string());
             std::string dest_path = dest_dir + "/" + relative;
 
             if (std::filesystem::exists(dest_path)) {
@@ -140,10 +145,13 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
 
     mark_finalizing(operation_id);
 
+    std::map<std::string, std::string> local_backup_map;
     std::error_code ec;
+
     for (const auto& entry : std::filesystem::recursive_directory_iterator(staging_files, ec)) {
         if (entry.is_regular_file()) {
-            std::string relative = std::filesystem::relative(entry.path(), staging_files).string();
+            std::string relative = FileUtils::sanitize_relative_path(
+                std::filesystem::relative(entry.path(), staging_files).string());
             std::string dest_path = dest_dir + "/" + relative;
             std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
 
@@ -158,12 +166,14 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
                             continue;
                         }
                         backup_file(dest_path, dest_path + ".backup");
+                        local_backup_map[dest_path] = dest_path + ".backup";
                         std::filesystem::copy_file(entry.path(), dest_path,
                             std::filesystem::copy_options::overwrite_existing, ec);
                         break;
                     }
                     case CollisionPolicy::BackupAndReplace:
                         backup_file(dest_path, dest_path + ".backup");
+                        local_backup_map[dest_path] = dest_path + ".backup";
                         std::filesystem::copy_file(entry.path(), dest_path,
                             std::filesystem::copy_options::overwrite_existing, ec);
                         break;
@@ -178,10 +188,18 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
         }
     }
 
+    {
+        std::lock_guard<std::mutex> lock(backup_mutex_);
+        backup_maps_[operation_id] = local_backup_map;
+    }
+
+    verify_finalized(operation_id, dest_dir);
+    cleanup_backups(operation_id);
     mark_committed(operation_id);
 }
 
 void StagingManager::rollback_staging(const std::string& operation_id) {
+    restore_backups(operation_id);
     mark_rolled_back(operation_id);
     cleanup_staging(operation_id);
 }
@@ -302,6 +320,70 @@ StagingState StagingManager::string_to_state(const std::string& str) {
     if (str == "abandoned")    return StagingState::Abandoned;
     if (str == "corrupted")    return StagingState::Corrupted;
     return StagingState::Corrupted;
+}
+
+void StagingManager::restore_backups(const std::string& operation_id) {
+    std::map<std::string, std::string> backup_map;
+    {
+        std::lock_guard<std::mutex> lock(backup_mutex_);
+        auto it = backup_maps_.find(operation_id);
+        if (it != backup_maps_.end()) {
+            backup_map = it->second;
+            backup_maps_.erase(it);
+        }
+    }
+
+    for (auto it = backup_map.rbegin(); it != backup_map.rend(); ++it) {
+        restore_file(it->second, it->first);
+    }
+}
+
+void StagingManager::cleanup_backups(const std::string& operation_id) {
+    std::map<std::string, std::string> backup_map;
+    {
+        std::lock_guard<std::mutex> lock(backup_mutex_);
+        auto it = backup_maps_.find(operation_id);
+        if (it != backup_maps_.end()) {
+            backup_map = it->second;
+            backup_maps_.erase(it);
+        }
+    }
+
+    for (const auto& [dest, backup] : backup_map) {
+        std::error_code ec;
+        std::filesystem::remove(backup, ec);
+    }
+}
+
+void StagingManager::verify_finalized(const std::string& operation_id, const std::string& dest_dir) {
+    std::string staging_files = get_staging_files_path(operation_id);
+    if (!std::filesystem::exists(staging_files)) return;
+
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(staging_files, ec)) {
+        if (entry.is_regular_file()) {
+            std::string relative = FileUtils::sanitize_relative_path(
+                std::filesystem::relative(entry.path(), staging_files).string());
+            std::string dest_path = dest_dir + "/" + relative;
+
+            if (!std::filesystem::exists(dest_path)) {
+                throw std::runtime_error("Verify failed: destination missing after copy: " + relative);
+            }
+
+            uint64_t src_size = entry.file_size(ec);
+            uint64_t dest_size = std::filesystem::file_size(dest_path, ec);
+            if (src_size != dest_size) {
+                throw std::runtime_error("Verify failed: size mismatch for " + relative
+                    + " (expected " + std::to_string(src_size) + ", got " + std::to_string(dest_size) + ")");
+            }
+
+            std::string src_hash = compute_file_checksum(entry.path().string());
+            std::string dest_hash = compute_file_checksum(dest_path);
+            if (!src_hash.empty() && !dest_hash.empty() && src_hash != dest_hash) {
+                throw std::runtime_error("Verify failed: checksum mismatch for " + relative);
+            }
+        }
+    }
 }
 
 void StagingManager::write_metadata(const std::string& operation_id, const StagingOperation& meta) {

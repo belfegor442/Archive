@@ -1088,7 +1088,7 @@ static void test_staging_validate_reject_different_skip() {
 }
 
 static void test_staging_finalize_backup_and_replace() {
-    TEST_BEGIN("StagingManager: finalize with BackupAndReplace backs up original");
+    TEST_BEGIN("StagingManager: finalize with BackupAndReplace replaces and cleans backup");
     setup_base();
 
     StagingManager staging(TEST_BASE);
@@ -1114,14 +1114,7 @@ static void test_staging_finalize_backup_and_replace() {
     ASSERT_EQ(content, "new version");
 
     std::string backup_file = dest_file + ".backup";
-    ASSERT_TRUE(FileUtils::file_exists(backup_file));
-    std::string backup_content;
-    {
-        std::ifstream bf(backup_file);
-        backup_content = std::string((std::istreambuf_iterator<char>(bf)),
-                                     std::istreambuf_iterator<char>());
-    }
-    ASSERT_EQ(backup_content, "old version");
+    ASSERT_TRUE(!FileUtils::file_exists(backup_file));
 
     staging.cleanup_staging(op_id);
     cleanup_base();
@@ -1394,6 +1387,167 @@ static void test_consistency_full_lifecycle_with_staging() {
     TEST_PASS();
 }
 
+// === Path Traversal Protection Tests ===
+
+static void test_path_traversal_rejected_in_staging() {
+    TEST_BEGIN("Path traversal: .. rejected in stage_file_in_dir");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_traversal");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "test content");
+
+    bool threw = false;
+    try {
+        staging.stage_file_in_dir(op_id, src, "../../etc/passwd");
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_path_traversal_rejected_in_storage() {
+    TEST_BEGIN("Path traversal: .. rejected in store_file_in_dir");
+    setup_base();
+
+    DatabaseManager db(":memory:");
+    db.initialize();
+    StorageManager storage(TEST_BASE, TEST_ITEMS);
+    storage.create_item_dir("test_item");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "test content");
+
+    bool threw = false;
+    try {
+        storage.store_file_in_dir("test_item", src, "../../evil.txt");
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_valid_relative_path_accepted() {
+    TEST_BEGIN("Valid relative path: sub/dir/file.txt accepted");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_valid_path");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "test content");
+
+    std::string result = staging.stage_file_in_dir(op_id, src, "sub/dir/file.txt");
+    ASSERT_TRUE(FileUtils::file_exists(result));
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Rollback Restores Backups Tests ===
+
+static void test_rollback_restores_backups() {
+    TEST_BEGIN("Rollback: restores backed up files");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_rollback_backup");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "new content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/" + FileUtils::file_name(src);
+    create_test_file(dest_file, "original content");
+
+    staging.finalize_staging(op_id, dest_dir, CollisionPolicy::BackupAndReplace);
+
+    std::string verify_content;
+    {
+        std::ifstream f(dest_file);
+        verify_content = std::string((std::istreambuf_iterator<char>(f)),
+                                     std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(verify_content, "new content");
+
+    auto op_id2 = staging.create_staging_dir("test_rollback_backup2");
+    std::string src2 = TEST_BASE + "/src2.txt";
+    create_test_file(src2, "another new");
+    staging.stage_file(op_id2, src2);
+    staging.finalize_staging(op_id2, dest_dir, CollisionPolicy::BackupAndReplace);
+
+    staging.rollback_staging(op_id2);
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Post-Copy Verification Tests ===
+
+static void test_finalize_verifies_copy() {
+    TEST_BEGIN("Finalize: verifies file size and checksum after copy");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_verify");
+
+    std::string src = TEST_BASE + "/src.txt";
+    std::string content(8192, 'A');
+    create_test_file(src, content);
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+
+    staging.finalize_staging(op_id, dest_dir);
+
+    std::string dest_file = dest_dir + "/" + FileUtils::file_name(src);
+    ASSERT_TRUE(FileUtils::file_exists(dest_file));
+    ASSERT_EQ(FileUtils::file_size(dest_file), 8192u);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_backup_cleanup_after_success() {
+    TEST_BEGIN("Finalize: backup files cleaned after successful finalize");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_backup_cleanup");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "new");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/" + FileUtils::file_name(src);
+    create_test_file(dest_file, "old");
+
+    staging.finalize_staging(op_id, dest_dir, CollisionPolicy::BackupAndReplace);
+
+    std::string backup_file = dest_file + ".backup";
+    ASSERT_TRUE(!FileUtils::file_exists(backup_file));
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
 void run_atomic_tests() {
     std::cout << "=== Atomic Operations Tests ===" << std::endl;
 
@@ -1438,4 +1592,10 @@ void run_atomic_tests() {
     test_consistency_corrupted_staging_detected();
     test_consistency_after_version_create_failure();
     test_consistency_full_lifecycle_with_staging();
+    test_path_traversal_rejected_in_staging();
+    test_path_traversal_rejected_in_storage();
+    test_valid_relative_path_accepted();
+    test_rollback_restores_backups();
+    test_finalize_verifies_copy();
+    test_backup_cleanup_after_success();
 }
