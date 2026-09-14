@@ -4,9 +4,11 @@
 #include <vector>
 
 #include "../core/types/VerificationResult.h"
+#include "../core/types/ConsistencyReport.h"
 #include "../storage/ArchiveItemRepository.h"
 #include "../storage/VersionRepository.h"
 #include "../storage/StoredObjectRepository.h"
+#include "../storage/ActivityRepository.h"
 #include "../filesystem/StorageManager.h"
 #include "../hashing/FileHasher.h"
 
@@ -18,6 +20,7 @@ public:
         storage::ArchiveItemRepository& items,
         storage::VersionRepository& versions,
         storage::StoredObjectRepository& stored_objects,
+        storage::ActivityRepository& activities,
         filesystem::StorageManager& storage
     );
 
@@ -29,10 +32,13 @@ public:
     core::IntegrityState get_state(const std::string& item_id);
     bool is_item_valid(const std::string& item_id);
 
+    core::ConsistencyReport check_consistency();
+
 private:
     storage::ArchiveItemRepository& items_;
     storage::VersionRepository& versions_;
     storage::StoredObjectRepository& stored_objects_;
+    storage::ActivityRepository& activities_;
     filesystem::StorageManager& storage_;
 
     core::VerificationItem verify_file_item(const core::ArchiveItem& item);

@@ -1,6 +1,7 @@
 #include "IntegrityService.h"
 
 #include <filesystem>
+#include <set>
 
 namespace archive::services {
 
@@ -8,10 +9,12 @@ IntegrityService::IntegrityService(
     storage::ArchiveItemRepository& items,
     storage::VersionRepository& versions,
     storage::StoredObjectRepository& stored_objects,
+    storage::ActivityRepository& activities,
     filesystem::StorageManager& storage
 ) : items_(items)
   , versions_(versions)
   , stored_objects_(stored_objects)
+  , activities_(activities)
   , storage_(storage)
 {}
 
@@ -244,6 +247,86 @@ core::IntegrityState IntegrityService::get_state(const std::string& item_id) {
 
 bool IntegrityService::is_item_valid(const std::string& item_id) {
     return get_state(item_id) == core::IntegrityState::Valid;
+}
+
+core::ConsistencyReport IntegrityService::check_consistency() {
+    core::ConsistencyReport report;
+
+    auto all_items = items_.find_all();
+    std::set<std::string> item_ids;
+    for (const auto& item : all_items) {
+        item_ids.insert(item.id);
+    }
+
+    for (const auto& item : all_items) {
+        auto versions = versions_.find_by_item(item.id);
+        if (versions.empty()) {
+            core::ConsistencyIssue issue;
+            issue.severity = core::ConsistencyIssue::Severity::Error;
+            issue.kind = core::ConsistencyIssue::Kind::ItemWithoutVersion;
+            issue.entity_id = item.id;
+            issue.details = "Item '" + item.name + "' has no versions";
+            report.add_issue(std::move(issue));
+        }
+
+        auto stored_objects = stored_objects_.find_by_item(item.id);
+        if (stored_objects.empty()) {
+            core::ConsistencyIssue issue;
+            issue.severity = core::ConsistencyIssue::Severity::Error;
+            issue.kind = core::ConsistencyIssue::Kind::VersionWithoutStoredObject;
+            issue.entity_id = item.id;
+            issue.details = "Item '" + item.name + "' has no stored objects";
+            report.add_issue(std::move(issue));
+        }
+
+        for (const auto& so : stored_objects) {
+            if (!std::filesystem::exists(so.storage_path)) {
+                core::ConsistencyIssue issue;
+                issue.severity = core::ConsistencyIssue::Severity::Error;
+                issue.kind = core::ConsistencyIssue::Kind::StoredObjectWithoutFile;
+                issue.entity_id = so.id;
+                issue.details = "Stored object file missing: " + so.storage_path;
+                report.add_issue(std::move(issue));
+            } else if (!so.checksum.empty()) {
+                try {
+                    std::string actual = hashing::FileHasher::hash_file(so.storage_path);
+                    if (!hashing::FileHasher::compare(actual, so.checksum)) {
+                        core::ConsistencyIssue issue;
+                        issue.severity = core::ConsistencyIssue::Severity::Error;
+                        issue.kind = core::ConsistencyIssue::Kind::ChecksumMismatch;
+                        issue.entity_id = so.id;
+                        issue.details = "Checksum mismatch for: " + so.storage_path;
+                        report.add_issue(std::move(issue));
+                    }
+                } catch (...) {}
+            }
+
+            if (item.size != so.size) {
+                core::ConsistencyIssue issue;
+                issue.severity = core::ConsistencyIssue::Severity::Warning;
+                issue.kind = core::ConsistencyIssue::Kind::SizeMismatch;
+                issue.entity_id = so.id;
+                issue.details = "Size mismatch: item=" + std::to_string(item.size)
+                    + " stored=" + std::to_string(so.size);
+                report.add_issue(std::move(issue));
+            }
+        }
+    }
+
+    auto abandoned = storage_.staging().detect_abandoned_staging();
+    for (const auto& op : abandoned) {
+        if (!op.completed) {
+            core::ConsistencyIssue issue;
+            issue.severity = core::ConsistencyIssue::Severity::Warning;
+            issue.kind = core::ConsistencyIssue::Kind::OrphanStaging;
+            issue.entity_id = op.operation_id;
+            issue.details = "Abandoned staging operation: " + op.operation_type
+                + " at " + op.staging_path;
+            report.add_issue(std::move(issue));
+        }
+    }
+
+    return report;
 }
 
 } // namespace archive::services
