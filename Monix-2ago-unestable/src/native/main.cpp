@@ -3362,12 +3362,20 @@ void MonixApp::FlushLogQueues(bool force) {
     return;
   }
 
-  if ((pendingPlainLogs_.empty() && pendingJsonLogs_.empty()) && !force) {
-    if (now - lastRetentionSweepAtMs_ > 60000) {
-      CleanupLogFiles();
-      lastRetentionSweepAtMs_ = now;
+  // Acquire lock to safely swap out pending log vectors
+  std::vector<std::wstring> plainBatch;
+  std::vector<std::wstring> jsonBatch;
+  {
+    std::lock_guard<std::mutex> lock(stateMutex_);
+    if (pendingPlainLogs_.empty() && pendingJsonLogs_.empty() && !force) {
+      if (now - lastRetentionSweepAtMs_ > 60000) {
+        CleanupLogFiles();
+        lastRetentionSweepAtMs_ = now;
+      }
+      return;
     }
-    return;
+    plainBatch.swap(pendingPlainLogs_);
+    jsonBatch.swap(pendingJsonLogs_);
   }
 
   std::error_code directoryError;
@@ -3377,41 +3385,48 @@ void MonixApp::FlushLogQueues(bool force) {
     return;
   }
 
-  if (config_.logPlainEnabled && !pendingPlainLogs_.empty()) {
+  if (config_.logPlainEnabled && !plainBatch.empty()) {
     std::wofstream output(ResolveLogFilePath(L"log"), std::ios::app);
     std::size_t written = 0;
     if (output.is_open()) {
-      for (const auto& line : pendingPlainLogs_) {
+      for (const auto& line : plainBatch) {
         output << line << L"\n";
         if (!output.good()) break;
         ++written;
       }
       output.flush();
       if (!output.good()) {
-        written = std::min(written, pendingPlainLogs_.size());
+        written = std::min(written, plainBatch.size());
       }
     }
-    if (written > 0) {
-      pendingPlainLogs_.erase(pendingPlainLogs_.begin(), pendingPlainLogs_.begin() + written);
+    if (written < plainBatch.size()) {
+      // Put unflushed entries back
+      std::lock_guard<std::mutex> lock(stateMutex_);
+      pendingPlainLogs_.insert(pendingPlainLogs_.begin(),
+        std::make_move_iterator(plainBatch.begin() + written),
+        std::make_move_iterator(plainBatch.end()));
     }
   }
 
-  if (config_.logJsonEnabled && !pendingJsonLogs_.empty()) {
+  if (config_.logJsonEnabled && !jsonBatch.empty()) {
     std::wofstream output(ResolveLogFilePath(L"jsonl"), std::ios::app);
     std::size_t written = 0;
     if (output.is_open()) {
-      for (const auto& line : pendingJsonLogs_) {
+      for (const auto& line : jsonBatch) {
         output << line << L"\n";
         if (!output.good()) break;
         ++written;
       }
       output.flush();
       if (!output.good()) {
-        written = std::min(written, pendingJsonLogs_.size());
+        written = std::min(written, jsonBatch.size());
       }
     }
-    if (written > 0) {
-      pendingJsonLogs_.erase(pendingJsonLogs_.begin(), pendingJsonLogs_.begin() + written);
+    if (written < jsonBatch.size()) {
+      std::lock_guard<std::mutex> lock(stateMutex_);
+      pendingJsonLogs_.insert(pendingJsonLogs_.begin(),
+        std::make_move_iterator(jsonBatch.begin() + written),
+        std::make_move_iterator(jsonBatch.end()));
     }
   }
 
