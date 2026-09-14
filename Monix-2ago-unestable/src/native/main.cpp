@@ -8373,7 +8373,7 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
                 InvalidateRect(hwnd, nullptr, FALSE);
                 return 0;
               }
-              const int filterBtn = monix::ui::Win98Theme::HitTestLogFilters(client, point, contentY);
+              const int filterBtn = monix::ui::Win98Theme::HitTestLogFilters(client, point, contentY, &state_.logs);
               if (filterBtn >= 0) {
                 InvalidateRect(hwnd, nullptr, FALSE);
                 return 0;

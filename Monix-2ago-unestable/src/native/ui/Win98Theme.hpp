@@ -1634,14 +1634,24 @@ public:
     return -1;
   }
 
-  static int HitTestLogScrollbar(const RECT& clientRect, POINT point) {
+  static int HitTestLogScrollbar(const RECT& clientRect, POINT point, int topY, int height, int width) {
     Canvas c = MakeCanvas(clientRect, Win98ThemeFonts{}, Win98Assets{});
     if (!PtInRect(&c.rect, point)) return 0;
     const float dx = static_cast<float>(point.x - c.rect.left) / c.scale;
     const float dy = static_cast<float>(point.y - c.rect.top) / c.scale;
-    if (dx >= 740 && dx <= 754) {
-      if (dy >= 112 && dy <= 124) return 1;
-      if (dy >= 958 && dy <= 970) return -1;
+    const int toolbarY = topY + 16;
+    const int toolbarH = 24;
+    const int filterY = toolbarY + toolbarH + 2;
+    const int filterH = 20;
+    const int headerY = filterY + filterH + 1;
+    const int headerH = 16;
+    const int consoleTopY = headerY + headerH;
+    const int scrollH = height - 48 - (toolbarH + 4 + filterH + 4 + headerH + 4);
+    const int sbX = 16 + width - 30;
+    const int sbRight = sbX + 14;
+    if (dx >= sbX && dx <= sbRight) {
+      if (dy >= consoleTopY + 2 && dy <= consoleTopY + 12) return 1;
+      if (dy >= consoleTopY + scrollH - 12 && dy <= consoleTopY + scrollH - 2) return -1;
     }
     return 0;
   }
@@ -1663,7 +1673,7 @@ public:
     return -1;
   }
 
-  static int HitTestLogFilters(const RECT& clientRect, POINT point, int topY) {
+  static int HitTestLogFilters(const RECT& clientRect, POINT point, int topY, const std::vector<LogEntry>* logs) {
     Canvas c = MakeCanvas(clientRect, Win98ThemeFonts{}, Win98Assets{});
     if (!PtInRect(&c.rect, point)) return -1;
     const float dx = static_cast<float>(point.x - c.rect.left) / c.scale;
@@ -1672,10 +1682,29 @@ public:
     const int toolbarH = 24;
     const int filterY = toolbarY + toolbarH + 2;
     if (dy < filterY + 2 || dy > filterY + 18) return -1;
-    static const std::array<const wchar_t*, 5> filterLabels {{ L"ALL", L"INFO", L"WARN", L"ERROR", L"CRIT" }};
+    int totalCount = 0, infoCount = 0, warnCount = 0, errorCount = 0, critCount = 0;
+    if (logs && !logs->empty()) {
+      for (const auto& e : *logs) {
+        if (e.level == LogLevel::Info) ++infoCount;
+        else if (e.level == LogLevel::Warn) ++warnCount;
+        else if (e.level == LogLevel::Error) ++errorCount;
+        else if (e.level == LogLevel::Critical) ++critCount;
+      }
+      totalCount = infoCount + warnCount + errorCount + critCount;
+    }
+    struct FilterBtn { const wchar_t* label; int count; };
+    FilterBtn filters[] = {
+      { L"ALL", totalCount },
+      { L"INFO", infoCount },
+      { L"WARN", warnCount },
+      { L"ERROR", errorCount },
+      { L"CRIT", critCount }
+    };
     int fbX = 20;
     for (int fi = 0; fi < 5; ++fi) {
-      int bw = static_cast<int>(wcslen(filterLabels[fi])) * 6 + 22;
+      wchar_t buf[32];
+      swprintf_s(buf, L"%ls (%d)", filters[fi].label, filters[fi].count);
+      int bw = static_cast<int>(wcslen(buf)) * 6 + 14;
       if (dx >= fbX && dx < fbX + bw) return fi;
       fbX += bw + 4;
     }
