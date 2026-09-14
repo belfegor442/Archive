@@ -302,33 +302,67 @@ target_link_libraries(monix PRIVATE
 
 # MSVC-specific flags matching build.ps1
 target_compile_options(monix PRIVATE
-    $<$<COMPILE_LANGUAGE:CXX,C>:/MT /Zm800 /bigobj /EHsc /utf-8 /W4 /external:anglebrackets /external:W0>
+    $<$<COMPILE_LANGUAGE:CXX,C>:/MT /Zm800 /bigobj /EHsc /utf-8 /W4 /permissive- /external:anglebrackets /external:W0>
 )
 target_compile_options(monix_core PRIVATE
-    /MT /EHsc /utf-8 /W4 /external:anglebrackets /external:W0 /DWIN32_LEAN_AND_MEAN /DMONIX_KERNEL_BUILD
+    /MT /EHsc /utf-8 /W4 /permissive- /external:anglebrackets /external:W0 /DWIN32_LEAN_AND_MEAN /DMONIX_KERNEL_BUILD
 )
 
-# --- Test executable ---
-file(GLOB_RECURSE TEST_SOURCES "${MONIX_TESTS}/core/**/*.cpp")
+# --- Test executables (each test file is a standalone executable) ---
+file(GLOB_RECURSE TEST_FILES "${MONIX_TESTS}/core/**/*.cpp")
 
-add_executable(monix_tests ${TEST_SOURCES})
-target_link_libraries(monix_tests PRIVATE monix_core)
-target_include_directories(monix_tests PRIVATE
-    "${MONIX_CORE}"
-    "${MONIX_CORE}/events"
-    "${MONIX_CORE}/eventbus"
-    "${MONIX_CORE}/validation"
-    "${MONIX_CORE}/collectors"
-    "${MONIX_CORE}/security"
-    "${MONIX_CORE}/integration"
-    "${MONIX_CORE}/platform"
-    "${MONIX_CORE}/platform/windows"
-    "${MONIX_NATIVE}/kernel"
-)
-target_compile_definitions(monix_tests PRIVATE
-    WIN32_LEAN_AND_MEAN
-    MONIX_KERNEL_BUILD
-    MONIX_KERNEL_TEST_BUILD
-    UNICODE _UNICODE
-)
-target_compile_options(monix_tests PRIVATE /MT /EHsc /utf-8 /W4)
+foreach(TEST_FILE ${TEST_FILES})
+    get_filename_component(TEST_NAME ${TEST_FILE} NAME_WE)
+    add_executable(${TEST_NAME} ${TEST_FILE})
+    target_link_libraries(${TEST_NAME} PRIVATE monix_core)
+    target_include_directories(${TEST_NAME} PRIVATE
+        "${MONIX_CORE}"
+        "${MONIX_CORE}/events"
+        "${MONIX_CORE}/eventbus"
+        "${MONIX_CORE}/validation"
+        "${MONIX_CORE}/collectors"
+        "${MONIX_CORE}/collectors/activity"
+        "${MONIX_CORE}/collectors/activityview"
+        "${MONIX_CORE}/collectors/camera"
+        "${MONIX_CORE}/collectors/circuit"
+        "${MONIX_CORE}/collectors/config"
+        "${MONIX_CORE}/collectors/context"
+        "${MONIX_CORE}/collectors/correlation"
+        "${MONIX_CORE}/collectors/device"
+        "${MONIX_CORE}/collectors/driver"
+        "${MONIX_CORE}/collectors/external"
+        "${MONIX_CORE}/collectors/failureinject"
+        "${MONIX_CORE}/collectors/filesystem"
+        "${MONIX_CORE}/collectors/forensic"
+        "${MONIX_CORE}/collectors/health"
+        "${MONIX_CORE}/collectors/inspector"
+        "${MONIX_CORE}/collectors/integrity_storage"
+        "${MONIX_CORE}/collectors/livestream"
+        "${MONIX_CORE}/collectors/network"
+        "${MONIX_CORE}/collectors/noise"
+        "${MONIX_CORE}/collectors/process"
+        "${MONIX_CORE}/collectors/quarantine"
+        "${MONIX_CORE}/collectors/retention"
+        "${MONIX_CORE}/collectors/ruleengine"
+        "${MONIX_CORE}/collectors/script"
+        "${MONIX_CORE}/collectors/selfmonitor"
+        "${MONIX_CORE}/collectors/sensor"
+        "${MONIX_CORE}/collectors/service"
+        "${MONIX_CORE}/collectors/snapshot"
+        "${MONIX_CORE}/collectors/storage"
+        "${MONIX_CORE}/collectors/storm"
+        "${MONIX_CORE}/collectors/trust"
+        "${MONIX_CORE}/collectors/usersession"
+        "${MONIX_CORE}/security"
+        "${MONIX_CORE}/integration"
+        "${MONIX_CORE}/platform"
+        "${MONIX_CORE}/platform/windows"
+        "${MONIX_NATIVE}/kernel"
+    )
+    target_compile_definitions(${TEST_NAME} PRIVATE
+        WIN32_LEAN_AND_MEAN
+        MONIX_KERNEL_TEST_BUILD
+        UNICODE _UNICODE
+    )
+    target_compile_options(${TEST_NAME} PRIVATE /MT /EHsc /utf-8 /W4 /permissive-)
+endforeach()

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "EventStorage.hpp"
+#include "../storage/EventStorage.hpp"
 
 namespace monix::collectors::retention {
 
