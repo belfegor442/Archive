@@ -192,8 +192,9 @@ static void test_integrity_verify_item_missing() {
     ArchiveItemRepository item_repo(db);
     VersionRepository ver_repo(db);
     StoredObjectRepository so_repo(db);
+    ActivityRepository act_repo(db);
     StorageManager storage(":", "test-items");
-    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     ArchiveItem item;
     item.id = "int-missing"; item.name = "Missing"; item.type = ItemType::File;
@@ -217,8 +218,9 @@ static void test_integrity_verify_item_no_checksum() {
     ArchiveItemRepository item_repo(db);
     VersionRepository ver_repo(db);
     StoredObjectRepository so_repo(db);
+    ActivityRepository act_repo(db);
     StorageManager storage(":", "test-items");
-    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     ArchiveItem item;
     item.id = "int-nocs"; item.name = "NoCS"; item.type = ItemType::File;
@@ -241,8 +243,9 @@ static void test_integrity_verify_all_empty() {
     ArchiveItemRepository item_repo(db);
     VersionRepository ver_repo(db);
     StoredObjectRepository so_repo(db);
+    ActivityRepository act_repo(db);
     StorageManager storage(":", "test-items");
-    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     auto result = integrity.verify_all();
     ASSERT_EQ(result.items.size(), 0u);
@@ -618,7 +621,7 @@ static void test_version_create_and_get() {
     ActivityRepository act_repo(db);
     StoredObjectRepository so_repo(db);
     StorageManager storage(":", "test-items");
-    VersionService svc(ver_repo, item_repo, act_repo, so_repo, storage);
+    VersionService svc(db, ver_repo, item_repo, act_repo, so_repo, storage);
 
     ArchiveItem item;
     item.id = "item-v1"; item.name = "Versioned"; item.type = ItemType::File;

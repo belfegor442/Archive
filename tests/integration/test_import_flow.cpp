@@ -69,8 +69,8 @@ static void test_import_file_verify_integrity() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
-    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     std::string src = TEST_BASE + "/src_file.txt";
     create_test_file(src, "Hello integration test");
@@ -115,8 +115,8 @@ static void test_import_folder_verify_all() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
-    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     std::string src_dir = TEST_BASE + "/src_folder";
     create_test_file(src_dir + "/a.txt", "content A");
@@ -157,8 +157,8 @@ static void test_import_source_modified_archive_valid() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
-    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     std::string src = TEST_BASE + "/original.txt";
     create_test_file(src, "original content");
@@ -194,8 +194,8 @@ static void test_import_modify_archived_detected() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
-    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     std::string src = TEST_BASE + "/tamper.txt";
     create_test_file(src, "original data");
@@ -231,7 +231,7 @@ static void test_import_copy_size_matches() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
 
     std::string src = TEST_BASE + "/sized.txt";
     std::string content(4096, 'X');
@@ -271,7 +271,7 @@ static void test_import_nonexistent_rollback() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
 
     auto result = import_svc.import_single("/nonexistent/path/file.txt", std::nullopt);
     ASSERT_EQ(result.success_count(), 0);
@@ -298,7 +298,7 @@ static void test_import_same_name_no_overwrite() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
 
     std::string src = TEST_BASE + "/dup.txt";
     create_test_file(src, "first version");
@@ -342,7 +342,7 @@ static void test_import_nested_folder_structure() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
 
     std::string src = TEST_BASE + "/deep";
     create_test_file(src + "/root.txt", "root");
@@ -384,9 +384,9 @@ static void test_import_version_create_and_verify() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
-    VersionService version_svc(ver_repo, item_repo, act_repo, so_repo, storage);
-    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    VersionService version_svc(db, ver_repo, item_repo, act_repo, so_repo, storage);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     std::string src = TEST_BASE + "/versioned.txt";
     create_test_file(src, "version 1 content");
@@ -434,9 +434,9 @@ static void test_import_trash_restore_integrity() {
     StoredObjectRepository so_repo(db);
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
-    ImportService import_svc(item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
     UpdateService update_svc(item_repo, act_repo, storage);
-    IntegrityService integrity(item_repo, ver_repo, so_repo, storage);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     std::string src = TEST_BASE + "/trash_restore.txt";
     create_test_file(src, "trash and restore test");

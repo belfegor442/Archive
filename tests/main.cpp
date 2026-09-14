@@ -7,6 +7,7 @@ void run_storage_tests();
 void run_hashing_tests();
 void run_service_tests();
 void run_integration_tests();
+void run_atomic_tests();
 
 int main() {
     run_enum_tests();
@@ -16,6 +17,7 @@ int main() {
     run_hashing_tests();
     run_service_tests();
     run_integration_tests();
+    run_atomic_tests();
 
     return ::test::test_summary();
 }
