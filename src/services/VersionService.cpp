@@ -111,15 +111,26 @@ void VersionService::restore(const std::string& item_id, const std::string& vers
 
     try {
         std::string item_file_dir = storage_.get_item_file_dir(item_id);
+        std::string item_dir = storage_.get_item_dir(item_id);
         std::string original_name = filesystem::FileUtils::file_name(item->original_path);
-        std::string dest = item_file_dir + "/" + original_name;
-        if (std::filesystem::exists(dest)) {
-            dest = filesystem::FileUtils::unique_path(item_file_dir,
-                filesystem::FileUtils::stem(item->original_path) + "_v" + std::to_string(ver->version_number),
-                filesystem::FileUtils::extension(item->original_path));
+
+        std::string dest;
+        if (std::filesystem::is_directory(ver->storage_path)) {
+            dest = item_dir + "/restored/" + original_name;
+            std::filesystem::create_directories(std::filesystem::path(dest).parent_path());
+            std::filesystem::copy(ver->storage_path, dest,
+                                  std::filesystem::copy_options::recursive);
+            fs_tracker.track_created_dir(dest);
+        } else {
+            dest = item_file_dir + "/" + original_name;
+            if (std::filesystem::exists(dest)) {
+                dest = filesystem::FileUtils::unique_path(item_file_dir,
+                    filesystem::FileUtils::stem(item->original_path) + "_v" + std::to_string(ver->version_number),
+                    filesystem::FileUtils::extension(item->original_path));
+            }
+            std::filesystem::copy_file(ver->storage_path, dest);
+            fs_tracker.track_copied_file(dest);
         }
-        std::filesystem::copy_file(ver->storage_path, dest);
-        fs_tracker.track_copied_file(dest);
 
         {
             storage::Transaction tx(db_);
