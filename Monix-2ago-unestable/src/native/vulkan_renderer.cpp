@@ -144,11 +144,6 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
         reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(vk.vkModule, "vkGetInstanceProcAddr"));
     vk.getDeviceProcAddr =
         reinterpret_cast<PFN_vkGetDeviceProcAddr>(GetProcAddress(vk.vkModule, "vkGetDeviceProcAddr"));
-    PFN_vkEnumerateInstanceExtensionProperties enumInstExt =
-        reinterpret_cast<PFN_vkEnumerateInstanceExtensionProperties>(GetProcAddress(vk.vkModule, "vkEnumerateInstanceExtensionProperties"));
-    PFN_vkEnumerateInstanceLayerProperties enumInstLayer =
-        reinterpret_cast<PFN_vkEnumerateInstanceLayerProperties>(GetProcAddress(vk.vkModule, "vkEnumerateInstanceLayerProperties"));
-
     if (!vk.getInstanceProcAddr) {
         OutputDebugStringA("[VK] vkGetInstanceProcAddr not found\n");
         shutdown();

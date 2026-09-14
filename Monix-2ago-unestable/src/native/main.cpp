@@ -5688,10 +5688,10 @@ void MonixApp::UpdateScramSummary(const Snapshot& snapshot) {
       risk += 20;
     }
 
-    // 21. Thermal hysteresis event
-    if (snapshot.cpuTempC > prev.cpuTempC + 5.0 && snapshot.cpuTempC < prev.cpuTempC - 5.0) {
+    // 21. Thermal hysteresis event (temp dropped >5C between samples while previously hot)
+    if (prev.cpuTempC > 70.0 && snapshot.cpuTempC < prev.cpuTempC - 5.0) {
       headline = L"Thermal hysteresis detected.";
-      insight = L"Temperature oscillating rapidly between samples, indicating unstable thermal state.";
+      insight = L"Temperature dropped rapidly between samples, indicating unstable thermal state or cooler transition.";
       diagnostics.push_back(L"Hysteresis: " + std::to_wstring((int)prev.cpuTempC) + L"C -> " + std::to_wstring((int)snapshot.cpuTempC) + L"C.");
       risk += 10;
     }
