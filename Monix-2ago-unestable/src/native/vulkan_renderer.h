@@ -351,7 +351,7 @@ public:
     bool blitAppContentOverPreset(uint32_t width, uint32_t height);
     const LoadedPreset& currentPreset() const { return preset_; }
 
-private:
+public: // Internal module state shared by the decomposed Vulkan implementation.
     // ---- Init helpers ----
     bool createInstance();
     bool createSurface(HWND hwnd);
@@ -443,8 +443,11 @@ private:
     bool validationEnabled_ = false;
     bool validationAvailable_ = false;
     std::vector<ValidationMessage> validationMessages_;
-    std::mutex validationMutex_;
+    mutable std::mutex validationMutex_;
 
-    // DLL handle
-    HMODULE vulkanDll_ = VK_NULL_HANDLE;
+    // DLL handle (g_vkModule is the global from vk_globals.hpp)
+
+    // Shader thread lifecycle — prevents use-after-free on shutdown
+    std::atomic<int> pendingShaderThreads_{0};
+    std::atomic<bool> shutdownRequested_{false};
 };

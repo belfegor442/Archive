@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include "sensors.h"
 
+#include <winsock2.h>
 #include <windows.h>
 #include <psapi.h>
 #include <iphlpapi.h>

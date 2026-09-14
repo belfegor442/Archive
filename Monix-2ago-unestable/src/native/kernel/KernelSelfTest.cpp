@@ -8,6 +8,7 @@
 struct KTestEntry { const char* name; void (*func)(); };
 struct KBoolTestEntry { const char* name; bool (*func)(); };
 
+#ifdef MONIX_KERNEL_TEST_BUILD
 // Pattern A: void test_* with gPassed/gFailed (C++ linkage)
 extern const KTestEntry* GetKTests_EventCore();
 extern std::size_t GetKTestCount_EventCore();
@@ -84,6 +85,7 @@ extern std::size_t GetKBoolTestCount_DriverCollector();
 
 extern const KBoolTestEntry* GetKBoolTests_ConfigCollector();
 extern std::size_t GetKBoolTestCount_ConfigCollector();
+#endif // MONIX_KERNEL_TEST_BUILD
 
 namespace monix {
 namespace kernel {
@@ -128,6 +130,8 @@ std::size_t KernelSelfTest::TotalTests() const {
 
 void KernelSelfTest::RegisterGroups() {
   groups_.clear();
+
+#ifdef MONIX_KERNEL_TEST_BUILD
 
   // --- EVENT CORE ---
   {
@@ -454,6 +458,7 @@ void KernelSelfTest::RegisterGroups() {
     }
     groups_.push_back({"CONFIG COLLECTOR", std::move(tests)});
   }
+#endif // MONIX_KERNEL_TEST_BUILD
 }
 
 } // namespace kernel

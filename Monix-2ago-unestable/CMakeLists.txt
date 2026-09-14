@@ -58,18 +58,24 @@ set(MAIN_SOURCES
     "${MONIX_NATIVE}/main.cpp"
     "${MONIX_LEAF}/src/native/vulkan_renderer.cpp"
     "${MONIX_LEAF}/src/native/renderer_vk_unity.cpp"
-    "${MONIX_LEAF}/src/native/settings/SettingsRegistry.cpp"
+    "${MONIX_NATIVE}/settings/SettingsRegistry.cpp"
     "${MONIX_LEAF}/src/native/core/TextUtils.cpp"
-    "${MONIX_LEAF}/src/native/telemetry/Collectors.cpp"
+    "${MONIX_NATIVE}/telemetry/Collectors.cpp"
     "${MONIX_NATIVE}/kernel/KernelDiagnostics.cpp"
     "${MONIX_NATIVE}/kernel/KernelSelfTest.cpp"
     "${MONIX_LEAF}/src/native/renderer_vk/opengl/GlBackend.cpp"
+    "${MONIX_LEAF}/src/native/tests/renderer_vk/test_pipeline.cpp"
+    "${MONIX_LEAF}/src/native/tests/renderer_vk/test_runtime.cpp"
 )
 
 # SCRAM engine (rule-based risk analysis)
 file(GLOB SCRAM_SOURCES "${MONIX_LEAF}/src/native/scram/*.cpp")
 file(GLOB SCRAM_RULE_SOURCES "${MONIX_LEAF}/src/native/scram/rules/*.cpp")
 list(APPEND MAIN_SOURCES ${SCRAM_SOURCES} ${SCRAM_RULE_SOURCES})
+
+# Vulkan decomposition modules (vk_globals, instance, device, swapchain, etc.)
+file(GLOB_RECURSE VK_DECOMPOSE_SOURCES "${MONIX_LEAF}/src/native/renderer_vk/vk/*.cpp")
+list(APPEND MAIN_SOURCES ${VK_DECOMPOSE_SOURCES})
 
 # Logging subsystem (LogManager, SoundPlayer, NotificationQueue)
 list(APPEND MAIN_SOURCES
@@ -145,11 +151,12 @@ target_link_libraries(monix PRIVATE
     iphlpapi ws2_32 ole32 opengl32 uuid winmm
     kernel32 ntdll setupapi bcrypt wintrust crypt32
     advapi32 powrprof gdiplus pdh wbemuuid shcore
+    wtsapi32
 )
 
 # MSVC-specific flags matching build.ps1
 target_compile_options(monix PRIVATE
-    /MT /Zm800 /bigobj /EHsc /utf-8 /w
+    $<$<COMPILE_LANGUAGE:CXX,C>:/MT /Zm800 /bigobj /EHsc /utf-8 /w>
 )
 target_compile_options(monix_core PRIVATE
     /MT /EHsc /utf-8 /w /DWIN32_LEAN_AND_MEAN /DMONIX_KERNEL_BUILD
@@ -175,6 +182,7 @@ target_include_directories(monix_tests PRIVATE
 target_compile_definitions(monix_tests PRIVATE
     WIN32_LEAN_AND_MEAN
     MONIX_KERNEL_BUILD
+    MONIX_KERNEL_TEST_BUILD
     UNICODE _UNICODE
 )
 target_compile_options(monix_tests PRIVATE /MT /EHsc /utf-8 /w)

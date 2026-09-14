@@ -1,7 +1,7 @@
 # MONIX CODEBASE COMPREHENSIVE AUDIT REPORT
 
 **Date:** 2025-09-13
-**Codebase commit:** `050d590` (pre-fix) → `6be8e5e` (post-fix)
+**Codebase commit:** `050d590` (pre-fix) → `316ea2d` (post-fix)
 **Scope:** Full codebase technical audit — concurrency, RAII, architecture, build system, security
 **Method:** Systematic 8-phase analysis across all source modules
 **Codebase:** Monix Windows Application (C++20, Win32, Vulkan/OpenGL, MSVC 14.44)
@@ -13,11 +13,11 @@
 | Severity | Total | Fixed | Remaining |
 |----------|-------|-------|-----------|
 | CRITICAL | 4 | 3 | 1 |
-| HIGH | 9 | 2 | 7 |
-| MEDIUM | 14 | 8 | 6 |
+| HIGH | 9 | 4 | 5 |
+| MEDIUM | 16 | 10 | 6 |
 | LOW | 12 | 0 | 12 |
 | ARCHITECTURAL | 6 | 0 | 6 |
-| **TOTAL** | **45** | **13** | **32** |
+| **TOTAL** | **47** | **17** | **30** |
 
 Build verified: `cmake --build build --config Release --target monix` — zero compilation errors. 161 pre-existing linker errors from kernel test symbols (architectural, not related to audit fixes).
 
@@ -84,10 +84,11 @@ Build verified: `cmake --build build --config Release --target monix` — zero c
 **Problem:** If `initialize()` fails at any point after loading the DLL, resources allocated up to that point (instance, surface, device, etc.) were never cleaned up.
 **Fix applied:** `shutdown()` no longer early-returns on `!initialized_`. `initialize()` calls `shutdown()` on every failure path for complete partial cleanup.
 
-### HIGH-001: ScramEngine not thread-safe [OPEN]
+### HIGH-001: ScramEngine not thread-safe [FIXED]
 **File:** `Monix/Monix/src/native/scram/ScramEngine.cpp:50-54,69-101`
 **Problem:** `Evaluate()` mutates `totalEvaluations_`, `phase_`, `calibrationSamples_`, and `findingState_` without synchronization.
-**Fix:** Add `std::mutex` to `ScramEngine`.
+**Fix applied:** Added `mutable std::mutex mutex_` to `ScramEngine`. `Evaluate()` and `AddRule()` acquire `std::lock_guard<std::mutex>`.
+**Regression risk:** LOW — serialized all mutating operations.
 
 ### HIGH-002: EnvironmentBaseline::ComputeContentHash data race [OPEN]
 **File:** `Monix/Mix/src/native/telemetry/EnvironmentBaseline.hpp:321-340`
@@ -106,9 +107,11 @@ Build verified: `cmake --build build --config Release --target monix` — zero c
 
 ## Phase 4: Telemetry Pipeline
 
-### HIGH-003: EnvironmentBaseline hash is incomplete [OPEN]
+### HIGH-003: EnvironmentBaseline hash is incomplete [FIXED]
 **File:** `Monix/Monix/src/native/telemetry/EnvironmentBaseline.hpp:321-340`
-**Problem:** `ComputeContentHash()` only hashes `biosVersion`, `systemProductName`, `driverNameSet`, `serviceNameSet`, `modulePathSet`. Ignores: `processes`, `pciDevices`, `usbDevices`, `networkInterfaces`, `volumes`, `startupItems`, `scheduledTasks`, `software`, `security`, `modules`.
+**Problem:** `ComputeContentHash()` only hashed `biosVersion`, `systemProductName`, `driverNameSet`, `serviceNameSet`, `modulePathSet`. Ignored: `processes`, `pciDevices`, `usbDevices`, `networkInterfaces`, `volumes`, `startupItems`, `scheduledTasks`, `software`, `security`, `modules`.
+**Fix applied:** Extended hash to cover all evidence domains: firmware fields, software/os, security state, process/service/startup/task name sets, vector sizes + representative entries, network interface names, volume mount points. Replaced weak `h * 31` with FNV-1a style mixing.
+**Regression risk:** LOW — hash output changes (expected, correct behavior).
 
 ### MEDIUM-005: Collectors.cpp is a stub [OPEN]
 **File:** `Monix/Monix/src/native/telemetry/Collectors.cpp:1`
@@ -272,7 +275,7 @@ Introduce platform abstraction layers for Win32-specific code.
 
 ---
 
-## Fixed Summary (Commits `050d590` → `6be8e5e`)
+## Fixed Summary (Commits `050d590` → `316ea2d`)
 
 | Fix ID | Severity | Description | Files Modified |
 |--------|----------|-------------|----------------|
@@ -288,6 +291,8 @@ Introduce platform abstraction layers for Win32-specific code.
 | FIX-10 | MEDIUM | Telemetry thread INFINITE wait | `main.cpp` |
 | FIX-11 | HIGH | Remove phantom CMake sources | `CMakeLists.txt` |
 | FIX-12 | HIGH | Fix resources.rc path | `CMakeLists.txt` |
+| FIX-13 | HIGH | ScramEngine thread safety | `ScramEngine.hpp`, `ScramEngine.cpp` |
+| FIX-14 | HIGH | EnvironmentBaseline hash completeness | `EnvironmentBaseline.hpp` |
 
 ---
 
