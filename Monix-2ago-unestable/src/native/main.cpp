@@ -8179,6 +8179,7 @@ void MonixApp::ComputeViewport(const RECT& client) {
 }
 
 POINT MonixApp::MapToViewport(POINT windowPt) const {
+  if (IsWin98ThemeActive()) return windowPt;
   const RECT& vp = state_.viewport_;
   const int vw = vp.right - vp.left;
   const int vh = vp.bottom - vp.top;

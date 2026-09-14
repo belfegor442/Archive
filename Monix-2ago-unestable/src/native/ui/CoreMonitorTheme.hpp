@@ -104,6 +104,12 @@ class CoreMonitorTheme {
     return true;
   }
 
+  static constexpr int kThemeArrowPrevX = 930;
+  static constexpr int kThemeArrowNextX = 974;
+  static constexpr int kThemeArrowW = 36;
+  static constexpr int kThemeArrowY = 197;
+  static constexpr int kThemeArrowH = 33;
+
   static bool HitTestThemeControl(const RECT& clientRect, POINT point, int& direction) {
     const Canvas canvas = MakeCanvas(clientRect);
     if (!PtInRect(&canvas.rect, point)) {
@@ -111,14 +117,14 @@ class CoreMonitorTheme {
     }
     const double x = (point.x - canvas.rect.left) / canvas.scale;
     const double y = (point.y - canvas.rect.top) / canvas.scale;
-    if (y < 197.0 || y > 230.0) {
+    if (y < kThemeArrowY || y > kThemeArrowY + kThemeArrowH) {
       return false;
     }
-    if (x >= 930.0 && x <= 966.0) {
+    if (x >= kThemeArrowPrevX && x <= kThemeArrowPrevX + kThemeArrowW) {
       direction = -1;
       return true;
     }
-    if (x >= 974.0 && x <= 1010.0) {
+    if (x >= kThemeArrowNextX && x <= kThemeArrowNextX + kThemeArrowW) {
       direction = 1;
       return true;
     }

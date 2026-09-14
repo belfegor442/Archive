@@ -889,60 +889,6 @@ public:
     }
   }
 
-  static void DrawLogConsole(HDC dc, const Canvas& c, const CoreMonitorThemeContext& ctx) {
-    DrawGroupbox(dc, c, 8, 94, 830, 356, L"LOG CONSOLE", c.fonts->menuFont);
-
-    RECT consoleBg = R(c, 16, 110, 814, 338);
-    Fill(dc, consoleBg, kWin98ConsoleBg);
-    Win98Bevel(dc, consoleBg, true);
-
-    RECT scrollBar = R(c, 822, 110, 16, 228);
-    Fill(dc, scrollBar, kWin98Gray);
-    Win98Bevel(dc, scrollBar, true);
-    RECT scrollBtn = R(c, 824, 112, 12, 12);
-    Fill(dc, scrollBtn, kWin98ButtonFace);
-    Win98Bevel(dc, scrollBtn, false);
-    Text(dc, scrollBtn, L"\u25B2", c.fonts->smallFont, kWin98Black, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-    RECT scrollBtn2 = R(c, 824, 326, 12, 12);
-    Fill(dc, scrollBtn2, kWin98ButtonFace);
-    Win98Bevel(dc, scrollBtn2, false);
-    Text(dc, scrollBtn2, L"\u25BC", c.fonts->smallFont, kWin98Black, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-
-    int ly = 116;
-    const int lineH = 17;
-    if (ctx.logs && !ctx.logs->empty()) {
-      int start = (std::max)(0, static_cast<int>(ctx.logs->size()) - 20);
-      for (int i = start; i < static_cast<int>(ctx.logs->size()); ++i) {
-        const auto& e = (*ctx.logs)[i];
-        DrawConsoleLine(dc, c, 20, ly, 796, lineH, e.time, e.severity, e.message, c.fonts->logFont);
-        ly += lineH + 1;
-        if (ly > 334) break;
-      }
-    } else {
-      static const std::array<std::tuple<const wchar_t*, const wchar_t*, const wchar_t*>, 14> logs {{
-        { L"[12:03:15]", L"[INFO ]", L"Monix initialized successfully." },
-        { L"[12:03:15]", L"[INFO ]", L"OS: Windows 98 SE (4.10.2222)" },
-        { L"[12:03:15]", L"[INFO ]", L"User: WEIRD\\User" },
-        { L"[12:03:16]", L"[INFO ]", L"Monitoring system..." },
-        { L"[12:03:16]", L"[OK   ]", L"All systems operational." },
-        { L"[12:03:17]", L"[TASK ]", L"explorer.exe (PID: 1840) started." },
-        { L"[12:03:18]", L"[TASK ]", L"Monix.exe (PID: 3920) started." },
-        { L"[12:03:18]", L"[WARN ]", L"High memory usage detected (78%)." },
-        { L"[12:03:19]", L"[NET  ]", L"Connected to 8.8.8.8" },
-        { L"[12:03:20]", L"[OK   ]", L"Internet connection stable." },
-        { L"[12:03:21]", L"[TEMP ]", L"CPU Temp: 58\u00B0C" },
-        { L"[12:03:22]", L"[DISK ]", L"C:\\ Usage: 65% (312GB/476GB)" },
-        { L"[12:03:23]", L"[AI   ]", L"Context Engine updated." },
-        { L"[12:03:25]", L"[INFO ]", L"Log buffer: 256/2048 lines used." }
-      }};
-      for (const auto& [ts, lvl, msg] : logs) {
-        DrawConsoleLine(dc, c, 20, ly, 796, lineH, ts, lvl, msg, c.fonts->logFont);
-        ly += lineH + 1;
-        if (ly > 334) break;
-      }
-    }
-  }
-
   static void DrawActiveTasks(HDC dc, const Canvas& c, const CoreMonitorThemeContext& ctx) {
     const Snapshot& s = SnapshotOrDefault(ctx);
     const int contentY = 96;
