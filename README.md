@@ -11,30 +11,46 @@ A native C++ desktop application for archiving, preserving and organizing projec
 - **Hashing**: OpenSSL EVP (SHA-256)
 - **Compiler**: MinGW-w64 (GCC 16.1.0) or compatible
 
+## Prerequisites
+
+MSYS2 with the following packages:
+
+```
+mingw-w64-x86_64-gcc
+mingw-w64-x86_64-cmake
+mingw-w64-x86_64-ninja
+mingw-w64-x86_64-qt6-base
+mingw-w64-x86_64-sqlite3
+mingw-w64-x86_64-openssl
+```
+
 ## Building
 
-### Prerequisites
+### Quick build (Windows)
 
-- MSYS2 with `mingw-w64-x86_64-gcc`, `mingw-w64-x86_64-cmake`, `mingw-w64-x86_64-ninja`, `mingw-w64-x86_64-qt6-base`, `mingw-w64-x86_64-sqlite3`, `mingw-w64-x86_64-openssl`
+```bat
+build.bat
+```
 
-### Build
+### Manual build
 
 ```bash
-# Windows
-build.bat
-
-# Or manually
 set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%
-cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=g++.exe
+
+cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=g++.exe -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-build\bin\archive_tests.exe
+```
+
+### Run
+
+```bat
 build\bin\archive.exe
 ```
 
-### Clean
+### Run tests
 
-```bash
-clean.bat
+```bat
+build\bin\archive_tests.exe
 ```
 
 ## Features
@@ -62,7 +78,27 @@ Archive/
     ui/             Qt6 interface widgets
     app/            Application bootstrap and config
   tests/            Unit and integration tests
+  .github/workflows CI pipeline
 ```
+
+## Runtime
+
+Data is stored at:
+
+- **Linux/macOS**: `~/.archive-data/`
+- **Windows**: `%USERPROFILE%\.archive-data\`
+
+Contents:
+- `archive.db` — SQLite database
+- `items/` — archived file storage
+
+## Testing
+
+```bash
+build\bin\archive_tests.exe
+```
+
+198 tests covering enums, models, types, storage, hashing, services, filesystem operations, and atomic staging with rollback/recovery.
 
 ## Architecture
 
@@ -83,16 +119,8 @@ UI (Qt6)
   |
   +-- Infrastructure
         DatabaseManager, StorageManager, FileUtils, FileHasher,
-        ProjectDetector
+        StagingManager, FilesystemTracker, ProjectDetector
 ```
-
-## Testing
-
-```bash
-build\bin\archive_tests.exe
-```
-
-Currently 78 unit tests covering enums, models, types, storage, hashing, and services.
 
 ## License
 

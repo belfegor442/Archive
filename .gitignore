@@ -42,6 +42,15 @@ node_modules/
 *.db-shm
 *.db-wal
 
-# Client/Server (legacy web stack)
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+
+# Client/Server (legacy web stack — removed from tracking)
 client/
 server/

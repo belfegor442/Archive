@@ -7,6 +7,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Default to Release build
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
+endif()
+
 # Output directories
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
@@ -17,6 +23,13 @@ if(MSVC)
     add_compile_options(/W4)
 else()
     add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter)
+endif()
+
+# Release optimizations
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options($<$<CONFIG:Release>:-O2>)
+    add_compile_options($<$<CONFIG:Release>:-DNDEBUG>)
+    add_link_options($<$<CONFIG:Release>:-s>)
 endif()
 
 # Dependencies
@@ -57,6 +70,7 @@ set(ARCHIVE_LIB_SOURCES
     src/services/CategoryService.cpp
     src/services/TagService.cpp
     src/services/UpdateService.cpp
+    src/core/utils/Logger.cpp
 )
 
 # Static library for all core code
@@ -78,7 +92,7 @@ target_link_directories(archive_lib PUBLIC
     ${OPENSSL_LIBRARY_DIRS}
 )
 
-# Qt6 (optional for tests)
+# Qt6 (optional — UI requires Qt6)
 find_package(Qt6 QUIET COMPONENTS Widgets)
 if(Qt6_FOUND)
     set(CMAKE_AUTOMOC ON)
@@ -109,8 +123,12 @@ if(Qt6_FOUND)
     target_include_directories(archive PRIVATE
         ${CMAKE_SOURCE_DIR}/src
     )
+
+    # Install targets
+    include(GNUInstallDirs)
+    install(TARGETS archive RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 else()
-    message(STATUS "Qt6 not found — skipping UI build")
+    message(STATUS "Qt6 not found — skipping UI build (core library still built)")
 endif()
 
 # Tests

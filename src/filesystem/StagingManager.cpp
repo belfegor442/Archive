@@ -5,7 +5,6 @@
 
 #include <fstream>
 #include <sstream>
-#include <iostream>
 #include <cstdio>
 
 namespace archive::filesystem {

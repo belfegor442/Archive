@@ -3,11 +3,11 @@ setlocal
 
 set PATH=C:\msys64\mingw64\bin;C:\msys64\usr\bin;%PATH%
 
-echo === Archive Build Script ===
+echo === Archive Build Script (Release) ===
 echo.
 
-echo [1/3] Configuring CMake...
-cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=g++.exe
+echo [1/3] Configuring CMake (Release)...
+cmake -B build -G Ninja -DCMAKE_CXX_COMPILER=g++.exe -DCMAKE_BUILD_TYPE=Release
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: CMake configuration failed
     exit /b 1
@@ -31,4 +31,4 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo === Build successful! ===
-echo Run: build\bin\archive.exe
+echo Binary: build\bin\archive.exe

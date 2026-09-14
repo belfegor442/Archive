@@ -1,6 +1,5 @@
 #include "FilesystemTracker.h"
 
-#include <iostream>
 #include <algorithm>
 
 namespace archive::filesystem {

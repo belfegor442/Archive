@@ -1,6 +1,5 @@
 #include "DatabaseManager.h"
 
-#include <iostream>
 #include <stdexcept>
 
 namespace archive::storage {

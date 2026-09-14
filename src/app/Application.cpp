@@ -1,9 +1,9 @@
 #include "Application.h"
 #include "../ui/MainWindow.h"
 #include "../filesystem/StagingManager.h"
+#include "../core/utils/Logger.h"
 
 #include <QApplication>
-#include <iostream>
 
 namespace archive::app {
 
@@ -53,7 +53,7 @@ void Application::recover_abandoned_staging() {
 
         staging.cleanup_committed();
     } catch (const std::exception& e) {
-        std::cerr << "Warning: Failed to recover abandoned staging: " << e.what() << std::endl;
+        LOG_WARN("Failed to recover abandoned staging: " + std::string(e.what()));
     }
 }
 
