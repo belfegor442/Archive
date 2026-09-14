@@ -79,6 +79,7 @@
 #include "logging/LogEntry.hpp"
 #include "ui/AppState.hpp"
 #include "ui/CoreMonitorTheme.hpp"
+#include "ui/Win98Theme.hpp"
 #include "config/MonixConfig.hpp"
 
 using namespace monix;
@@ -233,6 +234,7 @@ struct AppState {
   POINT clickDebugWnd { -1, -1 };
   POINT clickDebugBmp { -1, -1 };
   ULONGLONG clickDebugMs = 0;
+  UpdateState updateState;
 };
 
 bool HasRepoMarkers(const std::filesystem::path& candidate) {
@@ -812,7 +814,9 @@ private:
 
   void Render(HDC dc, const RECT& clientRect);
   void RenderCoreMonitorTheme(HDC dc, const RECT& clientRect);
+  void RenderWin98Theme(HDC dc, const RECT& clientRect);
   bool IsCoreMonitorThemeActive() const;
+  bool IsWin98ThemeActive() const;
   void DrawBackground(HDC dc, const RECT& clientRect);
   void DrawSparkline(HDC dc, const RECT& rect, const std::vector<double>& values, double maxValue, ColorRole color) const;
   void DrawTabs(HDC dc, const RECT& clientRect);
@@ -892,6 +896,9 @@ private:
   winraii::ThreadHandle telemetryHandle_;
   OpenGlState openGl_;
   ULONG_PTR gdiplusToken_ = 0;
+  monix::ui::Win98ThemeFonts win98Fonts_;
+  monix::ui::Win98Assets win98Assets_;
+  bool win98AssetsLoaded_ = false;
   int currentBorderIndex_ = 0;
   LARGE_INTEGER qpcFrequency_ {};
   LARGE_INTEGER lastNativeSampleQpc_ {};
@@ -1876,10 +1883,10 @@ SettingMutation MonixApp::AdjustSetting(SettingId id, int direction) {
       mutation.changed = true;
       break;
     case SettingId::ThemeMode: {
-      int index = std::clamp(config_.themeMode, 0, monix::ui::kCoreMonitorThemeMode);
+      int index = std::clamp(config_.themeMode, 0, monix::ui::kWin98ThemeMode);
       index += step;
-      if (index < 0) index = monix::ui::kCoreMonitorThemeMode;
-      if (index > monix::ui::kCoreMonitorThemeMode) index = 0;
+      if (index < 0) index = monix::ui::kWin98ThemeMode;
+      if (index > monix::ui::kWin98ThemeMode) index = 0;
       if (index != config_.themeMode) {
         config_.themeMode = index;
         mutation.changed = true;
@@ -6799,14 +6806,14 @@ void MonixApp::SeedReferenceState() {
   state_.snapshot.threadCreationDelta = 0;
   state_.snapshot.uptimeSeconds = 11ull * 3600ull + 24ull * 60ull;
   state_.snapshot.processes = {
-    {L"Game.exe", 9210, 900, 1, 42.0, 5ull * 1024ull * 1024ull * 1024ull + 200ull * 1024ull * 1024ull, 88.0, L"RUNNING", L"HIGH", L"P-000023FA-SEED"},
-    {L"chrome.exe", 4210, 880, 1, 12.0, 2900ull * 1024ull * 1024ull, 4.0, L"ACTIVE", L"NORMAL", L"P-00001072-SEED"},
-    {L"discord.exe", 4912, 880, 1, 4.0, 512ull * 1024ull * 1024ull, 1.0, L"ACTIVE", L"NORMAL", L"P-00001330-SEED"},
-    {L"obs64.exe", 6216, 880, 1, 18.0, 1400ull * 1024ull * 1024ull, 22.0, L"RECORDING", L"HIGH", L"P-00001848-SEED"},
-    {L"explorer.exe", 1820, 744, 1, 1.0, 184ull * 1024ull * 1024ull, 0.0, L"SYSTEM", L"NORMAL", L"P-0000071C-SEED"},
-    {L"render_service.exe", 2600, 900, 1, 28.0, 2100ull * 1024ull * 1024ull, 35.0, L"RUNNING", L"HIGH", L"P-00000A28-SEED"},
-    {L"Monix.exe", 3000, 1820, 1, 2.0, 142ull * 1024ull * 1024ull, 3.0, L"ACTIVE", L"NORMAL", L"P-00000BB8-SEED"},
-    {L"System.exe", 4, 0, 0, 0.0, 88ull * 1024ull * 1024ull, 0.0, L"KERNEL", L"HIGH", L"P-00000004-SEED"}
+    {L"Game.exe", 9210, 900, 1, 42.0, 5ull * 1024ull * 1024ull * 1024ull + 200ull * 1024ull * 1024ull, 88.0, 0, L"RUNNING", L"HIGH", L"P-000023FA-SEED"},
+    {L"chrome.exe", 4210, 880, 1, 12.0, 2900ull * 1024ull * 1024ull, 4.0, 0, L"ACTIVE", L"NORMAL", L"P-00001072-SEED"},
+    {L"discord.exe", 4912, 880, 1, 4.0, 512ull * 1024ull * 1024ull, 1.0, 0, L"ACTIVE", L"NORMAL", L"P-00001330-SEED"},
+    {L"obs64.exe", 6216, 880, 1, 18.0, 1400ull * 1024ull * 1024ull, 22.0, 0, L"RECORDING", L"HIGH", L"P-00001848-SEED"},
+    {L"explorer.exe", 1820, 744, 1, 1.0, 184ull * 1024ull * 1024ull, 0.0, 0, L"SYSTEM", L"NORMAL", L"P-0000071C-SEED"},
+    {L"render_service.exe", 2600, 900, 1, 28.0, 2100ull * 1024ull * 1024ull, 35.0, 0, L"RUNNING", L"HIGH", L"P-00000A28-SEED"},
+    {L"Monix.exe", 3000, 1820, 1, 2.0, 142ull * 1024ull * 1024ull, 3.0, 0, L"ACTIVE", L"NORMAL", L"P-00000BB8-SEED"},
+    {L"System.exe", 4, 0, 0, 0.0, 88ull * 1024ull * 1024ull, 0.0, 0, L"KERNEL", L"HIGH", L"P-00000004-SEED"}
   };
   state_.snapshot.flows = {
     {L"discord.exe", 4, L"162.159.133.234:443", L"ACTIVE"},
@@ -8310,6 +8317,27 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
           return 0;
         }
 
+        if (IsWin98ThemeActive()) {
+          auto canvas = monix::ui::Win98Theme::MakeCanvas(client, win98Fonts_, win98Assets_);
+
+          int menuIndex = 0;
+          if (monix::ui::Win98Theme::HitTestMenuBar(canvas, point, menuIndex)) {
+            state_.coreMonitorMenuIndex = menuIndex;
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+          }
+
+          int tabIndex = 0;
+          if (monix::ui::Win98Theme::HitTestTabs(client, point, tabIndex)) {
+            state_.coreMonitorMenuIndex = tabIndex;
+            InvalidateRect(hwnd, nullptr, FALSE);
+            return 0;
+          }
+
+          InvalidateRect(hwnd, nullptr, FALSE);
+          return 0;
+        }
+
         Tab tab = Tab::Log;
         if (HitTestTabs(client, point, tab)) {
           if (tab != state_.activeTab) {
@@ -9084,6 +9112,10 @@ bool MonixApp::IsCoreMonitorThemeActive() const {
   return config_.themeMode == monix::ui::kCoreMonitorThemeMode;
 }
 
+bool MonixApp::IsWin98ThemeActive() const {
+  return config_.themeMode == monix::ui::kWin98ThemeMode;
+}
+
 void MonixApp::RenderCoreMonitorTheme(HDC dc, const RECT& clientRect) {
   monix::ui::CoreMonitorThemeContext ctx;
   ctx.snapshot = &state_.snapshot;
@@ -9114,6 +9146,41 @@ void MonixApp::RenderCoreMonitorTheme(HDC dc, const RECT& clientRect) {
   monix::ui::CoreMonitorTheme::Render(dc, clientRect, ctx);
 }
 
+void MonixApp::RenderWin98Theme(HDC dc, const RECT& clientRect) {
+  if (!win98AssetsLoaded_) {
+    monix::ui::Win98Theme::LoadAssets(win98Assets_, paths_.rootDir);
+    win98AssetsLoaded_ = true;
+  }
+  monix::ui::CoreMonitorThemeContext ctx;
+  ctx.snapshot = &state_.snapshot;
+  ctx.logs = &state_.logs;
+  ctx.counters = &state_.counters;
+  ctx.cpuHistory = &state_.cpuHistory;
+  ctx.ramHistory = &state_.ramHistory;
+  ctx.gpuHistory = &state_.gpuHistory;
+  ctx.netHistory = &state_.netHistory;
+  ctx.netUploadHistory = &state_.netUploadHistory;
+  ctx.config = config_;
+  ctx.fonts.title = titleFont_.get();
+  ctx.fonts.body = bodyFont_.get();
+  ctx.fonts.smallText = smallFont_.get();
+  ctx.fonts.logText = logFont_.get();
+  ctx.fonts.bodyLineHeight = bodyLineHeight_;
+  ctx.fonts.smallLineHeight = smallLineHeight_;
+  ctx.fonts.logLineHeight = logLineHeight_;
+  ctx.rendererName = openGl_.renderer.empty() ? L"VULKAN 1.3" : openGl_.renderer;
+  ctx.shaderName = paths_.crtShaderFile.empty() ? L"crt-lottes-with-bezel" : paths_.crtShaderFile.stem().wstring();
+  ctx.fontName = L"Terminal";
+  if (!paths_.fontList.empty() && state_.currentFontIndex >= 0 && state_.currentFontIndex < static_cast<int>(paths_.fontList.size())) {
+    ctx.fontName = paths_.fontList[state_.currentFontIndex].displayName;
+  }
+  ctx.menuIndex = state_.coreMonitorMenuIndex;
+  ctx.livePaused = state_.livePaused || config_.pauseLiveLogs;
+  ctx.frameCount = openGl_.frameCount;
+  ctx.updateState = &state_.updateState;
+  monix::ui::Win98Theme::Render(dc, clientRect, ctx, win98Fonts_, win98Assets_, paths_.rootDir);
+}
+
 void MonixApp::Render(HDC dc, const RECT& clientRect) {
   std::lock_guard<std::mutex> lock(stateMutex_);
   DrawBackground(dc, clientRect);
@@ -9138,6 +9205,13 @@ void MonixApp::Render(HDC dc, const RECT& clientRect) {
 
   if (IsCoreMonitorThemeActive()) {
     RenderCoreMonitorTheme(dc, clientRect);
+    DrawToast(dc, clientRect);
+    DrawClickDebug(dc, clientRect);
+    return;
+  }
+
+  if (IsWin98ThemeActive()) {
+    RenderWin98Theme(dc, clientRect);
     DrawToast(dc, clientRect);
     DrawClickDebug(dc, clientRect);
     return;

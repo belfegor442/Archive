@@ -23,6 +23,7 @@
 namespace monix::ui {
 
 constexpr int kCoreMonitorThemeMode = 3;
+constexpr int kWin98ThemeMode = 4;
 
 struct CoreMonitorThemeFonts {
   HFONT title = nullptr;
@@ -51,6 +52,13 @@ struct CoreMonitorThemeContext {
   int menuIndex = 0;
   bool livePaused = false;
   std::uint64_t frameCount = 0;
+  const UpdateState* updateState = nullptr;
+  int settingsCategory = 0;
+  int pressedButton = -1;
+  int hoveredMenuIndex = -1;
+  int activeFilter = 0;
+  int taskScroll = 0;
+  int selectedTaskPid = 0;
 };
 
 class CoreMonitorTheme {
@@ -713,11 +721,11 @@ class CoreMonitorTheme {
 
   static std::vector<ProcessInfo> FallbackProcesses() {
     return {
-      { L"chrome.exe", 18472, 0, 0, 12.4, 1932735283ull, 2.0, L"RUNNING", L"NORMAL", L"" },
-      { L"Monix.exe", 8216, 0, 0, 4.2, 440401920ull, 8.0, L"RUNNING", L"HIGH", L"" },
-      { L"explorer.exe", 4920, 0, 0, 1.8, 220200960ull, 0.0, L"RUNNING", L"NORMAL", L"" },
-      { L"Spotify.exe", 15332, 0, 0, 2.1, 335544320ull, 1.0, L"RUNNING", L"NORMAL", L"" },
-      { L"Discord.exe", 11156, 0, 0, 3.7, 293601280ull, 2.0, L"RUNNING", L"NORMAL", L"" },
+      { L"chrome.exe", 18472, 0, 0, 12.4, 1932735283ull, 2.0, 0, L"RUNNING", L"NORMAL", L"" },
+      { L"Monix.exe", 8216, 0, 0, 4.2, 440401920ull, 8.0, 0, L"RUNNING", L"HIGH", L"" },
+      { L"explorer.exe", 4920, 0, 0, 1.8, 220200960ull, 0.0, 0, L"RUNNING", L"NORMAL", L"" },
+      { L"Spotify.exe", 15332, 0, 0, 2.1, 335544320ull, 1.0, 0, L"RUNNING", L"NORMAL", L"" },
+      { L"Discord.exe", 11156, 0, 0, 3.7, 293601280ull, 2.0, 0, L"RUNNING", L"NORMAL", L"" },
     };
   }
 
@@ -1419,6 +1427,7 @@ class CoreMonitorTheme {
       case 1: return L"LIGHT";
       case 2: return L"SYSTEM";
       case kCoreMonitorThemeMode: return L"CORE MONITOR";
+      case kWin98ThemeMode: return L"WINDOWS 98";
       default: return L"UNKNOWN";
     }
   }

@@ -18,6 +18,7 @@ struct ProcessInfo {
   double cpuPct = 0.0;
   std::uint64_t ramBytes = 0;
   double gpuPct = 0.0;
+  std::uint64_t createTime100ns = 0;
   std::wstring status;
   std::wstring priority;
   std::wstring processGuid;
@@ -392,6 +393,7 @@ struct Snapshot {
   int mainThreadResponsive = 1;
   int uiResponsivenessMs = 0;
   int threadHealthOk = 1;
+  std::wstring biosVersion;
 };
 
 }

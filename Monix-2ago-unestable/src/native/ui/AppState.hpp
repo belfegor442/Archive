@@ -41,4 +41,16 @@ struct NativeProcessSample {
   std::uint64_t writeBytes = 0;
 };
 
+struct UpdateState {
+  bool dialogVisible = false;
+  bool updateAvailable = false;
+  bool checking = false;
+  bool checkedThisSession = false;
+  std::wstring latestVersion;
+  std::wstring currentVersion;
+  std::wstring releaseNotes;
+  std::wstring downloadUrl;
+  int hoverButton = -1;
+};
+
 }
