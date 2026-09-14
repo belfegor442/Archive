@@ -12,6 +12,8 @@ public:
 
 private:
     AppConfig config_;
+
+    void recover_abandoned_staging();
 };
 
 } // namespace archive::app
