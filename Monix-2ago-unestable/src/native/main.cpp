@@ -1110,7 +1110,7 @@ private:
   int prevMainThreadResponsive_ = 1;
   int prevUiResponsivenessMs_ = 0;
   int prevThreadHealthOk_ = 1;
-  mutable std::recursive_mutex stateMutex_;
+  mutable std::mutex stateMutex_;
   AppState state_;
 };
 
@@ -1450,7 +1450,7 @@ void MonixApp::LoadConfig(bool logEvent) {
     }
   }
 
-  std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+  std::lock_guard<std::mutex> lock(stateMutex_);
   config_ = next;
   state_.intro.active = false;
 
@@ -2050,7 +2050,7 @@ int MonixApp::Run(HINSTANCE instance, int showCommand) {
   }
 
   {
-    std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+    std::lock_guard<std::mutex> lock(stateMutex_);
     if (openGl_.available) {
       PushLog(L"OPENGL", L"INFO", L"Window context ready: " + openGl_.version + L" on " + openGl_.renderer + L".", ColorRole::UserInput, L"opengl", L"bootstrap", L"ready=true");
       PushLog(L"OPENGL", L"INFO", openGl_.status, ColorRole::Primary, L"opengl", L"postprocess", L"ready=true");
@@ -2558,7 +2558,7 @@ void MonixApp::TelemetryLoop() {
     Snapshot snapshot = PollSnapshot();
     if (!snapshot.processes.empty() || snapshot.ramTotalBytes != 0) {
       {
-        std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+        std::lock_guard<std::mutex> lock(stateMutex_);
         ConsumeSnapshot(std::move(snapshot));
       }
 
@@ -2569,7 +2569,7 @@ void MonixApp::TelemetryLoop() {
 
     UINT delay = 1000;
     {
-      std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+      std::lock_guard<std::mutex> lock(stateMutex_);
       delay = std::min<UINT>(config_.telemetryIntervalMs, 75u);
     }
 
@@ -8266,7 +8266,7 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         state_.clickDebugBmp = point;
         state_.clickDebugMs = GetTickCount64();
       }
-      std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+      std::lock_guard<std::mutex> lock(stateMutex_);
       if (!state_.loggedIn) {
         InvalidateRect(hwnd, nullptr, FALSE);
         return 0;
@@ -8341,7 +8341,7 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
       ComputeViewport(client);
       POINT wndPt { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
       POINT point = MapToViewport(wndPt);
-      std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+      std::lock_guard<std::mutex> lock(stateMutex_);
       if (!state_.intro.active && IsCoreMonitorThemeActive()) {
         state_.taskMenu.visible = false;
         InvalidateRect(hwnd, nullptr, FALSE);
@@ -8361,7 +8361,7 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
       return 0;
     }
     case WM_MOUSEMOVE: {
-      std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+      std::lock_guard<std::mutex> lock(stateMutex_);
       if (state_.taskMenu.visible) {
         RECT client {};
         GetClientRect(hwnd, &client);
@@ -8378,7 +8378,7 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
       return 0;
     }
     case WM_MOUSEWHEEL: {
-      std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+      std::lock_guard<std::mutex> lock(stateMutex_);
       if (state_.intro.active) {
         return 0;
       }
@@ -8417,7 +8417,7 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
       return 0;
     }
     case WM_CHAR: {
-      std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+      std::lock_guard<std::mutex> lock(stateMutex_);
       if (!state_.loggedIn) {
         kernel_.HandleChar(wParam);
         InvalidateRect(hwnd, nullptr, FALSE);
@@ -8446,7 +8446,7 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
       return 0;
     }
     case WM_KEYDOWN: {
-      std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+      std::lock_guard<std::mutex> lock(stateMutex_);
       const bool ctrlHeld = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
       const bool shiftHeld = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
       if (!state_.loggedIn && ctrlHeld && shiftHeld && wParam == 'K') {
@@ -8708,7 +8708,7 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
       GetClientRect(hwnd, &client);
       ComputeViewport(client);
       {
-        std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+        std::lock_guard<std::mutex> lock(stateMutex_);
         TickAnimations(state_.viewport_);
       }
       InvalidateRect(hwnd, nullptr, FALSE);
@@ -8738,7 +8738,7 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
       }
       QueryPerformanceCounter(&frameEnd);
       {
-        std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+        std::lock_guard<std::mutex> lock(stateMutex_);
         state_.snapshot.frameTimeMs = static_cast<double>(frameEnd.QuadPart - frameStart.QuadPart) * 1000.0 / static_cast<double>(freq.QuadPart);
       }
       EndPaint(hwnd, &ps);
@@ -9104,7 +9104,7 @@ void MonixApp::RenderCoreMonitorTheme(HDC dc, const RECT& clientRect) {
 }
 
 void MonixApp::Render(HDC dc, const RECT& clientRect) {
-  std::lock_guard<std::recursive_mutex> lock(stateMutex_);
+  std::lock_guard<std::mutex> lock(stateMutex_);
   DrawBackground(dc, clientRect);
 
   if (!state_.loggedIn) {
