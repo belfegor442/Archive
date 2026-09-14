@@ -14,23 +14,117 @@ set(MONIX_NATIVE "${CMAKE_CURRENT_SOURCE_DIR}/src/native")
 set(MONIX_CORE "${CMAKE_CURRENT_SOURCE_DIR}/src/core")
 set(MONIX_TESTS "${CMAKE_CURRENT_SOURCE_DIR}/tests")
 
-# Collect all core library sources
-file(GLOB_RECURSE CORE_EVENTS_SRC     "${MONIX_CORE}/events/*.cpp")
-file(GLOB_RECURSE CORE_EVENTBUS_SRC   "${MONIX_CORE}/eventbus/*.cpp")
-file(GLOB_RECURSE CORE_VALIDATION_SRC "${MONIX_CORE}/validation/*.cpp")
-file(GLOB_RECURSE CORE_COLLECTORS_SRC "${MONIX_CORE}/collectors/*.cpp")
-file(GLOB_RECURSE CORE_SECURITY_SRC   "${MONIX_CORE}/security/*.cpp")
-file(GLOB_RECURSE CORE_INTEGRATION_SRC "${MONIX_CORE}/integration/*.cpp")
-file(GLOB_RECURSE CORE_PLATFORM_SRC   "${MONIX_CORE}/platform/*.cpp")
-
+# Core library sources (explicit lists — no GLOB_RECURSE)
 set(CORE_SOURCES
-    ${CORE_EVENTS_SRC}
-    ${CORE_EVENTBUS_SRC}
-    ${CORE_VALIDATION_SRC}
-    ${CORE_COLLECTORS_SRC}
-    ${CORE_SECURITY_SRC}
-    ${CORE_INTEGRATION_SRC}
-    ${CORE_PLATFORM_SRC}
+    # events
+    "${MONIX_CORE}/events/ActorRef.cpp"
+    "${MONIX_CORE}/events/EntityRef.cpp"
+    "${MONIX_CORE}/events/EventBuilder.cpp"
+    "${MONIX_CORE}/events/EventDeserializer.cpp"
+    "${MONIX_CORE}/events/EventErrors.cpp"
+    "${MONIX_CORE}/events/EventFactory.cpp"
+    "${MONIX_CORE}/events/EventId.cpp"
+    "${MONIX_CORE}/events/EventPayload.cpp"
+    "${MONIX_CORE}/events/EventSerializer.cpp"
+    "${MONIX_CORE}/events/EventSeverity.cpp"
+    "${MONIX_CORE}/events/EventTime.cpp"
+    "${MONIX_CORE}/events/Provenance.cpp"
+    "${MONIX_CORE}/events/SourceRef.cpp"
+    # eventbus
+    "${MONIX_CORE}/eventbus/BackpressureController.cpp"
+    "${MONIX_CORE}/eventbus/DeadLetterQueue.cpp"
+    "${MONIX_CORE}/eventbus/EventBus.cpp"
+    "${MONIX_CORE}/eventbus/EventBusErrors.cpp"
+    "${MONIX_CORE}/eventbus/EventBusMetrics.cpp"
+    "${MONIX_CORE}/eventbus/EventFilter.cpp"
+    "${MONIX_CORE}/eventbus/EventQueue.cpp"
+    "${MONIX_CORE}/eventbus/EventSubscription.cpp"
+    # validation
+    "${MONIX_CORE}/validation/EventSchema.cpp"
+    "${MONIX_CORE}/validation/EventSchemaRegistry.cpp"
+    "${MONIX_CORE}/validation/EventValidationPipeline.cpp"
+    "${MONIX_CORE}/validation/IntegrityValidator.cpp"
+    "${MONIX_CORE}/validation/QuarantineManager.cpp"
+    "${MONIX_CORE}/validation/SchemaValidator.cpp"
+    "${MONIX_CORE}/validation/SourceRegistry.cpp"
+    "${MONIX_CORE}/validation/StructuralValidator.cpp"
+    "${MONIX_CORE}/validation/SemanticValidator.cpp"
+    "${MONIX_CORE}/validation/ValidationMetrics.cpp"
+    "${MONIX_CORE}/validation/ValidationPolicy.cpp"
+    "${MONIX_CORE}/validation/ValidationResult.cpp"
+    "${MONIX_CORE}/validation/ValidationTypes.cpp"
+    # collectors
+    "${MONIX_CORE}/collectors/CollectorConfig.cpp"
+    "${MONIX_CORE}/collectors/CollectorErrors.cpp"
+    "${MONIX_CORE}/collectors/CollectorManager.cpp"
+    "${MONIX_CORE}/collectors/CollectorMetrics.cpp"
+    "${MONIX_CORE}/collectors/CollectorRegistry.cpp"
+    "${MONIX_CORE}/collectors/CollectorStatus.cpp"
+    "${MONIX_CORE}/collectors/activity/ActivityModel.cpp"
+    "${MONIX_CORE}/collectors/activityview/ActivityView.cpp"
+    "${MONIX_CORE}/collectors/camera/CameraAdapter.cpp"
+    "${MONIX_CORE}/collectors/circuit/CircuitBreaker.cpp"
+    "${MONIX_CORE}/collectors/config/ConfigCollector.cpp"
+    "${MONIX_CORE}/collectors/config/ConfigTypes.cpp"
+    "${MONIX_CORE}/collectors/context/DetectionContext.cpp"
+    "${MONIX_CORE}/collectors/correlation/EventCorrelation.cpp"
+    "${MONIX_CORE}/collectors/device/DeviceCollector.cpp"
+    "${MONIX_CORE}/collectors/device/DeviceTypes.cpp"
+    "${MONIX_CORE}/collectors/driver/DriverCollector.cpp"
+    "${MONIX_CORE}/collectors/driver/DriverTypes.cpp"
+    "${MONIX_CORE}/collectors/external/ExternalObservation.cpp"
+    "${MONIX_CORE}/collectors/failureinject/FailureInjector.cpp"
+    "${MONIX_CORE}/collectors/filesystem/FilesystemCoalescer.cpp"
+    "${MONIX_CORE}/collectors/filesystem/FilesystemCollector.cpp"
+    "${MONIX_CORE}/collectors/filesystem/FilesystemDeduplicator.cpp"
+    "${MONIX_CORE}/collectors/filesystem/FilesystemHasher.cpp"
+    "${MONIX_CORE}/collectors/filesystem/FilesystemScope.cpp"
+    "${MONIX_CORE}/collectors/filesystem/FilesystemTypes.cpp"
+    "${MONIX_CORE}/collectors/filesystem/FilesystemWatcher.cpp"
+    "${MONIX_CORE}/collectors/forensic/ForensicMode.cpp"
+    "${MONIX_CORE}/collectors/forensic/HashIntegrity.cpp"
+    "${MONIX_CORE}/collectors/health/CollectorHealth.cpp"
+    "${MONIX_CORE}/collectors/health/HealthTypes.cpp"
+    "${MONIX_CORE}/collectors/health/ObservationGap.cpp"
+    "${MONIX_CORE}/collectors/health/RestartPolicy.cpp"
+    "${MONIX_CORE}/collectors/inspector/EventInspector.cpp"
+    "${MONIX_CORE}/collectors/integrity_storage/IntegrityStorage.cpp"
+    "${MONIX_CORE}/collectors/livestream/LiveStream.cpp"
+    "${MONIX_CORE}/collectors/network/NetworkCollector.cpp"
+    "${MONIX_CORE}/collectors/network/NetworkTypes.cpp"
+    "${MONIX_CORE}/collectors/noise/NoiseControl.cpp"
+    "${MONIX_CORE}/collectors/process/ProcessCollector.cpp"
+    "${MONIX_CORE}/collectors/process/ProcessIdentity.cpp"
+    "${MONIX_CORE}/collectors/process/ProcessSnapshot.cpp"
+    "${MONIX_CORE}/collectors/process/ProcessTypes.cpp"
+    "${MONIX_CORE}/collectors/quarantine/QuarantineIntegration.cpp"
+    "${MONIX_CORE}/collectors/retention/RetentionPolicy.cpp"
+    "${MONIX_CORE}/collectors/ruleengine/RuleEngine.cpp"
+    "${MONIX_CORE}/collectors/script/ScriptCollector.cpp"
+    "${MONIX_CORE}/collectors/script/ScriptTypes.cpp"
+    "${MONIX_CORE}/collectors/selfmonitor/SelfMonitor.cpp"
+    "${MONIX_CORE}/collectors/sensor/SensorCollector.cpp"
+    "${MONIX_CORE}/collectors/sensor/SensorTypes.cpp"
+    "${MONIX_CORE}/collectors/service/ServiceCollector.cpp"
+    "${MONIX_CORE}/collectors/service/ServiceTypes.cpp"
+    "${MONIX_CORE}/collectors/snapshot/SnapshotEngine.cpp"
+    "${MONIX_CORE}/collectors/snapshot/SnapshotTypes.cpp"
+    "${MONIX_CORE}/collectors/storage/EventStorage.cpp"
+    "${MONIX_CORE}/collectors/storage/StorageCollector.cpp"
+    "${MONIX_CORE}/collectors/storage/StorageTypes.cpp"
+    "${MONIX_CORE}/collectors/storm/EventStormProtection.cpp"
+    "${MONIX_CORE}/collectors/trust/DeviceTrust.cpp"
+    "${MONIX_CORE}/collectors/usersession/UserSessionCollector.cpp"
+    "${MONIX_CORE}/collectors/usersession/UserSessionTypes.cpp"
+    # security
+    "${MONIX_CORE}/security/SecretDetector.cpp"
+    # integration
+    "${MONIX_CORE}/integration/UltraPipeline.cpp"
+    # platform
+    "${MONIX_CORE}/platform/PlatformFactory.cpp"
+    "${MONIX_CORE}/platform/PlatformInterfaces.cpp"
+    "${MONIX_CORE}/platform/linux/LinuxPlatform.cpp"
+    "${MONIX_CORE}/platform/windows/WindowsPlatform.cpp"
 )
 
 # Ultra Logger core library (header-heavy, but compile .cpp files)
@@ -69,12 +163,60 @@ set(MAIN_SOURCES
 )
 
 # SCRAM engine (rule-based risk analysis)
-file(GLOB SCRAM_SOURCES "${MONIX_LEAF}/src/native/scram/*.cpp")
-file(GLOB SCRAM_RULE_SOURCES "${MONIX_LEAF}/src/native/scram/rules/*.cpp")
-list(APPEND MAIN_SOURCES ${SCRAM_SOURCES} ${SCRAM_RULE_SOURCES})
+set(SCRAM_SOURCES
+    "${MONIX_LEAF}/src/native/scram/ScramEngine.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/AudioMultimediaRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/CpuIdentityRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/CpuPressureRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/DiskStorageRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/DisplayConfigRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/FilesystemDataRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/FrameTimeRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/GpuDriverRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/GpuThermalPowerFanRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/GpuUtilizationRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/GpuVramRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/HandleObjectRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/HardwareSensorsRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/MemorySubsystemRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/NetworkLatencyRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/NetworkTopologyRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/NetworkTrafficRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/OsKernelRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/PowerBatteryRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/ProcessTriageRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/RamExhaustionRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/RegistryConfigRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/ReliabilityRecoveryRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/SecurityIntegrityRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/TdrStabilityRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/ThermalCoolingRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/ThermalDriftRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/ThreadSchedulingRule.cpp"
+    "${MONIX_LEAF}/src/native/scram/rules/VpnTunnelRule.cpp"
+)
+list(APPEND MAIN_SOURCES ${SCRAM_SOURCES})
 
 # Vulkan decomposition modules (vk_globals, instance, device, swapchain, etc.)
-file(GLOB_RECURSE VK_DECOMPOSE_SOURCES "${MONIX_LEAF}/src/native/renderer_vk/vk/*.cpp")
+set(VK_DECOMPOSE_SOURCES
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/vk_globals.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/buffer/VkBuffer.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/cmd/VkCmdRecording.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/command/VkCommand.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/descriptor/VkDescriptor.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/device/VkDevice.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/image/VkImage.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/instance/VkInstance.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/memory/VkMemory.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/pipeline/VkPipeline.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/preset/VkPreset.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/sampler/VkSampler.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/screenshot/VkScreenshot.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/swapchain/VkSwapchain.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/sync/VkSync.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/upload/VkUploadTexture.cpp"
+    "${MONIX_LEAF}/src/native/renderer_vk/vk/validation/VkValidation.cpp"
+)
 list(APPEND MAIN_SOURCES ${VK_DECOMPOSE_SOURCES})
 
 # Logging subsystem (LogManager, SoundPlayer, NotificationQueue)
@@ -95,8 +237,12 @@ set(LOGIN_SOURCES
 )
 
 # Transitions subsystem
-file(GLOB TRANSITION_SOURCES "${MONIX_NATIVE}/transitions/*.cpp")
-list(REMOVE_ITEM TRANSITION_SOURCES "${MONIX_NATIVE}/transitions/tests/transition_tests.cpp")
+set(TRANSITION_SOURCES
+    "${MONIX_NATIVE}/transitions/TransitionPipeline.cpp"
+    "${MONIX_NATIVE}/transitions/TransitionManager.cpp"
+    "${MONIX_NATIVE}/transitions/ScanlineTransition.cpp"
+    "${MONIX_NATIVE}/transitions/ScanlineBlender.cpp"
+)
 
 # Hardware sensors (C + ASM)
 set(SENSOR_SOURCES
