@@ -889,7 +889,7 @@ private:
   bool regressionTestMode_ = false;
   std::wstring regressionPresetsDir_;
   int regressionFrames_ = 3;
-  HANDLE telemetryHandle_{nullptr};
+  winraii::ThreadHandle telemetryHandle_;
   OpenGlState openGl_;
   ULONG_PTR gdiplusToken_ = 0;
   int currentBorderIndex_ = 0;
@@ -2528,16 +2528,12 @@ static unsigned __stdcall TelemetryThreadProc(void* param) {
 
 void MonixApp::StartTelemetry() {
   running_ = true;
-  telemetryHandle_ = reinterpret_cast<HANDLE>(_beginthreadex(nullptr, 8 * 1024 * 1024, TelemetryThreadProc, this, 0, nullptr));
+  telemetryHandle_.reset(reinterpret_cast<HANDLE>(_beginthreadex(nullptr, 8 * 1024 * 1024, TelemetryThreadProc, this, 0, nullptr)));
 }
 
 void MonixApp::StopTelemetry() {
   running_ = false;
-  if (telemetryHandle_) {
-    WaitForSingleObject(telemetryHandle_, INFINITE);
-    CloseHandle(telemetryHandle_);
-    telemetryHandle_ = nullptr;
-  }
+  telemetryHandle_.reset();
 }
 
 void MonixApp::RequestRefresh() {

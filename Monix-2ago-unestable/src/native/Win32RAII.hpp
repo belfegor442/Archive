@@ -82,4 +82,34 @@ struct Dc {
     explicit operator bool() const { return h != nullptr; }
 };
 
+struct ThreadHandle {
+    HANDLE h = nullptr;
+    ThreadHandle() = default;
+    explicit ThreadHandle(HANDLE thread) : h(thread) {}
+    ~ThreadHandle() {
+        if (h) {
+            WaitForSingleObject(h, 3000);
+            CloseHandle(h);
+            h = nullptr;
+        }
+    }
+    ThreadHandle(const ThreadHandle&) = delete;
+    ThreadHandle& operator=(const ThreadHandle&) = delete;
+    ThreadHandle(ThreadHandle&& o) noexcept : h(o.h) { o.h = nullptr; }
+    ThreadHandle& operator=(ThreadHandle&& o) noexcept {
+        if (this != &o) {
+            if (h) { WaitForSingleObject(h, 3000); CloseHandle(h); }
+            h = o.h; o.h = nullptr;
+        }
+        return *this;
+    }
+    HANDLE get() const { return h; }
+    explicit operator bool() const { return h != nullptr; }
+    HANDLE release() { HANDLE tmp = h; h = nullptr; return tmp; }
+    void reset(HANDLE thread = nullptr) {
+        if (h) { WaitForSingleObject(h, 3000); CloseHandle(h); }
+        h = thread;
+    }
+};
+
 } // namespace winraii
