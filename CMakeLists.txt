@@ -94,9 +94,17 @@ target_link_directories(archive_lib PUBLIC
 )
 
 # CLI executable (no Qt dependency)
-add_executable(archive-cli src/cli/main.cpp)
+add_executable(archive-cli WIN32 src/cli/main.cpp)
 target_link_libraries(archive-cli PRIVATE archive_lib)
 target_include_directories(archive-cli PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
+# Win32 native GUI (no Qt dependency)
+add_executable(archive-gui WIN32 src/gui/main.cpp)
+target_link_libraries(archive-gui PRIVATE archive_lib comctl32 shell32)
+target_include_directories(archive-gui PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_compile_definitions(archive-gui PRIVATE UNICODE _UNICODE)
+target_compile_options(archive-gui PRIVATE -municode)
+target_link_options(archive-gui PRIVATE -municode)
 
 # Qt6 (optional — UI requires Qt6)
 find_package(Qt6 QUIET COMPONENTS Widgets)
@@ -130,11 +138,11 @@ if(Qt6_FOUND)
     )
 
     include(GNUInstallDirs)
-    install(TARGETS archive archive-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS archive archive-cli archive-gui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 else()
-    message(STATUS "Qt6 not found — skipping UI build (CLI and core library still built)")
+    message(STATUS "Qt6 not found — skipping UI build (CLI, Win32 GUI, and core library still built)")
     include(GNUInstallDirs)
-    install(TARGETS archive-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS archive-cli archive-gui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 # Tests
