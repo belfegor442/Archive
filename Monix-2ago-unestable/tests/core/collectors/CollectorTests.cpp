@@ -145,24 +145,26 @@ static void test_capability_bitmask() {
 static void test_config_set_get() {
   TEST("CollectorConfig: set and get values");
   CollectorConfig cfg;
-  cfg.set("path", std::string("/tmp"));
-  cfg.set("interval", std::int64_t(5000));
-  cfg.set("enabled", true);
+  cfg.set(CollectorConfigField::AutoRestart, true);
+  cfg.set(CollectorConfigField::SamplingIntervalMs, std::int64_t(5000));
+  cfg.set(CollectorConfigField::Enabled, false);
 
-  ASSERT_EQ(cfg.getString("path"), "/tmp");
-  ASSERT_EQ(cfg.getInt("interval"), 5000);
-  ASSERT_TRUE(cfg.getBool("enabled"));
-  ASSERT_TRUE(cfg.has("path"));
-  ASSERT_FALSE(cfg.has("missing"));
+  ASSERT_TRUE(cfg.getBool(CollectorConfigField::AutoRestart));
+  ASSERT_EQ(cfg.getInt(CollectorConfigField::SamplingIntervalMs), 5000);
+  ASSERT_FALSE(cfg.getBool(CollectorConfigField::Enabled));
+  cfg.set(CollectorConfigField::Enabled, true);
+  ASSERT_TRUE(cfg.getBool(CollectorConfigField::Enabled));
+  cfg.remove(CollectorConfigField::Enabled);
+  ASSERT_FALSE(cfg.has(CollectorConfigField::Enabled));
   PASS();
 }
 
 static void test_config_defaults() {
   TEST("CollectorConfig: defaults for missing keys");
   CollectorConfig cfg;
-  ASSERT_EQ(cfg.getString("x", "default"), "default");
-  ASSERT_EQ(cfg.getInt("x", 42), 42);
-  ASSERT_FALSE(cfg.getBool("x", false));
+  ASSERT_EQ(cfg.getInt(CollectorConfigField::SamplingIntervalMs, 999), 1000);
+  ASSERT_TRUE(cfg.getBool(CollectorConfigField::AutoRestart));
+  ASSERT_EQ(cfg.getInt(CollectorConfigField::MaxRestartAttempts), 3);
   PASS();
 }
 #endif
