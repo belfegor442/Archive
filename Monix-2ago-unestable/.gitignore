@@ -1,49 +1,8 @@
-# Build outputs
+# Build artifacts
 build/
-**/build/
 *.obj
-*.o
-*.exe
 *.pdb
 *.ilk
-*.lib
 *.exp
-
-# Runtime output
-logs/
-**/logs/
-test_output/
-**/test_output/
-tests/results/
-*.log
-*.jsonl
-stdout.txt
-stderr.txt
-
-# Local screenshots and throwaway scripts
-screen*.png
-temp_*.ps1
-check_sdk.cpp
-
-# IDE and OS metadata
-.vs/
-.vscode/
-*.user
-*.suo
-Thumbs.db
-desktop.ini
-
-# External tools (zig compiler ~500MB)
-Monix/Monix/tools/
-Monix/Monix/build/
-
-# Fonts (binary assets ~50MB)
-Monix/Monix/fonts/
-
-# Cache and test output
-Monix/Monix/cache/
-Monix/Monix/test_output/
-Monix/Monix/logs/
-
-# Generated files
-*.zip
+*.lib
+*.exe
