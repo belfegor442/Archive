@@ -5,7 +5,6 @@
 #include <vector>
 #include <cstdint>
 #include <map>
-#include <mutex>
 
 namespace archive::filesystem {
 
@@ -38,6 +37,12 @@ struct StagingOperation {
     std::vector<std::string> staged_files;
 };
 
+struct BackupEntry {
+    std::string destination;
+    std::string backup_path;
+    std::string state;
+};
+
 class StagingManager {
 public:
     StagingManager(const std::string& base_dir);
@@ -65,6 +70,7 @@ public:
                      const std::string& checksum = "");
     void mark_finalizing(const std::string& operation_id);
     void mark_committed(const std::string& operation_id);
+    void mark_rolling_back(const std::string& operation_id);
     void mark_rolled_back(const std::string& operation_id);
     void mark_abandoned(const std::string& operation_id);
 
@@ -78,23 +84,28 @@ public:
 
     std::string staging_base() const { return staging_base_; }
 
+    std::vector<BackupEntry> read_backup_journal(const std::string& operation_id) const;
+    void write_backup_journal(const std::string& operation_id,
+                              const std::vector<BackupEntry>& entries);
     void restore_backups(const std::string& operation_id);
     void cleanup_backups(const std::string& operation_id);
     void verify_finalized(const std::string& operation_id, const std::string& dest_dir);
 
+    void backup_file_strict(const std::string& src, const std::string& dest);
+    void restore_file_strict(const std::string& backup, const std::string& original);
+    static std::string compute_file_checksum(const std::string& path);
+
 private:
     std::string staging_base_;
-    std::map<std::string, std::map<std::string, std::string>> backup_maps_;
-    std::mutex backup_mutex_;
 
     void write_metadata(const std::string& operation_id, const StagingOperation& meta);
     StagingOperation read_metadata(const std::string& operation_id) const;
     void update_metadata(const std::string& operation_id,
                          const std::map<std::string, std::string>& updates);
 
-    static void backup_file(const std::string& src, const std::string& dest);
-    static void restore_file(const std::string& backup, const std::string& original);
-    static std::string compute_file_checksum(const std::string& path);
+    std::string get_backup_path(const std::string& operation_id,
+                                const std::string& relative) const;
+    void append_backup_entry(const std::string& operation_id, const BackupEntry& entry);
 };
 
 } // namespace archive::filesystem

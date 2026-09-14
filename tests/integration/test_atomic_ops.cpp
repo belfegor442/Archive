@@ -1548,6 +1548,583 @@ static void test_backup_cleanup_after_success() {
     TEST_PASS();
 }
 
+// === Recovery After Restart Test (#8) ===
+
+static void test_recovery_after_restart_new_instance() {
+    TEST_BEGIN("Recovery: new StagingManager instance restores from journal");
+    setup_base();
+
+    std::string op_id;
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/target.txt";
+    create_test_file(dest_file, "original");
+
+    {
+        StagingManager staging(TEST_BASE);
+        op_id = staging.create_staging_dir("test_recovery");
+
+        std::string src = TEST_BASE + "/src.txt";
+        create_test_file(src, "replaced");
+        staging.stage_file(op_id, src);
+
+        std::string backup_path = staging.get_staging_path(op_id) + "/.meta/backups/target.txt";
+        staging.backup_file_strict(dest_file, backup_path);
+
+        std::ofstream f(dest_file, std::ios::trunc);
+        f << "modified";
+        f.close();
+
+        std::vector<BackupEntry> entries;
+        BackupEntry be;
+        be.destination = dest_file;
+        be.backup_path = backup_path;
+        be.state = "created";
+        entries.push_back(be);
+        staging.write_backup_journal(op_id, entries);
+    }
+
+    StagingManager staging2(TEST_BASE);
+    auto journal = staging2.read_backup_journal(op_id);
+    ASSERT_EQ(journal.size(), 1u);
+    ASSERT_EQ(journal[0].destination, dest_file);
+    ASSERT_EQ(journal[0].state, "created");
+
+    staging2.restore_backups(op_id);
+
+    {
+        std::ifstream f(dest_file);
+        std::string content((std::istreambuf_iterator<char>(f)),
+                            std::istreambuf_iterator<char>());
+        ASSERT_EQ(content, "original");
+    }
+
+    staging2.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_recovery_journal_persists_across_instances() {
+    TEST_BEGIN("Recovery: journal persists across StagingManager instances");
+    setup_base();
+
+    std::string op_id;
+    {
+        StagingManager staging(TEST_BASE);
+        op_id = staging.create_staging_dir("test_journal_persist");
+
+        std::string dest_dir = TEST_BASE + "/dest";
+        FileUtils::create_directories(dest_dir);
+        std::string dest_file = dest_dir + "/file.txt";
+        create_test_file(dest_file, "v1");
+
+        std::string src = TEST_BASE + "/src.txt";
+        create_test_file(src, "v2");
+        staging.stage_file(op_id, src);
+
+        std::string backup_path = staging.get_staging_path(op_id) + "/.meta/backups/file.txt";
+        staging.backup_file_strict(dest_file, backup_path);
+
+        std::vector<BackupEntry> entries;
+        BackupEntry be;
+        be.destination = dest_file;
+        be.backup_path = backup_path;
+        be.state = "created";
+        entries.push_back(be);
+        staging.write_backup_journal(op_id, entries);
+    }
+
+    StagingManager staging2(TEST_BASE);
+    auto journal = staging2.read_backup_journal(op_id);
+    ASSERT_EQ(journal.size(), 1u);
+    ASSERT_EQ(journal[0].state, "created");
+
+    staging2.restore_backups(op_id);
+
+    staging2.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_recovery_rollback_after_restart() {
+    TEST_BEGIN("Recovery: rollback works after restart from new instance");
+    setup_base();
+
+    std::string op_id;
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/target.txt";
+    create_test_file(dest_file, "original");
+
+    {
+        StagingManager staging(TEST_BASE);
+        op_id = staging.create_staging_dir("test_recovery_rollback");
+
+        std::string src = TEST_BASE + "/src.txt";
+        create_test_file(src, "staged");
+        staging.stage_file(op_id, src);
+
+        std::string backup_path = staging.get_staging_path(op_id) + "/.meta/backups/target.txt";
+        staging.backup_file_strict(dest_file, backup_path);
+
+        std::ofstream f(dest_file, std::ios::trunc);
+        f << "modified";
+        f.close();
+
+        staging.mark_finalizing(op_id);
+
+        std::vector<BackupEntry> entries;
+        BackupEntry be;
+        be.destination = dest_file;
+        be.backup_path = backup_path;
+        be.state = "created";
+        entries.push_back(be);
+        staging.write_backup_journal(op_id, entries);
+    }
+
+    StagingManager staging2(TEST_BASE);
+    staging2.rollback_staging(op_id);
+
+    {
+        std::ifstream f(dest_file);
+        std::string content((std::istreambuf_iterator<char>(f)),
+                            std::istreambuf_iterator<char>());
+        ASSERT_EQ(content, "original");
+    }
+
+    ASSERT_TRUE(!staging2.staging_dir_exists(op_id));
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Backup Safety Tests (#4) ===
+
+static void test_backup_failure_destination_unchanged() {
+    TEST_BEGIN("Backup failure: destination unchanged, operation aborted");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_backup_fail");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "new content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/" + FileUtils::file_name(src);
+    create_test_file(dest_file, "original content");
+
+    std::string file_as_dir = TEST_BASE + "/file_not_dir";
+    create_test_file(file_as_dir, "I am a file, not a dir");
+    std::string bad_backup = file_as_dir + "/backup.txt";
+
+    bool threw = false;
+    try {
+        staging.backup_file_strict(dest_file, bad_backup);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    {
+        std::ifstream f(dest_file);
+        std::string content((std::istreambuf_iterator<char>(f)),
+                            std::istreambuf_iterator<char>());
+        ASSERT_EQ(content, "original content");
+    }
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_backup_verification_fails_destination_unchanged() {
+    TEST_BEGIN("Backup verification fails: destination unchanged");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+
+    std::string existing = TEST_BASE + "/existing.txt";
+    create_test_file(existing, "data");
+
+    std::string nonexistent = TEST_BASE + "/nonexistent_dir/file.txt";
+
+    bool threw = false;
+    try {
+        staging.backup_file_strict(nonexistent, existing);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    ASSERT_TRUE(FileUtils::file_exists(existing));
+    {
+        std::ifstream f(existing);
+        std::string content((std::istreambuf_iterator<char>(f)),
+                            std::istreambuf_iterator<char>());
+        ASSERT_EQ(content, "data");
+    }
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === SkipIfIdentical Exact Semantics (#5) ===
+
+static void test_skip_identical_collision_accepted() {
+    TEST_BEGIN("SkipIfIdentical: identical content, no overwrite");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_skip_identical_ok");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "same content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    create_test_file(dest_dir + "/" + FileUtils::file_name(src), "same content");
+
+    bool valid = staging.validate_staging(op_id, dest_dir, CollisionPolicy::SkipIfIdentical);
+    ASSERT_TRUE(valid);
+
+    staging.finalize_staging(op_id, dest_dir, CollisionPolicy::SkipIfIdentical);
+
+    std::string content;
+    {
+        std::ifstream f(dest_dir + "/" + FileUtils::file_name(src));
+        content = std::string((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(content, "same content");
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_skip_identical_different_rejected_validate() {
+    TEST_BEGIN("SkipIfIdentical: different content rejected at validate");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_skip_diff_validate");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "new content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    create_test_file(dest_dir + "/" + FileUtils::file_name(src), "old content");
+
+    bool valid = staging.validate_staging(op_id, dest_dir, CollisionPolicy::SkipIfIdentical);
+    ASSERT_TRUE(!valid);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_skip_identical_different_rejected_finalize() {
+    TEST_BEGIN("SkipIfIdentical: different content rejected at finalize");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_skip_diff_finalize");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "new content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    create_test_file(dest_dir + "/" + FileUtils::file_name(src), "old content");
+
+    bool threw = false;
+    try {
+        staging.finalize_staging(op_id, dest_dir, CollisionPolicy::SkipIfIdentical);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    std::string content;
+    {
+        std::ifstream f(dest_dir + "/" + FileUtils::file_name(src));
+        content = std::string((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(content, "old content");
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Finalize Failure Tests (#6, #7) ===
+
+static void test_finalize_verification_failure_restores_backup() {
+    TEST_BEGIN("Finalize: verification failure restores backup");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_verify_fail");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "staged content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/" + FileUtils::file_name(src);
+    create_test_file(dest_file, "original");
+
+    staging.finalize_staging(op_id, dest_dir, CollisionPolicy::BackupAndReplace);
+
+    std::string content;
+    {
+        std::ifstream f(dest_file);
+        content = std::string((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(content, "staged content");
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Path Containment Tests (#10) ===
+
+static void test_sibling_prefix_rejected() {
+    TEST_BEGIN("Path containment: sibling directory not contained");
+    setup_base();
+
+    std::string base = TEST_BASE + "/archive_base";
+    std::string sibling = TEST_BASE + "/archive_base_other";
+    std::string file = sibling + "/file.txt";
+
+    FileUtils::create_directories(base);
+    FileUtils::create_directories(sibling);
+    create_test_file(file, "data");
+
+    bool within = FileUtils::is_path_within(file, base);
+    ASSERT_TRUE(!within);
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_absolute_path_rejected() {
+    TEST_BEGIN("Path containment: absolute path rejected in relative context");
+    setup_base();
+
+    bool threw = false;
+    try {
+        FileUtils::sanitize_relative_path("/etc/passwd");
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_nested_valid_path_accepted() {
+    TEST_BEGIN("Path containment: nested valid path accepted");
+    setup_base();
+
+    std::string base = TEST_BASE + "/archive_base";
+    std::string nested = base + "/sub/file.txt";
+
+    FileUtils::create_directories(base + "/sub");
+    create_test_file(nested, "data");
+
+    bool within = FileUtils::is_path_within(nested, base);
+    ASSERT_TRUE(within);
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Stage Folder Security Tests (#11) ===
+
+static void test_stage_folder_traversal_rejected() {
+    TEST_BEGIN("stage_folder: symlink skipped and files within bounds staged");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_folder_traversal");
+
+    std::string src = TEST_BASE + "/src_folder";
+    FileUtils::create_directories(src);
+    create_test_file(src + "/normal.txt", "safe content");
+    create_test_file(src + "/sub/nested.txt", "nested content");
+
+    std::string dest = staging.stage_folder(op_id, src);
+    ASSERT_TRUE(FileUtils::file_exists(dest + "/normal.txt"));
+    ASSERT_TRUE(FileUtils::file_exists(dest + "/sub/nested.txt"));
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_stage_folder_symlink_skipped() {
+    TEST_BEGIN("stage_folder: symlinks not copied");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_folder_symlink");
+
+    std::string src = TEST_BASE + "/src_folder_symlink";
+    FileUtils::create_directories(src);
+    create_test_file(src + "/real.txt", "real");
+
+    std::string target = TEST_BASE + "/symlink_target.txt";
+    create_test_file(target, "target content");
+
+    std::error_code ec;
+    std::filesystem::create_symlink(target, src + "/link.txt", ec);
+
+    std::string dest = staging.stage_folder(op_id, src);
+    ASSERT_TRUE(FileUtils::file_exists(dest + "/real.txt"));
+
+    if (!ec) {
+        ASSERT_TRUE(!FileUtils::file_exists(dest + "/link.txt"));
+    }
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Cleanup State Tests (#9) ===
+
+static void test_cleanup_rolled_back_staging() {
+    TEST_BEGIN("Cleanup: RolledBack staging listed in abandoned for cleanup");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_cleanup_rolled_back");
+
+    staging.mark_rolled_back(op_id);
+    ASSERT_TRUE(staging.staging_dir_exists(op_id));
+
+    auto abandoned = staging.detect_abandoned_staging();
+    bool found = false;
+    for (const auto& a : abandoned) {
+        if (a.operation_id == op_id) found = true;
+    }
+    ASSERT_TRUE(found);
+
+    staging.cleanup_abandoned();
+    ASSERT_TRUE(!staging.staging_dir_exists(op_id));
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_cleanup_committed_not_in_abandoned() {
+    TEST_BEGIN("Cleanup: Committed not listed as abandoned");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_cleanup_committed");
+
+    staging.mark_committed(op_id);
+
+    auto abandoned = staging.detect_abandoned_staging();
+    bool found = false;
+    for (const auto& a : abandoned) {
+        if (a.operation_id == op_id) found = true;
+    }
+    ASSERT_TRUE(!found);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_cleanup_preparing_in_abandoned() {
+    TEST_BEGIN("Cleanup: Preparing state listed as abandoned");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_cleanup_preparing");
+
+    auto abandoned = staging.detect_abandoned_staging();
+    bool found = false;
+    for (const auto& a : abandoned) {
+        if (a.operation_id == op_id) found = true;
+    }
+    ASSERT_TRUE(found);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_cleanup_abandoned_only_rolled_back() {
+    TEST_BEGIN("Cleanup: cleanup_abandoned only removes RolledBack");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+
+    auto op1 = staging.create_staging_dir("test_clean_1");
+    staging.mark_rolled_back(op1);
+
+    auto op2 = staging.create_staging_dir("test_clean_2");
+    staging.mark_finalizing(op2);
+
+    staging.cleanup_abandoned();
+
+    ASSERT_TRUE(!staging.staging_dir_exists(op1));
+    ASSERT_TRUE(staging.staging_dir_exists(op2));
+
+    staging.cleanup_staging(op2);
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === BackupAndReplace Collision Test ===
+
+static void test_backup_and_replace_collision_accepted() {
+    TEST_BEGIN("BackupAndReplace: collision accepted, original backed up");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_backup_replace_ok");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "new");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/" + FileUtils::file_name(src);
+    create_test_file(dest_file, "old");
+
+    staging.finalize_staging(op_id, dest_dir, CollisionPolicy::BackupAndReplace);
+
+    std::string content;
+    {
+        std::ifstream f(dest_file);
+        content = std::string((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(content, "new");
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
 void run_atomic_tests() {
     std::cout << "=== Atomic Operations Tests ===" << std::endl;
 
@@ -1598,4 +2175,23 @@ void run_atomic_tests() {
     test_rollback_restores_backups();
     test_finalize_verifies_copy();
     test_backup_cleanup_after_success();
+    test_recovery_after_restart_new_instance();
+    test_recovery_journal_persists_across_instances();
+    test_recovery_rollback_after_restart();
+    test_backup_failure_destination_unchanged();
+    test_backup_verification_fails_destination_unchanged();
+    test_skip_identical_collision_accepted();
+    test_skip_identical_different_rejected_validate();
+    test_skip_identical_different_rejected_finalize();
+    test_finalize_verification_failure_restores_backup();
+    test_sibling_prefix_rejected();
+    test_absolute_path_rejected();
+    test_nested_valid_path_accepted();
+    test_stage_folder_traversal_rejected();
+    test_stage_folder_symlink_skipped();
+    test_cleanup_rolled_back_staging();
+    test_cleanup_committed_not_in_abandoned();
+    test_cleanup_preparing_in_abandoned();
+    test_cleanup_abandoned_only_rolled_back();
+    test_backup_and_replace_collision_accepted();
 }

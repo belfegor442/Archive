@@ -128,6 +128,9 @@ std::string FileUtils::unique_path(const std::string& dir, const std::string& na
 }
 
 std::string FileUtils::sanitize_relative_path(const std::string& relative) {
+    if (!relative.empty() && (relative[0] == '/' || relative[0] == '\\')) {
+        throw std::runtime_error("Absolute path rejected in relative context: " + relative);
+    }
     auto p = std::filesystem::path(relative);
     std::vector<std::string> parts;
     for (const auto& part : p) {
@@ -147,17 +150,50 @@ std::string FileUtils::sanitize_relative_path(const std::string& relative) {
 }
 
 bool FileUtils::is_path_within(const std::string& path, const std::string& base) {
-    std::error_code ec;
-    auto abs_path = std::filesystem::weakly_canonical(std::filesystem::path(path), ec);
-    if (ec) return false;
-    auto abs_base = std::filesystem::weakly_canonical(std::filesystem::path(base), ec);
-    if (ec) return false;
+    auto is_sep = [](char c) { return c == '/' || c == '\\'; };
 
-    auto path_str = abs_path.string();
-    auto base_str = abs_base.string();
+    auto get_components = [&](const std::string& s) {
+        std::vector<std::string> parts;
+        std::string current;
+        for (char c : s) {
+            if (is_sep(c)) {
+                if (!current.empty()) {
+                    parts.push_back(current);
+                    current.clear();
+                }
+            } else {
+                current += c;
+            }
+        }
+        if (!current.empty()) {
+            parts.push_back(current);
+        }
 
-    if (path_str.size() < base_str.size()) return false;
-    return path_str.compare(0, base_str.size(), base_str) == 0;
+        std::vector<std::string> resolved;
+        for (const auto& part : parts) {
+            if (part == "..") {
+                if (!resolved.empty()) resolved.pop_back();
+            } else if (part != ".") {
+                resolved.push_back(part);
+            }
+        }
+        return resolved;
+    };
+
+    bool path_abs = !path.empty() && is_sep(path[0]);
+    bool base_abs = !base.empty() && is_sep(base[0]);
+    if (path_abs != base_abs) return false;
+
+    auto path_parts = get_components(path);
+    auto base_parts = get_components(base);
+
+    if (path_parts.size() < base_parts.size()) return false;
+
+    for (size_t i = 0; i < base_parts.size(); i++) {
+        if (path_parts[i] != base_parts[i]) return false;
+    }
+
+    return true;
 }
 
 } // namespace archive::filesystem

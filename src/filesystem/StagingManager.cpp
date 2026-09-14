@@ -25,6 +25,7 @@ std::string StagingManager::create_staging_dir(const std::string& operation_type
     FileUtils::create_directories(path);
     FileUtils::create_directories(path + "/files");
     FileUtils::create_directories(path + "/.meta");
+    FileUtils::create_directories(path + "/.meta/backups");
 
     StagingOperation meta;
     meta.operation_id = op_id;
@@ -81,8 +82,12 @@ std::string StagingManager::stage_folder(const std::string& operation_id, const 
         }
 
         if (entry.is_regular_file()) {
-            std::string relative = std::filesystem::relative(entry.path(), source_dir).string();
+            std::string relative = FileUtils::sanitize_relative_path(
+                std::filesystem::relative(entry.path(), source_dir).string());
             std::string dest_path = files_dir + "/" + relative;
+            if (!FileUtils::is_path_within(dest_path, files_dir)) {
+                throw std::runtime_error("Path traversal rejected in stage_folder: " + relative);
+            }
             std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
             FileUtils::copy_file(entry.path().string(), dest_path);
         }
@@ -145,9 +150,7 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
 
     mark_finalizing(operation_id);
 
-    std::map<std::string, std::string> local_backup_map;
     std::error_code ec;
-
     for (const auto& entry : std::filesystem::recursive_directory_iterator(staging_files, ec)) {
         if (entry.is_regular_file()) {
             std::string relative = FileUtils::sanitize_relative_path(
@@ -165,32 +168,36 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
                         if (dest_checksum == src_checksum) {
                             continue;
                         }
-                        backup_file(dest_path, dest_path + ".backup");
-                        local_backup_map[dest_path] = dest_path + ".backup";
-                        std::filesystem::copy_file(entry.path(), dest_path,
+                        throw std::runtime_error(
+                            "SkipIfIdentical: destination differs from staged file: " + relative);
+                    }
+                    case CollisionPolicy::BackupAndReplace: {
+                        std::string backup_path = get_backup_path(operation_id, relative);
+                        backup_file_strict(dest_path, backup_path);
+
+                        BackupEntry bk;
+                        bk.destination = dest_path;
+                        bk.backup_path = backup_path;
+                        bk.state = "created";
+                        append_backup_entry(operation_id, bk);
+
+                        std::filesystem::copy_file(entry.path().string(), dest_path,
                             std::filesystem::copy_options::overwrite_existing, ec);
+                        if (ec) {
+                            throw std::runtime_error("Failed to copy to destination: " + relative
+                                + " (" + ec.message() + ")");
+                        }
                         break;
                     }
-                    case CollisionPolicy::BackupAndReplace:
-                        backup_file(dest_path, dest_path + ".backup");
-                        local_backup_map[dest_path] = dest_path + ".backup";
-                        std::filesystem::copy_file(entry.path(), dest_path,
-                            std::filesystem::copy_options::overwrite_existing, ec);
-                        break;
                 }
             } else {
                 std::filesystem::copy_file(entry.path(), dest_path, ec);
-            }
-
-            if (ec) {
-                throw std::runtime_error("Failed to finalize file: " + relative + " (" + ec.message() + ")");
+                if (ec) {
+                    throw std::runtime_error("Failed to copy new file: " + relative
+                        + " (" + ec.message() + ")");
+                }
             }
         }
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(backup_mutex_);
-        backup_maps_[operation_id] = local_backup_map;
     }
 
     verify_finalized(operation_id, dest_dir);
@@ -199,6 +206,7 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
 }
 
 void StagingManager::rollback_staging(const std::string& operation_id) {
+    mark_rolling_back(operation_id);
     restore_backups(operation_id);
     mark_rolled_back(operation_id);
     cleanup_staging(operation_id);
@@ -227,6 +235,10 @@ void StagingManager::mark_finalizing(const std::string& operation_id) {
 
 void StagingManager::mark_committed(const std::string& operation_id) {
     update_metadata(operation_id, {{"state", state_to_string(StagingState::Committed)}});
+}
+
+void StagingManager::mark_rolling_back(const std::string& operation_id) {
+    update_metadata(operation_id, {{"state", state_to_string(StagingState::RollingBack)}});
 }
 
 void StagingManager::mark_rolled_back(const std::string& operation_id) {
@@ -285,8 +297,7 @@ std::vector<StagingOperation> StagingManager::detect_corrupted_staging() const {
 void StagingManager::cleanup_abandoned() {
     auto operations = detect_abandoned_staging();
     for (const auto& op : operations) {
-        if (op.state == state_to_string(StagingState::Committed) ||
-            op.state == state_to_string(StagingState::RolledBack)) {
+        if (op.state == state_to_string(StagingState::RolledBack)) {
             cleanup_staging(op.operation_id);
         }
     }
@@ -322,36 +333,183 @@ StagingState StagingManager::string_to_state(const std::string& str) {
     return StagingState::Corrupted;
 }
 
-void StagingManager::restore_backups(const std::string& operation_id) {
-    std::map<std::string, std::string> backup_map;
-    {
-        std::lock_guard<std::mutex> lock(backup_mutex_);
-        auto it = backup_maps_.find(operation_id);
-        if (it != backup_maps_.end()) {
-            backup_map = it->second;
-            backup_maps_.erase(it);
+std::vector<BackupEntry> StagingManager::read_backup_journal(const std::string& operation_id) const {
+    std::vector<BackupEntry> entries;
+    std::string journal = get_staging_path(operation_id) + "/.meta/backups.json";
+
+    if (!std::filesystem::exists(journal)) {
+        return entries;
+    }
+
+    std::ifstream f(journal);
+    if (!f.is_open()) return entries;
+
+    std::string line;
+    while (std::getline(f, line)) {
+        auto trim = [](std::string s) {
+            while (!s.empty() && (s.front() == ' ' || s.front() == '"' || s.front() == '\t'))
+                s.erase(s.begin());
+            while (!s.empty() && (s.back() == ' ' || s.back() == '"' || s.back() == '\t'
+                                  || s.back() == ',' || s.back() == '}'))
+                s.pop_back();
+            return s;
+        };
+
+        if (line.find("{") != std::string::npos) continue;
+        if (line.find("}") != std::string::npos) continue;
+        if (line.find("[") != std::string::npos) continue;
+        if (line.find("]") != std::string::npos) continue;
+
+        std::string key;
+        std::string value;
+        BackupEntry be;
+        bool in_entry = false;
+
+        auto colon = line.find(':');
+        if (colon == std::string::npos) continue;
+
+        key = trim(line.substr(0, colon));
+        value = trim(line.substr(colon + 1));
+
+        if (key == "destination") {
+            be.destination = value;
+            in_entry = true;
+        }
+
+        if (in_entry) {
+            entries.push_back(be);
         }
     }
 
-    for (auto it = backup_map.rbegin(); it != backup_map.rend(); ++it) {
-        restore_file(it->second, it->first);
+    std::vector<BackupEntry> result;
+    std::ifstream f2(journal);
+    if (!f2.is_open()) return result;
+
+    std::string content((std::istreambuf_iterator<char>(f2)),
+                        std::istreambuf_iterator<char>());
+
+    size_t pos = 0;
+    while (true) {
+        auto start = content.find("{", pos);
+        if (start == std::string::npos) break;
+        auto end = content.find("}", start);
+        if (end == std::string::npos) break;
+
+        std::string obj = content.substr(start + 1, end - start - 1);
+        BackupEntry be;
+
+        auto d_pos = obj.find("\"destination\"");
+        auto b_pos = obj.find("\"backup_path\"");
+        auto s_pos = obj.find("\"state\"");
+
+        if (d_pos != std::string::npos) {
+            auto dv = obj.find("\"", d_pos + 14);
+            auto de = obj.find("\"", dv + 1);
+            if (dv != std::string::npos && de != std::string::npos)
+                be.destination = obj.substr(dv + 1, de - dv - 1);
+        }
+        if (b_pos != std::string::npos) {
+            auto bv = obj.find("\"", b_pos + 14);
+            auto be2 = obj.find("\"", bv + 1);
+            if (bv != std::string::npos && be2 != std::string::npos)
+                be.backup_path = obj.substr(bv + 1, be2 - bv - 1);
+        }
+        if (s_pos != std::string::npos) {
+            auto sv = obj.find("\"", s_pos + 8);
+            auto se = obj.find("\"", sv + 1);
+            if (sv != std::string::npos && se != std::string::npos)
+                be.state = obj.substr(sv + 1, se - sv - 1);
+        }
+
+        if (!be.destination.empty()) {
+            result.push_back(std::move(be));
+        }
+
+        pos = end + 1;
+    }
+
+    return result;
+}
+
+void StagingManager::write_backup_journal(const std::string& operation_id,
+                                           const std::vector<BackupEntry>& entries) {
+    std::string journal = get_staging_path(operation_id) + "/.meta/backups.json";
+    std::ofstream f(journal);
+    if (!f.is_open()) {
+        throw std::runtime_error("Failed to write backup journal: " + journal);
+    }
+
+    f << "[\n";
+    for (size_t i = 0; i < entries.size(); i++) {
+        const auto& e = entries[i];
+        f << "  {\n";
+        f << "    \"destination\": \"" << e.destination << "\",\n";
+        f << "    \"backup_path\": \"" << e.backup_path << "\",\n";
+        f << "    \"state\": \"" << e.state << "\"\n";
+        f << "  }";
+        if (i + 1 < entries.size()) f << ",";
+        f << "\n";
+    }
+    f << "]\n";
+    f.flush();
+    if (f.fail()) {
+        throw std::runtime_error("Failed to flush backup journal: " + journal);
+    }
+}
+
+void StagingManager::append_backup_entry(const std::string& operation_id,
+                                          const BackupEntry& entry) {
+    auto entries = read_backup_journal(operation_id);
+    entries.push_back(entry);
+    write_backup_journal(operation_id, entries);
+}
+
+std::string StagingManager::get_backup_path(const std::string& operation_id,
+                                             const std::string& relative) const {
+    std::string safe_name;
+    for (char c : relative) {
+        if (c == '/' || c == '\\') safe_name += '_';
+        else safe_name += c;
+    }
+    return get_staging_path(operation_id) + "/.meta/backups/" + safe_name;
+}
+
+void StagingManager::restore_backups(const std::string& operation_id) {
+    auto entries = read_backup_journal(operation_id);
+
+    for (auto it = entries.rbegin(); it != entries.rend(); ++it) {
+        if (it->state == "created" && !it->backup_path.empty() && !it->destination.empty()) {
+            restore_file_strict(it->backup_path, it->destination);
+        }
+    }
+
+    std::string journal = get_staging_path(operation_id) + "/.meta/backups.json";
+    std::error_code ec;
+    std::filesystem::remove(journal, ec);
+
+    std::string backups_dir = get_staging_path(operation_id) + "/.meta/backups";
+    if (std::filesystem::exists(backups_dir)) {
+        std::filesystem::remove_all(backups_dir, ec);
     }
 }
 
 void StagingManager::cleanup_backups(const std::string& operation_id) {
-    std::map<std::string, std::string> backup_map;
-    {
-        std::lock_guard<std::mutex> lock(backup_mutex_);
-        auto it = backup_maps_.find(operation_id);
-        if (it != backup_maps_.end()) {
-            backup_map = it->second;
-            backup_maps_.erase(it);
+    auto entries = read_backup_journal(operation_id);
+
+    for (const auto& e : entries) {
+        if (!e.backup_path.empty()) {
+            std::error_code ec;
+            std::filesystem::remove(e.backup_path, ec);
         }
     }
 
-    for (const auto& [dest, backup] : backup_map) {
-        std::error_code ec;
-        std::filesystem::remove(backup, ec);
+    std::string journal = get_staging_path(operation_id) + "/.meta/backups.json";
+    std::error_code ec;
+    std::filesystem::remove(journal, ec);
+
+    std::string backups_dir = get_staging_path(operation_id) + "/.meta/backups";
+    if (std::filesystem::exists(backups_dir)) {
+        std::filesystem::remove_all(backups_dir, ec);
     }
 }
 
@@ -468,19 +626,47 @@ void StagingManager::update_metadata(const std::string& operation_id,
     write_metadata(operation_id, meta);
 }
 
-void StagingManager::backup_file(const std::string& src, const std::string& dest) {
+void StagingManager::backup_file_strict(const std::string& src, const std::string& dest) {
     std::error_code ec;
-    if (std::filesystem::exists(src)) {
-        std::filesystem::copy_file(src, dest, std::filesystem::copy_options::overwrite_existing, ec);
+    if (!std::filesystem::exists(src)) {
+        throw std::runtime_error("Backup source does not exist: " + src);
+    }
+
+    std::filesystem::create_directories(std::filesystem::path(dest).parent_path(), ec);
+    if (ec) {
+        throw std::runtime_error("Failed to create backup directory: " + ec.message());
+    }
+
+    std::filesystem::copy_file(src, dest, std::filesystem::copy_options::overwrite_existing, ec);
+    if (ec) {
+        throw std::runtime_error("Failed to create backup: " + src + " -> " + dest + " (" + ec.message() + ")");
+    }
+
+    if (!std::filesystem::exists(dest)) {
+        throw std::runtime_error("Backup verification failed: file does not exist after copy: " + dest);
+    }
+
+    auto src_size = std::filesystem::file_size(src, ec);
+    auto dest_size = std::filesystem::file_size(dest, ec);
+    if (!ec && src_size != dest_size) {
+        throw std::runtime_error("Backup verification failed: size mismatch for " + dest);
     }
 }
 
-void StagingManager::restore_file(const std::string& backup, const std::string& original) {
+void StagingManager::restore_file_strict(const std::string& backup, const std::string& original) {
     std::error_code ec;
-    if (std::filesystem::exists(backup)) {
-        std::filesystem::copy_file(backup, original, std::filesystem::copy_options::overwrite_existing, ec);
-        std::filesystem::remove(backup, ec);
+    if (!std::filesystem::exists(backup)) {
+        return;
     }
+
+    std::filesystem::copy_file(backup, original,
+        std::filesystem::copy_options::overwrite_existing, ec);
+    if (ec) {
+        throw std::runtime_error("Failed to restore backup: " + backup + " -> " + original
+            + " (" + ec.message() + ")");
+    }
+
+    std::filesystem::remove(backup, ec);
 }
 
 std::string StagingManager::compute_file_checksum(const std::string& path) {

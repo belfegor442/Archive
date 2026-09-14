@@ -32,10 +32,22 @@ void Application::recover_abandoned_staging() {
         auto abandoned = staging.detect_abandoned_staging();
 
         for (const auto& op : abandoned) {
-            if (op.state == "finalizing" || op.state == "staged" || op.state == "preparing"
-                || op.state == "corrupted" || op.state == "abandoned") {
-                staging.restore_backups(op.operation_id);
+            auto s = filesystem::StagingManager::string_to_state(op.state);
+
+            switch (s) {
+                case filesystem::StagingState::Finalizing:
+                case filesystem::StagingState::Staged:
+                case filesystem::StagingState::Preparing:
+                case filesystem::StagingState::Abandoned:
+                case filesystem::StagingState::Corrupted:
+                case filesystem::StagingState::RollingBack:
+                    staging.restore_backups(op.operation_id);
+                    break;
+                case filesystem::StagingState::RolledBack:
+                case filesystem::StagingState::Committed:
+                    break;
             }
+
             staging.cleanup_staging(op.operation_id);
         }
     } catch (const std::exception& e) {

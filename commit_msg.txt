@@ -1,0 +1,27 @@
+Final hardening: crash recovery, backup journal, path containment, 166/166 tests
+
+- StagingManager: persistent backup journal on disk (.meta/backups.json)
+  with BackupEntry struct, backup_file_strict, restore_file_strict,
+  restore_backups, cleanup_backups, verify_finalized (all public)
+- StagingManager: rollback restores from persisted journal after restart
+  (new instance reads .meta/backups.json and restores files)
+- StagingManager: backup files stored under .meta/backups/<sanitized>
+  (unique paths, no destination-name collision)
+- StagingManager: backup failure aborts operation before dest modification
+- StagingManager: SkipIfIdentical throws on diff at validate and finalize
+- StagingManager: post-copy verify checks existence/size/checksum;
+  backup only cleaned AFTER verification succeeds
+- StagingManager: mark_rolling_back added during rollback for state clarity
+- StagingManager: cleanup_abandoned only removes RolledBack operations
+- FileUtils: is_path_within uses pure lexical component-based comparison
+  (no weakly_canonical, handles both / and \ separators)
+- FileUtils: sanitize_relative_path rejects absolute paths
+- FileUtils: create_directories guards against path traversal
+- StagingManager::stage_folder calls sanitize+is_path_within per entry
+- Application: recovery switch handles all StagingState values
+- 20+ new tests: restart recovery, journal persistence, rollback after
+  restart, backup failure, backup verification failure, SkipIfIdentical
+  identical/different, finalize verification failure, path containment
+  (sibling/absolute/nested), stage_folder basic+symlink, cleanup states,
+  BackupAndReplace collision
+- 166/166 tests passed, build clean
