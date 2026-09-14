@@ -1,10 +1,60 @@
 # CHANGELOG-AUDIT.md — Monix Codebase Audit Fixes
 
-All fixes verified: `cmake --build build --config Release --target monix` — zero compilation errors.
+All fixes verified: `cmake --build build --config Release --target monix` — zero compilation errors, zero linker errors.
 
 ---
 
-## [050d590 → 6be8e5e] — 2025-09-13
+## [050d590 → 92c3e05] — 2025-09-14
+
+### Build System
+
+#### FIX-15: Add VK decomposition sources to CMake
+- **File:** `CMakeLists.txt`
+- **Before:** 17 `.cpp` files under `renderer_vk/vk/` (including `vk_globals.cpp`) not compiled. All `pfn_vk*` globals undefined → 8 linker errors.
+- **After:** All 17 files added to `VK_DECOMPOSE_SOURCES`.
+- **Regression risk:** NEGLIGIBLE — was broken, now correct.
+
+#### FIX-16: Fix Collectors.cpp and SettingsRegistry.cpp paths
+- **File:** `CMakeLists.txt`
+- **Before:** Pointed to 1-line stubs in `Monix/Monix/src/native/` instead of 1600+ line implementations in `src/native/`.
+- **After:** Paths corrected to `${MONIX_NATIVE}/telemetry/Collectors.cpp` and `${MONIX_NATIVE}/settings/SettingsRegistry.cpp`.
+- **Regression risk:** NEGLIGIBLE — was broken, now correct.
+
+#### FIX-17: Add wtsapi32.lib
+- **File:** `CMakeLists.txt`
+- **Before:** `WTSEnumerateSessionsA`/`WTSFreeMemory` unresolved.
+- **After:** Added `wtsapi32` to link libraries.
+- **Regression risk:** NEGLIGIBLE — was broken, now correct.
+
+#### FIX-18: Guard kernel test registrations
+- **File:** `KernelSelfTest.cpp`, `CMakeLists.txt`
+- **Before:** `RegisterGroups()` calls `GetKTests_*` symbols only defined in test files compiled into `monix_tests` target.
+- **After:** Test registration wrapped with `#ifdef MONIX_KERNEL_TEST_BUILD`. Define added to `monix_tests` target.
+- **Regression risk:** LOW — production builds no longer pull test symbols.
+
+#### FIX-19: Fix hardware.c AF_INET include
+- **File:** `Monix/Monix/sensors/hardware.c`
+- **Before:** Missing `<winsock2.h>`, `AF_INET` undeclared.
+- **After:** Added `#include <winsock2.h>` before `<windows.h>`.
+- **Regression risk:** NEGLIGIBLE — was broken, now correct.
+
+#### FIX-20: Sync vulkan_renderer.h for decomposition
+- **File:** `src/native/vulkan_renderer.h`
+- **Before:** `private:` section blocked decomposition module access to `device_`, `instance_`, etc.
+- **After:** Changed to `public: // Internal module state shared by the decomposed Vulkan implementation.` matching the other header copy.
+- **Regression risk:** LOW — internal state needed by decomposition modules.
+
+#### FIX-21: Exclude MASM from C++ compile flags
+- **File:** `CMakeLists.txt`
+- **Before:** `/MT /Zm800 /bigobj /EHsc /utf-8 /w` applied to all sources including `cpu.asm`, causing MASM errors.
+- **After:** Wrapped in `$<$<COMPILE_LANGUAGE:CXX,C>:...>` generator expression.
+- **Regression risk:** NEGLIGIBLE — only affects compilation of non-C++ files.
+
+#### FIX-22: Replace all GLOB/GLOB_RECURSE with explicit source lists
+- **File:** `CMakeLists.txt`
+- **Before:** 10 `file(GLOB...)` / `file(GLOB_RECURSE...)` patterns for source discovery. CMake cannot detect new/removed files.
+- **After:** All 152 source files listed explicitly (101 core + 30 SCRAM + 17 VK decomposition + 4 transitions).
+- **Regression risk:** LOW — new files must be added to CMakeLists.txt manually.
 
 ### CRITICAL
 

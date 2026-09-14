@@ -1,7 +1,7 @@
 # MONIX CODEBASE COMPREHENSIVE AUDIT REPORT
 
 **Date:** 2025-09-13
-**Codebase commit:** `050d590` (pre-fix) → `316ea2d` (post-fix)
+**Codebase commit:** `050d590` (pre-fix) → `92c3e05` (post-fix)
 **Scope:** Full codebase technical audit — concurrency, RAII, architecture, build system, security
 **Method:** Systematic 8-phase analysis across all source modules
 **Codebase:** Monix Windows Application (C++20, Win32, Vulkan/OpenGL, MSVC 14.44)
@@ -13,21 +13,23 @@
 | Severity | Total | Fixed | Remaining |
 |----------|-------|-------|-----------|
 | CRITICAL | 4 | 3 | 1 |
-| HIGH | 9 | 4 | 5 |
-| MEDIUM | 16 | 10 | 6 |
+| HIGH | 9 | 6 | 3 |
+| MEDIUM | 16 | 11 | 5 |
 | LOW | 12 | 0 | 12 |
-| ARCHITECTURAL | 6 | 0 | 6 |
-| **TOTAL** | **47** | **17** | **30** |
+| ARCHITECTURAL | 7 | 1 | 6 |
+| **TOTAL** | **48** | **21** | **27** |
 
-Build verified: `cmake --build build --config Release --target monix` — zero compilation errors. 161 pre-existing linker errors from kernel test symbols (architectural, not related to audit fixes).
+Build verified: `cmake --build build --config Release --target monix` — zero compilation errors, zero linker errors.
 
 ---
 
 ## Phase 1: Build System (CMake)
 
-### CRITICAL-001: GLOB_RECURSE for source collection [OPEN]
+### CRITICAL-001: GLOB_RECURSE for source collection [FIXED]
 **File:** `CMakeLists.txt:18-24,73-74`
 **Problem:** `file(GLOB_RECURSE ...)` used for source file discovery. CMake cannot detect new/removed files without re-running configure.
+**Fix applied:** All GLOB/GLOB_RECURSE replaced with explicit source lists (101 core + 30 SCRAM + 17 VK decomposition + 4 transitions).
+**Regression risk:** LOW — must update CMakeLists.txt when adding/removing files, but build correctness is now deterministic.
 **Impact:** Build may miss new source files or include stale ones.
 **Fix:** Replace with explicit source lists.
 
@@ -275,7 +277,7 @@ Introduce platform abstraction layers for Win32-specific code.
 
 ---
 
-## Fixed Summary (Commits `050d590` → `316ea2d`)
+## Fixed Summary (Commits `050d590` → `92c3e05`)
 
 | Fix ID | Severity | Description | Files Modified |
 |--------|----------|-------------|----------------|
@@ -293,6 +295,14 @@ Introduce platform abstraction layers for Win32-specific code.
 | FIX-12 | HIGH | Fix resources.rc path | `CMakeLists.txt` |
 | FIX-13 | HIGH | ScramEngine thread safety | `ScramEngine.hpp`, `ScramEngine.cpp` |
 | FIX-14 | HIGH | EnvironmentBaseline hash completeness | `EnvironmentBaseline.hpp` |
+| FIX-15 | HIGH | Add VK decomposition sources to CMake | `CMakeLists.txt` |
+| FIX-16 | HIGH | Fix Collectors/SettingsRegistry paths | `CMakeLists.txt` |
+| FIX-17 | HIGH | Add wtsapi32.lib | `CMakeLists.txt` |
+| FIX-18 | HIGH | Guard kernel test registrations | `KernelSelfTest.cpp`, `CMakeLists.txt` |
+| FIX-19 | HIGH | Fix hardware.c AF_INET include | `hardware.c` |
+| FIX-20 | HIGH | Sync vulkan_renderer.h for decomposition | `vulkan_renderer.h` |
+| FIX-21 | MEDIUM | Exclude MASM from C++ compile flags | `CMakeLists.txt` |
+| FIX-22 | CRITICAL | Replace all GLOB/GLOB_RECURSE with explicit lists | `CMakeLists.txt` |
 
 ---
 
