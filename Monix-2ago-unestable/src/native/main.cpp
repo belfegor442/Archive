@@ -899,6 +899,8 @@ private:
   monix::ui::Win98ThemeFonts win98Fonts_;
   monix::ui::Win98Assets win98Assets_;
   bool win98AssetsLoaded_ = false;
+  int win98SettingsCategory_ = 0;
+  int win98SelectedTaskPid_ = 0;
   int currentBorderIndex_ = 0;
   LARGE_INTEGER qpcFrequency_ {};
   LARGE_INTEGER lastNativeSampleQpc_ {};
@@ -8322,6 +8324,24 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
         if (IsWin98ThemeActive()) {
           auto canvas = monix::ui::Win98Theme::MakeCanvas(client, win98Fonts_, win98Assets_);
 
+          if (state_.updateState.dialogVisible) {
+            int result = -1;
+            if (monix::ui::Win98Theme::HitTestUpdateDialog(canvas, state_.updateState, point, result)) {
+              if (result == -1) {
+                state_.updateState.dialogVisible = false;
+              } else if (result == 0) {
+                if (state_.updateState.updateAvailable && !state_.updateState.downloadUrl.empty()) {
+                  ShellExecuteW(nullptr, L"open", state_.updateState.downloadUrl.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+                }
+                state_.updateState.dialogVisible = false;
+              } else if (result == 1) {
+                state_.updateState.dialogVisible = false;
+              }
+              InvalidateRect(hwnd, nullptr, FALSE);
+              return 0;
+            }
+          }
+
           int menuIndex = 0;
           if (monix::ui::Win98Theme::HitTestMenuBar(canvas, point, menuIndex)) {
             state_.coreMonitorMenuIndex = menuIndex;
@@ -8334,6 +8354,95 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             state_.coreMonitorMenuIndex = tabIndex;
             InvalidateRect(hwnd, nullptr, FALSE);
             return 0;
+          }
+
+          const int activeTab = std::clamp(state_.coreMonitorMenuIndex, 0, 4);
+          switch (activeTab) {
+            case 0: {
+              const int contentY = 94;
+              const int logBtn = monix::ui::Win98Theme::HitTestLogToolbar(client, point, contentY);
+              if (logBtn >= 0) {
+                switch (logBtn) {
+                  case 0: state_.logs.clear(); break;
+                  case 1: state_.livePaused = !state_.livePaused; break;
+                  case 2: break;
+                  case 3: break;
+                  case 4: break;
+                  case 5: break;
+                }
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+              }
+              const int filterBtn = monix::ui::Win98Theme::HitTestLogFilters(client, point, contentY);
+              if (filterBtn >= 0) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+              }
+              break;
+            }
+            case 1: {
+              const int toolbarBtn = monix::ui::Win98Theme::HitTestTaskToolbar(client, point);
+              if (toolbarBtn >= 0) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+              }
+              auto taskHit = monix::ui::Win98Theme::HitTestTaskRow(client, point);
+              if (taskHit.hit && taskHit.index >= 0) {
+                std::vector<monix::ProcessInfo> sorted = state_.snapshot.processes;
+                std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+                  if (a.cpuPct != b.cpuPct) return a.cpuPct > b.cpuPct;
+                  return a.ramBytes > b.ramBytes;
+                });
+                const int processIndex = state_.taskScroll + taskHit.index;
+                if (processIndex >= 0 && processIndex < static_cast<int>(sorted.size())) {
+                  win98SelectedTaskPid_ = sorted[processIndex].pid;
+                }
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+              }
+              const int scrollDir = monix::ui::Win98Theme::HitTestTaskScrollbar(client, point);
+              if (scrollDir != 0) {
+                const int maxScroll = std::max(0, static_cast<int>(state_.snapshot.processes.size()) - 49);
+                state_.taskScroll = std::clamp(state_.taskScroll + scrollDir * 3, 0, maxScroll);
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+              }
+              break;
+            }
+            case 2: {
+              const int scramBtn = monix::ui::Win98Theme::HitTestScramButton(client, point);
+              if (scramBtn >= 0) {
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+              }
+              break;
+            }
+            case 3: {
+              break;
+            }
+            case 4: {
+              int catIdx = 0;
+              if (monix::ui::Win98Theme::HitTestSettingsCategories(client, point, catIdx)) {
+                win98SettingsCategory_ = catIdx;
+                InvalidateRect(hwnd, nullptr, FALSE);
+                return 0;
+              }
+              int toggleIdx = -1;
+              if (monix::ui::Win98Theme::HitTestSettingsToggle(client, point, toggleIdx)) {
+                if (toggleIdx >= 0) {
+                  InvalidateRect(hwnd, nullptr, FALSE);
+                  return 0;
+                }
+              }
+              int adjRow = -1, adjDir = 0;
+              if (monix::ui::Win98Theme::HitTestSettingsAdjust(client, point, adjRow, adjDir)) {
+                if (adjRow >= 0) {
+                  InvalidateRect(hwnd, nullptr, FALSE);
+                  return 0;
+                }
+              }
+              break;
+            }
           }
 
           InvalidateRect(hwnd, nullptr, FALSE);
@@ -9180,6 +9289,9 @@ void MonixApp::RenderWin98Theme(HDC dc, const RECT& clientRect) {
   ctx.livePaused = state_.livePaused || config_.pauseLiveLogs;
   ctx.frameCount = openGl_.frameCount;
   ctx.updateState = &state_.updateState;
+  ctx.settingsCategory = win98SettingsCategory_;
+  ctx.taskScroll = state_.taskScroll;
+  ctx.selectedTaskPid = win98SelectedTaskPid_;
   monix::ui::Win98Theme::Render(dc, clientRect, ctx, win98Fonts_, win98Assets_, paths_.rootDir);
 }
 

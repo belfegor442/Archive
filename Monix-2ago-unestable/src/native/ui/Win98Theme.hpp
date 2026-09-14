@@ -110,12 +110,14 @@ public:
 
   static void Fill(HDC dc, const RECT& rect, COLORREF color) {
     HBRUSH brush = CreateSolidBrush(color);
+    if (!brush) return;
     FillRect(dc, &rect, brush);
     DeleteObject(brush);
   }
 
   static void Line(HDC dc, int x1, int y1, int x2, int y2, COLORREF color, int width = 1) {
     HPEN pen = CreatePen(PS_SOLID, width, color);
+    if (!pen) return;
     HGDIOBJ oldPen = SelectObject(dc, pen);
     MoveToEx(dc, x1, y1, nullptr);
     LineTo(dc, x2, y2);
@@ -604,8 +606,9 @@ public:
       RECT iconRect = R(c, tabX + 8, ty + 8, 10, 10);
       HBRUSH iconBrush = CreateSolidBrush(tabs[i].iconColor);
       HGDIOBJ oldBrush = SelectObject(dc, iconBrush);
-      SelectObject(dc, GetStockObject(NULL_PEN));
+      HPEN oldPen = static_cast<HPEN>(SelectObject(dc, GetStockObject(NULL_PEN)));
       Rectangle(dc, iconRect.left, iconRect.top, iconRect.right, iconRect.bottom);
+      SelectObject(dc, oldPen);
       SelectObject(dc, oldBrush);
       DeleteObject(iconBrush);
 
@@ -1532,6 +1535,24 @@ public:
     fonts.logFont = CreateFontW(-logH, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
       DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
       FIXED_PITCH | FF_MODERN, logFace.c_str());
+    if (!fonts.msSansSerif || !fonts.titleBar || !fonts.menuFont || !fonts.smallFont || !fonts.logFont) {
+      fonts.Destroy();
+      fonts.msSansSerif = CreateFontW(-msH, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+        FIXED_PITCH | FF_MODERN, L"MS Sans Serif");
+      fonts.titleBar = CreateFontW(-titleH, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+        FIXED_PITCH | FF_MODERN, L"MS Sans Serif");
+      fonts.menuFont = CreateFontW(-menuH, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+        FIXED_PITCH | FF_MODERN, L"MS Sans Serif");
+      fonts.smallFont = CreateFontW(-smallH, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+        FIXED_PITCH | FF_MODERN, L"MS Sans Serif");
+      fonts.logFont = CreateFontW(-logH, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, ANTIALIASED_QUALITY,
+        FIXED_PITCH | FF_MODERN, L"MS Sans Serif");
+    }
     fonts.lineHeight = (std::max)(16, static_cast<int>(18 * scale));
     fonts.smallLineHeight = (std::max)(12, static_cast<int>(14 * scale));
     fonts.logLineHeight = (std::max)(12, static_cast<int>(14 * scale));
@@ -1623,6 +1644,42 @@ public:
       if (dy >= 958 && dy <= 970) return -1;
     }
     return 0;
+  }
+
+  static int HitTestLogToolbar(const RECT& clientRect, POINT point, int topY) {
+    Canvas c = MakeCanvas(clientRect, Win98ThemeFonts{}, Win98Assets{});
+    if (!PtInRect(&c.rect, point)) return -1;
+    const float dx = static_cast<float>(point.x - c.rect.left) / c.scale;
+    const float dy = static_cast<float>(point.y - c.rect.top) / c.scale;
+    const int toolbarY = topY + 16;
+    if (dy < toolbarY + 2 || dy > toolbarY + 20) return -1;
+    static const std::array<const wchar_t*, 6> toolBtns {{ L"  CLEAR  ", L"  PAUSE  ", L"  SEARCH  ", L"  JSON  ", L"  CSV  ", L"  COPY  " }};
+    int tbX = 20;
+    for (int ti = 0; ti < 6; ++ti) {
+      int bw = static_cast<int>(wcslen(toolBtns[ti])) * 6 + 12;
+      if (dx >= tbX && dx < tbX + bw) return ti;
+      tbX += bw + 4;
+    }
+    return -1;
+  }
+
+  static int HitTestLogFilters(const RECT& clientRect, POINT point, int topY) {
+    Canvas c = MakeCanvas(clientRect, Win98ThemeFonts{}, Win98Assets{});
+    if (!PtInRect(&c.rect, point)) return -1;
+    const float dx = static_cast<float>(point.x - c.rect.left) / c.scale;
+    const float dy = static_cast<float>(point.y - c.rect.top) / c.scale;
+    const int toolbarY = topY + 16;
+    const int toolbarH = 24;
+    const int filterY = toolbarY + toolbarH + 2;
+    if (dy < filterY + 2 || dy > filterY + 18) return -1;
+    static const std::array<const wchar_t*, 5> filterLabels {{ L"ALL", L"INFO", L"WARN", L"ERROR", L"CRIT" }};
+    int fbX = 20;
+    for (int fi = 0; fi < 5; ++fi) {
+      int bw = static_cast<int>(wcslen(filterLabels[fi])) * 6 + 22;
+      if (dx >= fbX && dx < fbX + bw) return fi;
+      fbX += bw + 4;
+    }
+    return -1;
   }
 
   static bool HitTestSettingsToggle(const RECT& clientRect, POINT point, int& toggleIndex) {
