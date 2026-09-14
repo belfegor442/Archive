@@ -791,6 +791,7 @@ bool VulkanRenderer::createSyncObjects() {
         }
     }
 
+    syncCreated_ = true;
     return true;
 }
 
@@ -888,7 +889,10 @@ bool VulkanRenderer::beginFrame(uint32_t width, uint32_t height) {
         OutputDebugStringA("[VK] beginFrame: fence wait timeout, skipping frame\n");
         return false;
     }
-    vk.resetFences(device_, 1, &inFlightFences_[currentFrame_]);
+    VkResult resetResult = vk.resetFences(device_, 1, &inFlightFences_[currentFrame_]);
+    if (resetResult != VK_SUCCESS) {
+        OutputDebugStringA("[VK] vkResetFences failed\n");
+    }
 
     // Acquire next swapchain image
     VkResult result = vk.acquireNextImageKHR(
@@ -909,7 +913,11 @@ bool VulkanRenderer::beginFrame(uint32_t width, uint32_t height) {
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    vk.beginCommandBuffer(cmdBuffers_[currentFrame_], &beginInfo);
+    VkResult beginResult = vk.beginCommandBuffer(cmdBuffers_[currentFrame_], &beginInfo);
+    if (beginResult != VK_SUCCESS) {
+        OutputDebugStringA("[VK] vkBeginCommandBuffer failed\n");
+        return false;
+    }
     frameActive_ = true;
     return true;
 }
@@ -939,7 +947,10 @@ void VulkanRenderer::endFrame() {
         }
     }
 
-    vk.endCommandBuffer(cmdBuffers_[currentFrame_]);
+    VkResult endResult = vk.endCommandBuffer(cmdBuffers_[currentFrame_]);
+    if (endResult != VK_SUCCESS) {
+        OutputDebugStringA("[VK] vkEndCommandBuffer failed\n");
+    }
     frameActive_ = false;
 }
 
@@ -959,7 +970,10 @@ void VulkanRenderer::present() {
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &renderFinishedSem_[currentFrame_];
 
-    vk.queueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]);
+    VkResult submitResult = vk.queueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]);
+    if (submitResult != VK_SUCCESS) {
+        OutputDebugStringA("[VK] vkQueueSubmit failed\n");
+    }
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -969,7 +983,10 @@ void VulkanRenderer::present() {
     presentInfo.pSwapchains = &swapchain_;
     presentInfo.pImageIndices = &currentImageIndex_;
 
-    vk.queuePresentKHR(presentQueue_, &presentInfo);
+    VkResult presentResult = vk.queuePresentKHR(presentQueue_, &presentInfo);
+    if (presentResult != VK_SUCCESS) {
+        OutputDebugStringA("[VK] vkQueuePresentKHR failed\n");
+    }
 
     currentFrame_ = (currentFrame_ + 1) % kMaxFramesInFlight;
 }
@@ -1266,7 +1283,12 @@ VkBufferResource VulkanRenderer::createBuffer(VkDeviceSize size, VkBufferUsageFl
         return result;
     }
 
-    vk.bindBufferMemory(device_, result.buffer, result.memory, 0);
+    if (vk.bindBufferMemory(device_, result.buffer, result.memory, 0) != VK_SUCCESS) {
+        OutputDebugStringA("[VK] vkBindBufferMemory failed\n");
+        vk.destroyBuffer(device_, result.buffer, nullptr);
+        vk.freeMemory(device_, result.memory, nullptr);
+        return {};
+    }
     result.size = size;
 
     // Map if host visible
