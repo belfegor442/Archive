@@ -47,7 +47,98 @@ void loadDevice(VkDevice dev);
 // ============================================================================
 // Forward declarations
 // ============================================================================
-struct VkFuncs;
+
+// ============================================================================
+// Vulkan function pointers loaded from vulkan-1.dll (instance-level + device-level)
+// ============================================================================
+struct VkFuncs {
+    HMODULE vkModule = nullptr;
+    PFN_vkGetInstanceProcAddr getInstanceProcAddr = nullptr;
+    PFN_vkGetDeviceProcAddr getDeviceProcAddr = nullptr;
+    // Instance-level
+    PFN_vkCreateInstance createInstance = nullptr;
+    PFN_vkDestroyInstance destroyInstance = nullptr;
+    PFN_vkEnumeratePhysicalDevices enumeratePhysicalDevices = nullptr;
+    PFN_vkGetPhysicalDeviceProperties getPhysicalDeviceProperties = nullptr;
+    PFN_vkGetPhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties = nullptr;
+    PFN_vkGetPhysicalDeviceQueueFamilyProperties getPhysicalDeviceQueueFamilyProperties = nullptr;
+    PFN_vkGetPhysicalDeviceSurfaceSupportKHR getPhysicalDeviceSurfaceSupportKHR = nullptr;
+    PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
+    PFN_vkGetPhysicalDeviceSurfaceFormatsKHR getPhysicalDeviceSurfaceFormatsKHR = nullptr;
+    PFN_vkGetPhysicalDeviceSurfacePresentModesKHR getPhysicalDeviceSurfacePresentModesKHR = nullptr;
+    PFN_vkCreateWin32SurfaceKHR createWin32SurfaceKHR = nullptr;
+    PFN_vkDestroySurfaceKHR destroySurfaceKHR = nullptr;
+    PFN_vkCreateDebugUtilsMessengerEXT createDebugUtilsMessengerEXT = nullptr;
+    PFN_vkDestroyDebugUtilsMessengerEXT destroyDebugUtilsMessengerEXT = nullptr;
+    PFN_vkEnumerateDeviceExtensionProperties enumerateDeviceExtensionProperties = nullptr;
+    // Device-level
+    PFN_vkCreateDevice createDevice = nullptr;
+    PFN_vkDestroyDevice destroyDevice = nullptr;
+    PFN_vkGetDeviceQueue getDeviceQueue = nullptr;
+    PFN_vkCreateSwapchainKHR createSwapchainKHR = nullptr;
+    PFN_vkDestroySwapchainKHR destroySwapchainKHR = nullptr;
+    PFN_vkGetSwapchainImagesKHR getSwapchainImagesKHR = nullptr;
+    PFN_vkAcquireNextImageKHR acquireNextImageKHR = nullptr;
+    PFN_vkQueuePresentKHR queuePresentKHR = nullptr;
+    PFN_vkQueueWaitIdle queueWaitIdle = nullptr;
+    PFN_vkDeviceWaitIdle deviceWaitIdle = nullptr;
+    PFN_vkCreateCommandPool createCommandPool = nullptr;
+    PFN_vkDestroyCommandPool destroyCommandPool = nullptr;
+    PFN_vkAllocateCommandBuffers allocateCommandBuffers = nullptr;
+    PFN_vkFreeCommandBuffers freeCommandBuffers = nullptr;
+    PFN_vkBeginCommandBuffer beginCommandBuffer = nullptr;
+    PFN_vkEndCommandBuffer endCommandBuffer = nullptr;
+    PFN_vkCmdBeginRendering cmdBeginRendering = nullptr;
+    PFN_vkCmdEndRendering cmdEndRendering = nullptr;
+    PFN_vkCmdBindPipeline cmdBindPipeline = nullptr;
+    PFN_vkCmdSetViewport cmdSetViewport = nullptr;
+    PFN_vkCmdSetScissor cmdSetScissor = nullptr;
+    PFN_vkCmdDraw cmdDraw = nullptr;
+    PFN_vkCmdBlitImage cmdBlitImage = nullptr;
+    PFN_vkCmdCopyImageToBuffer cmdCopyImageToBuffer = nullptr;
+    PFN_vkCmdPipelineBarrier cmdPipelineBarrier = nullptr;
+    PFN_vkCmdBindVertexBuffers cmdBindVertexBuffers = nullptr;
+    PFN_vkCmdPushConstants cmdPushConstants = nullptr;
+    PFN_vkCmdBindDescriptorSets cmdBindDescriptorSets = nullptr;
+    PFN_vkCreateFence createFence = nullptr;
+    PFN_vkDestroyFence destroyFence = nullptr;
+    PFN_vkWaitForFences waitForFences = nullptr;
+    PFN_vkResetFences resetFences = nullptr;
+    PFN_vkCreateSemaphore createSemaphore = nullptr;
+    PFN_vkDestroySemaphore destroySemaphore = nullptr;
+    PFN_vkCreateImage createImage = nullptr;
+    PFN_vkDestroyImage destroyImage = nullptr;
+    PFN_vkGetImageMemoryRequirements getImageMemoryRequirements = nullptr;
+    PFN_vkAllocateMemory allocateMemory = nullptr;
+    PFN_vkFreeMemory freeMemory = nullptr;
+    PFN_vkBindImageMemory bindImageMemory = nullptr;
+    PFN_vkCreateImageView createImageView = nullptr;
+    PFN_vkDestroyImageView destroyImageView = nullptr;
+    PFN_vkCreateSampler createSampler = nullptr;
+    PFN_vkDestroySampler destroySampler = nullptr;
+    PFN_vkCreateBuffer createBuffer = nullptr;
+    PFN_vkDestroyBuffer destroyBuffer = nullptr;
+    PFN_vkGetBufferMemoryRequirements getBufferMemoryRequirements = nullptr;
+    PFN_vkBindBufferMemory bindBufferMemory = nullptr;
+    PFN_vkMapMemory mapMemory = nullptr;
+    PFN_vkUnmapMemory unmapMemory = nullptr;
+    PFN_vkCreateShaderModule createShaderModule = nullptr;
+    PFN_vkDestroyShaderModule destroyShaderModule = nullptr;
+    PFN_vkCreatePipelineLayout createPipelineLayout = nullptr;
+    PFN_vkDestroyPipelineLayout destroyPipelineLayout = nullptr;
+    PFN_vkCreateGraphicsPipelines createGraphicsPipelines = nullptr;
+    PFN_vkDestroyPipeline destroyPipeline = nullptr;
+    PFN_vkCreateDescriptorSetLayout createDescriptorSetLayout = nullptr;
+    PFN_vkDestroyDescriptorSetLayout destroyDescriptorSetLayout = nullptr;
+    PFN_vkCreateDescriptorPool createDescriptorPool = nullptr;
+    PFN_vkDestroyDescriptorPool destroyDescriptorPool = nullptr;
+    PFN_vkAllocateDescriptorSets allocateDescriptorSets = nullptr;
+    PFN_vkUpdateDescriptorSets updateDescriptorSets = nullptr;
+    PFN_vkQueueSubmit queueSubmit = nullptr;
+    PFN_vkCmdCopyBufferToImage cmdCopyBufferToImage = nullptr;
+    PFN_vkGetImageSubresourceLayout getImageSubresourceLayout = nullptr;
+    PFN_vkFlushMappedMemoryRanges flushMappedMemoryRanges = nullptr;
+};
 
 // ============================================================================
 // Configuration
@@ -352,6 +443,9 @@ public:
     const LoadedPreset& currentPreset() const { return preset_; }
 
 public: // Internal module state shared by the decomposed Vulkan implementation.
+    // ---- Vulkan function pointers ----
+    VkFuncs vk;
+
     // ---- Init helpers ----
     bool createInstance();
     bool createSurface(HWND hwnd);

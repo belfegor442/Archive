@@ -16,102 +16,6 @@
 // Vulkan function pointers loaded dynamically from vulkan-1.dll
 // ============================================================================
 
-static HMODULE g_vkModule = nullptr;
-
-// We need vkGetInstanceProcAddr and vkGetDeviceProcAddr for loading
-static PFN_vkGetInstanceProcAddr pfn_vkGetInstanceProcAddr = nullptr;
-static PFN_vkGetDeviceProcAddr pfn_vkGetDeviceProcAddr = nullptr;
-
-// ============================================================================
-// vk_funcs.inc helper — define all needed function pointers
-// ============================================================================
-// We'll define the minimum set needed rather than an external file.
-// This keeps the build self-contained.
-
-// Instance-level
-static PFN_vkCreateInstance pfn_vkCreateInstance = nullptr;
-static PFN_vkDestroyInstance pfn_vkDestroyInstance = nullptr;
-static PFN_vkEnumeratePhysicalDevices pfn_vkEnumeratePhysicalDevices = nullptr;
-static PFN_vkGetPhysicalDeviceProperties pfn_vkGetPhysicalDeviceProperties = nullptr;
-static PFN_vkGetPhysicalDeviceMemoryProperties pfn_vkGetPhysicalDeviceMemoryProperties = nullptr;
-static PFN_vkGetPhysicalDeviceQueueFamilyProperties pfn_vkGetPhysicalDeviceQueueFamilyProperties = nullptr;
-static PFN_vkGetPhysicalDeviceSurfaceSupportKHR pfn_vkGetPhysicalDeviceSurfaceSupportKHR = nullptr;
-static PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR pfn_vkGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
-static PFN_vkGetPhysicalDeviceSurfaceFormatsKHR pfn_vkGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
-static PFN_vkGetPhysicalDeviceSurfacePresentModesKHR pfn_vkGetPhysicalDeviceSurfacePresentModesKHR = nullptr;
-static PFN_vkCreateWin32SurfaceKHR pfn_vkCreateWin32SurfaceKHR = nullptr;
-static PFN_vkDestroySurfaceKHR pfn_vkDestroySurfaceKHR = nullptr;
-static PFN_vkCreateDebugUtilsMessengerEXT pfn_vkCreateDebugUtilsMessengerEXT = nullptr;
-static PFN_vkDestroyDebugUtilsMessengerEXT pfn_vkDestroyDebugUtilsMessengerEXT = nullptr;
-static PFN_vkEnumerateDeviceExtensionProperties pfn_vkEnumerateDeviceExtensionProperties = nullptr;
-
-// Device-level
-static PFN_vkCreateDevice pfn_vkCreateDevice = nullptr;
-static PFN_vkDestroyDevice pfn_vkDestroyDevice = nullptr;
-static PFN_vkGetDeviceQueue pfn_vkGetDeviceQueue = nullptr;
-static PFN_vkCreateSwapchainKHR pfn_vkCreateSwapchainKHR = nullptr;
-static PFN_vkDestroySwapchainKHR pfn_vkDestroySwapchainKHR = nullptr;
-static PFN_vkGetSwapchainImagesKHR pfn_vkGetSwapchainImagesKHR = nullptr;
-static PFN_vkAcquireNextImageKHR pfn_vkAcquireNextImageKHR = nullptr;
-static PFN_vkQueuePresentKHR pfn_vkQueuePresentKHR = nullptr;
-static PFN_vkQueueWaitIdle pfn_vkQueueWaitIdle = nullptr;
-static PFN_vkDeviceWaitIdle pfn_vkDeviceWaitIdle = nullptr;
-static PFN_vkCreateCommandPool pfn_vkCreateCommandPool = nullptr;
-static PFN_vkDestroyCommandPool pfn_vkDestroyCommandPool = nullptr;
-static PFN_vkAllocateCommandBuffers pfn_vkAllocateCommandBuffers = nullptr;
-static PFN_vkFreeCommandBuffers pfn_vkFreeCommandBuffers = nullptr;
-static PFN_vkBeginCommandBuffer pfn_vkBeginCommandBuffer = nullptr;
-static PFN_vkEndCommandBuffer pfn_vkEndCommandBuffer = nullptr;
-static PFN_vkCmdBeginRendering pfn_vkCmdBeginRendering = nullptr;
-static PFN_vkCmdEndRendering pfn_vkCmdEndRendering = nullptr;
-static PFN_vkCmdBindPipeline pfn_vkCmdBindPipeline = nullptr;
-static PFN_vkCmdSetViewport pfn_vkCmdSetViewport = nullptr;
-static PFN_vkCmdSetScissor pfn_vkCmdSetScissor = nullptr;
-static PFN_vkCmdDraw pfn_vkCmdDraw = nullptr;
-static PFN_vkCmdBlitImage pfn_vkCmdBlitImage = nullptr;
-static PFN_vkCmdCopyImageToBuffer pfn_vkCmdCopyImageToBuffer = nullptr;
-static PFN_vkCmdPipelineBarrier pfn_vkCmdPipelineBarrier = nullptr;
-static PFN_vkCmdBindVertexBuffers pfn_vkCmdBindVertexBuffers = nullptr;
-static PFN_vkCmdPushConstants pfn_vkCmdPushConstants = nullptr;
-static PFN_vkCmdBindDescriptorSets pfn_vkCmdBindDescriptorSets = nullptr;
-static PFN_vkCreateFence pfn_vkCreateFence = nullptr;
-static PFN_vkDestroyFence pfn_vkDestroyFence = nullptr;
-static PFN_vkWaitForFences pfn_vkWaitForFences = nullptr;
-static PFN_vkResetFences pfn_vkResetFences = nullptr;
-static PFN_vkCreateSemaphore pfn_vkCreateSemaphore = nullptr;
-static PFN_vkDestroySemaphore pfn_vkDestroySemaphore = nullptr;
-static PFN_vkCreateImage pfn_vkCreateImage = nullptr;
-static PFN_vkDestroyImage pfn_vkDestroyImage = nullptr;
-static PFN_vkGetImageMemoryRequirements pfn_vkGetImageMemoryRequirements = nullptr;
-static PFN_vkAllocateMemory pfn_vkAllocateMemory = nullptr;
-static PFN_vkFreeMemory pfn_vkFreeMemory = nullptr;
-static PFN_vkBindImageMemory pfn_vkBindImageMemory = nullptr;
-static PFN_vkCreateImageView pfn_vkCreateImageView = nullptr;
-static PFN_vkDestroyImageView pfn_vkDestroyImageView = nullptr;
-static PFN_vkCreateSampler pfn_vkCreateSampler = nullptr;
-static PFN_vkDestroySampler pfn_vkDestroySampler = nullptr;
-static PFN_vkCreateBuffer pfn_vkCreateBuffer = nullptr;
-static PFN_vkDestroyBuffer pfn_vkDestroyBuffer = nullptr;
-static PFN_vkGetBufferMemoryRequirements pfn_vkGetBufferMemoryRequirements = nullptr;
-static PFN_vkBindBufferMemory pfn_vkBindBufferMemory = nullptr;
-static PFN_vkMapMemory pfn_vkMapMemory = nullptr;
-static PFN_vkUnmapMemory pfn_vkUnmapMemory = nullptr;
-static PFN_vkCreateShaderModule pfn_vkCreateShaderModule = nullptr;
-static PFN_vkDestroyShaderModule pfn_vkDestroyShaderModule = nullptr;
-static PFN_vkCreatePipelineLayout pfn_vkCreatePipelineLayout = nullptr;
-static PFN_vkDestroyPipelineLayout pfn_vkDestroyPipelineLayout = nullptr;
-static PFN_vkCreateGraphicsPipelines pfn_vkCreateGraphicsPipelines = nullptr;
-static PFN_vkDestroyPipeline pfn_vkDestroyPipeline = nullptr;
-static PFN_vkCreateDescriptorSetLayout pfn_vkCreateDescriptorSetLayout = nullptr;
-static PFN_vkDestroyDescriptorSetLayout pfn_vkDestroyDescriptorSetLayout = nullptr;
-static PFN_vkCreateDescriptorPool pfn_vkCreateDescriptorPool = nullptr;
-static PFN_vkDestroyDescriptorPool pfn_vkDestroyDescriptorPool = nullptr;
-static PFN_vkAllocateDescriptorSets pfn_vkAllocateDescriptorSets = nullptr;
-static PFN_vkUpdateDescriptorSets pfn_vkUpdateDescriptorSets = nullptr;
-static PFN_vkQueueSubmit pfn_vkQueueSubmit = nullptr;
-static PFN_vkCmdCopyBufferToImage pfn_vkCmdCopyBufferToImage = nullptr;
-static PFN_vkGetImageSubresourceLayout pfn_vkGetImageSubresourceLayout = nullptr;
-static PFN_vkFlushMappedMemoryRanges pfn_vkFlushMappedMemoryRanges = nullptr;
 
 // ============================================================================
 // Debug callback
@@ -229,44 +133,44 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
     hwnd_ = hwnd;
 
     // Load Vulkan DLL
-    g_vkModule = LoadLibraryA("vulkan-1.dll");
-    if (!g_vkModule) {
+    vk.vkModule = LoadLibraryA("vulkan-1.dll");
+    if (!vk.vkModule) {
         OutputDebugStringA("[VK] Failed to load vulkan-1.dll\n");
         return false;
     }
-    vulkanDll_ = g_vkModule;
+    vulkanDll_ = vk.vkModule;
 
-    pfn_vkGetInstanceProcAddr =
-        reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(g_vkModule, "vkGetInstanceProcAddr"));
-    pfn_vkGetDeviceProcAddr =
-        reinterpret_cast<PFN_vkGetDeviceProcAddr>(GetProcAddress(g_vkModule, "vkGetDeviceProcAddr"));
+    vk.getInstanceProcAddr =
+        reinterpret_cast<PFN_vkGetInstanceProcAddr>(GetProcAddress(vk.vkModule, "vkGetInstanceProcAddr"));
+    vk.getDeviceProcAddr =
+        reinterpret_cast<PFN_vkGetDeviceProcAddr>(GetProcAddress(vk.vkModule, "vkGetDeviceProcAddr"));
     PFN_vkEnumerateInstanceExtensionProperties enumInstExt =
-        reinterpret_cast<PFN_vkEnumerateInstanceExtensionProperties>(GetProcAddress(g_vkModule, "vkEnumerateInstanceExtensionProperties"));
+        reinterpret_cast<PFN_vkEnumerateInstanceExtensionProperties>(GetProcAddress(vk.vkModule, "vkEnumerateInstanceExtensionProperties"));
     PFN_vkEnumerateInstanceLayerProperties enumInstLayer =
-        reinterpret_cast<PFN_vkEnumerateInstanceLayerProperties>(GetProcAddress(g_vkModule, "vkEnumerateInstanceLayerProperties"));
+        reinterpret_cast<PFN_vkEnumerateInstanceLayerProperties>(GetProcAddress(vk.vkModule, "vkEnumerateInstanceLayerProperties"));
 
-    if (!pfn_vkGetInstanceProcAddr) {
+    if (!vk.getInstanceProcAddr) {
         OutputDebugStringA("[VK] vkGetInstanceProcAddr not found\n");
         shutdown();
         return false;
     }
 
     // Load global-level function pointers
-    pfn_vkCreateInstance = reinterpret_cast<PFN_vkCreateInstance>(
-        GetProcAddress(g_vkModule, "vkCreateInstance"));
-    pfn_vkDestroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(
-        GetProcAddress(g_vkModule, "vkDestroyInstance"));
-    pfn_vkCreateDevice = reinterpret_cast<PFN_vkCreateDevice>(
-        GetProcAddress(g_vkModule, "vkCreateDevice"));
-    pfn_vkEnumeratePhysicalDevices = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(
-        GetProcAddress(g_vkModule, "vkEnumeratePhysicalDevices"));
+    vk.createInstance = reinterpret_cast<PFN_vkCreateInstance>(
+        GetProcAddress(vk.vkModule, "vkCreateInstance"));
+    vk.destroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(
+        GetProcAddress(vk.vkModule, "vkDestroyInstance"));
+    vk.createDevice = reinterpret_cast<PFN_vkCreateDevice>(
+        GetProcAddress(vk.vkModule, "vkCreateDevice"));
+    vk.enumeratePhysicalDevices = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(
+        GetProcAddress(vk.vkModule, "vkEnumeratePhysicalDevices"));
 
     // Create instance
     if (!createInstance()) { shutdown(); return false; }
     loadInstanceFuncs();
 
     // Create debug messenger (13.B)
-    if (validationEnabled_ && pfn_vkCreateDebugUtilsMessengerEXT) {
+    if (validationEnabled_ && vk.createDebugUtilsMessengerEXT) {
         VkDebugUtilsMessengerCreateInfoEXT dbgInfo{};
         dbgInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
         dbgInfo.messageSeverity =
@@ -279,7 +183,7 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
         dbgInfo.pfnUserCallback = debugCallback;
         dbgInfo.pUserData = this;
 
-        VkResult dbgResult = pfn_vkCreateDebugUtilsMessengerEXT(instance_, &dbgInfo, nullptr, &debugMessenger_);
+        VkResult dbgResult = vk.createDebugUtilsMessengerEXT(instance_, &dbgInfo, nullptr, &debugMessenger_);
         if (dbgResult == VK_SUCCESS) {
             OutputDebugStringA("[VK] Debug messenger created\n");
         } else {
@@ -297,8 +201,8 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
     // Create logical device
     if (!createLogicalDevice()) { shutdown(); return false; }
     loadDeviceFuncs();
-    pfn_vkGetDeviceQueue(device_, graphicsFamily_, 0, &graphicsQueue_);
-    pfn_vkGetDeviceQueue(device_, presentFamily_, 0, &presentQueue_);
+    vk.getDeviceQueue(device_, graphicsFamily_, 0, &graphicsQueue_);
+    vk.getDeviceQueue(device_, presentFamily_, 0, &presentQueue_);
 
     // Create swapchain
     if (!createSwapchain(width, height)) { shutdown(); return false; }
@@ -327,7 +231,7 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
 void VulkanRenderer::shutdown() {
 
     if (device_) {
-        pfn_vkDeviceWaitIdle(device_);
+        vk.deviceWaitIdle(device_);
     }
 
     // Destroy quad
@@ -351,22 +255,22 @@ void VulkanRenderer::shutdown() {
 
     // Destroy descriptor pool
     if (descPool_) {
-        pfn_vkDestroyDescriptorPool(device_, descPool_, nullptr);
+        vk.destroyDescriptorPool(device_, descPool_, nullptr);
         descPool_ = VK_NULL_HANDLE;
     }
 
     // Destroy command pool
     if (cmdPool_) {
-        pfn_vkDestroyCommandPool(device_, cmdPool_, nullptr);
+        vk.destroyCommandPool(device_, cmdPool_, nullptr);
         cmdPool_ = VK_NULL_HANDLE;
     }
 
     // Destroy sync objects
     if (syncCreated_) {
         for (uint32_t i = 0; i < kMaxFramesInFlight; i++) {
-            pfn_vkDestroySemaphore(device_, imageAvailableSem_[i], nullptr);
-            pfn_vkDestroySemaphore(device_, renderFinishedSem_[i], nullptr);
-            pfn_vkDestroyFence(device_, inFlightFences_[i], nullptr);
+            vk.destroySemaphore(device_, imageAvailableSem_[i], nullptr);
+            vk.destroySemaphore(device_, renderFinishedSem_[i], nullptr);
+            vk.destroyFence(device_, inFlightFences_[i], nullptr);
         }
         syncCreated_ = false;
     }
@@ -376,119 +280,119 @@ void VulkanRenderer::shutdown() {
 
     // Destroy debug messenger
     if (debugMessenger_) {
-        pfn_vkDestroyDebugUtilsMessengerEXT(instance_, debugMessenger_, nullptr);
+        vk.destroyDebugUtilsMessengerEXT(instance_, debugMessenger_, nullptr);
         debugMessenger_ = VK_NULL_HANDLE;
     }
 
     // Destroy surface
     if (surface_) {
-        pfn_vkDestroySurfaceKHR(instance_, surface_, nullptr);
+        vk.destroySurfaceKHR(instance_, surface_, nullptr);
         surface_ = VK_NULL_HANDLE;
     }
 
     // Destroy device
     if (device_) {
-        pfn_vkDestroyDevice(device_, nullptr);
+        vk.destroyDevice(device_, nullptr);
         device_ = VK_NULL_HANDLE;
     }
 
     // Destroy instance
     if (instance_) {
-        pfn_vkDestroyInstance(instance_, nullptr);
+        vk.destroyInstance(instance_, nullptr);
         instance_ = VK_NULL_HANDLE;
     }
 
     initialized_ = false;
 
     // Reset all function pointers to prevent stale references
-    pfn_vkGetInstanceProcAddr = nullptr;
-    pfn_vkGetDeviceProcAddr = nullptr;
-    pfn_vkCreateInstance = nullptr;
-    pfn_vkDestroyInstance = nullptr;
-    pfn_vkEnumeratePhysicalDevices = nullptr;
-    pfn_vkGetPhysicalDeviceProperties = nullptr;
-    pfn_vkGetPhysicalDeviceMemoryProperties = nullptr;
-    pfn_vkGetPhysicalDeviceQueueFamilyProperties = nullptr;
-    pfn_vkGetPhysicalDeviceSurfaceSupportKHR = nullptr;
-    pfn_vkGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
-    pfn_vkGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
-    pfn_vkGetPhysicalDeviceSurfacePresentModesKHR = nullptr;
-    pfn_vkCreateWin32SurfaceKHR = nullptr;
-    pfn_vkDestroySurfaceKHR = nullptr;
-    pfn_vkCreateDebugUtilsMessengerEXT = nullptr;
-    pfn_vkDestroyDebugUtilsMessengerEXT = nullptr;
-    pfn_vkEnumerateDeviceExtensionProperties = nullptr;
-    pfn_vkCreateDevice = nullptr;
-    pfn_vkDestroyDevice = nullptr;
-    pfn_vkGetDeviceQueue = nullptr;
-    pfn_vkCreateSwapchainKHR = nullptr;
-    pfn_vkDestroySwapchainKHR = nullptr;
-    pfn_vkGetSwapchainImagesKHR = nullptr;
-    pfn_vkAcquireNextImageKHR = nullptr;
-    pfn_vkQueuePresentKHR = nullptr;
-    pfn_vkQueueWaitIdle = nullptr;
-    pfn_vkDeviceWaitIdle = nullptr;
-    pfn_vkCreateCommandPool = nullptr;
-    pfn_vkDestroyCommandPool = nullptr;
-    pfn_vkAllocateCommandBuffers = nullptr;
-    pfn_vkFreeCommandBuffers = nullptr;
-    pfn_vkBeginCommandBuffer = nullptr;
-    pfn_vkEndCommandBuffer = nullptr;
-    pfn_vkCmdBeginRendering = nullptr;
-    pfn_vkCmdEndRendering = nullptr;
-    pfn_vkCmdBindPipeline = nullptr;
-    pfn_vkCmdSetViewport = nullptr;
-    pfn_vkCmdSetScissor = nullptr;
-    pfn_vkCmdDraw = nullptr;
-    pfn_vkCmdBlitImage = nullptr;
-    pfn_vkCmdCopyImageToBuffer = nullptr;
-    pfn_vkCmdPipelineBarrier = nullptr;
-    pfn_vkCmdBindVertexBuffers = nullptr;
-    pfn_vkCmdPushConstants = nullptr;
-    pfn_vkCmdBindDescriptorSets = nullptr;
-    pfn_vkCreateFence = nullptr;
-    pfn_vkDestroyFence = nullptr;
-    pfn_vkWaitForFences = nullptr;
-    pfn_vkResetFences = nullptr;
-    pfn_vkCreateSemaphore = nullptr;
-    pfn_vkDestroySemaphore = nullptr;
-    pfn_vkCreateImage = nullptr;
-    pfn_vkDestroyImage = nullptr;
-    pfn_vkGetImageMemoryRequirements = nullptr;
-    pfn_vkAllocateMemory = nullptr;
-    pfn_vkFreeMemory = nullptr;
-    pfn_vkBindImageMemory = nullptr;
-    pfn_vkCreateImageView = nullptr;
-    pfn_vkDestroyImageView = nullptr;
-    pfn_vkCreateSampler = nullptr;
-    pfn_vkDestroySampler = nullptr;
-    pfn_vkCreateBuffer = nullptr;
-    pfn_vkDestroyBuffer = nullptr;
-    pfn_vkGetBufferMemoryRequirements = nullptr;
-    pfn_vkBindBufferMemory = nullptr;
-    pfn_vkMapMemory = nullptr;
-    pfn_vkUnmapMemory = nullptr;
-    pfn_vkCreateShaderModule = nullptr;
-    pfn_vkDestroyShaderModule = nullptr;
-    pfn_vkCreatePipelineLayout = nullptr;
-    pfn_vkDestroyPipelineLayout = nullptr;
-    pfn_vkCreateGraphicsPipelines = nullptr;
-    pfn_vkDestroyPipeline = nullptr;
-    pfn_vkCreateDescriptorSetLayout = nullptr;
-    pfn_vkDestroyDescriptorSetLayout = nullptr;
-    pfn_vkCreateDescriptorPool = nullptr;
-    pfn_vkDestroyDescriptorPool = nullptr;
-    pfn_vkAllocateDescriptorSets = nullptr;
-    pfn_vkUpdateDescriptorSets = nullptr;
-    pfn_vkQueueSubmit = nullptr;
-    pfn_vkCmdCopyBufferToImage = nullptr;
-    pfn_vkGetImageSubresourceLayout = nullptr;
-    pfn_vkFlushMappedMemoryRanges = nullptr;
+    vk.getInstanceProcAddr = nullptr;
+    vk.getDeviceProcAddr = nullptr;
+    vk.createInstance = nullptr;
+    vk.destroyInstance = nullptr;
+    vk.enumeratePhysicalDevices = nullptr;
+    vk.getPhysicalDeviceProperties = nullptr;
+    vk.getPhysicalDeviceMemoryProperties = nullptr;
+    vk.getPhysicalDeviceQueueFamilyProperties = nullptr;
+    vk.getPhysicalDeviceSurfaceSupportKHR = nullptr;
+    vk.getPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
+    vk.getPhysicalDeviceSurfaceFormatsKHR = nullptr;
+    vk.getPhysicalDeviceSurfacePresentModesKHR = nullptr;
+    vk.createWin32SurfaceKHR = nullptr;
+    vk.destroySurfaceKHR = nullptr;
+    vk.createDebugUtilsMessengerEXT = nullptr;
+    vk.destroyDebugUtilsMessengerEXT = nullptr;
+    vk.enumerateDeviceExtensionProperties = nullptr;
+    vk.createDevice = nullptr;
+    vk.destroyDevice = nullptr;
+    vk.getDeviceQueue = nullptr;
+    vk.createSwapchainKHR = nullptr;
+    vk.destroySwapchainKHR = nullptr;
+    vk.getSwapchainImagesKHR = nullptr;
+    vk.acquireNextImageKHR = nullptr;
+    vk.queuePresentKHR = nullptr;
+    vk.queueWaitIdle = nullptr;
+    vk.deviceWaitIdle = nullptr;
+    vk.createCommandPool = nullptr;
+    vk.destroyCommandPool = nullptr;
+    vk.allocateCommandBuffers = nullptr;
+    vk.freeCommandBuffers = nullptr;
+    vk.beginCommandBuffer = nullptr;
+    vk.endCommandBuffer = nullptr;
+    vk.cmdBeginRendering = nullptr;
+    vk.cmdEndRendering = nullptr;
+    vk.cmdBindPipeline = nullptr;
+    vk.cmdSetViewport = nullptr;
+    vk.cmdSetScissor = nullptr;
+    vk.cmdDraw = nullptr;
+    vk.cmdBlitImage = nullptr;
+    vk.cmdCopyImageToBuffer = nullptr;
+    vk.cmdPipelineBarrier = nullptr;
+    vk.cmdBindVertexBuffers = nullptr;
+    vk.cmdPushConstants = nullptr;
+    vk.cmdBindDescriptorSets = nullptr;
+    vk.createFence = nullptr;
+    vk.destroyFence = nullptr;
+    vk.waitForFences = nullptr;
+    vk.resetFences = nullptr;
+    vk.createSemaphore = nullptr;
+    vk.destroySemaphore = nullptr;
+    vk.createImage = nullptr;
+    vk.destroyImage = nullptr;
+    vk.getImageMemoryRequirements = nullptr;
+    vk.allocateMemory = nullptr;
+    vk.freeMemory = nullptr;
+    vk.bindImageMemory = nullptr;
+    vk.createImageView = nullptr;
+    vk.destroyImageView = nullptr;
+    vk.createSampler = nullptr;
+    vk.destroySampler = nullptr;
+    vk.createBuffer = nullptr;
+    vk.destroyBuffer = nullptr;
+    vk.getBufferMemoryRequirements = nullptr;
+    vk.bindBufferMemory = nullptr;
+    vk.mapMemory = nullptr;
+    vk.unmapMemory = nullptr;
+    vk.createShaderModule = nullptr;
+    vk.destroyShaderModule = nullptr;
+    vk.createPipelineLayout = nullptr;
+    vk.destroyPipelineLayout = nullptr;
+    vk.createGraphicsPipelines = nullptr;
+    vk.destroyPipeline = nullptr;
+    vk.createDescriptorSetLayout = nullptr;
+    vk.destroyDescriptorSetLayout = nullptr;
+    vk.createDescriptorPool = nullptr;
+    vk.destroyDescriptorPool = nullptr;
+    vk.allocateDescriptorSets = nullptr;
+    vk.updateDescriptorSets = nullptr;
+    vk.queueSubmit = nullptr;
+    vk.cmdCopyBufferToImage = nullptr;
+    vk.getImageSubresourceLayout = nullptr;
+    vk.flushMappedMemoryRanges = nullptr;
 
     // Free Vulkan DLL
-    if (g_vkModule) {
-        FreeLibrary(g_vkModule);
-        g_vkModule = nullptr;
+    if (vk.vkModule) {
+        FreeLibrary(vk.vkModule);
+        vk.vkModule = nullptr;
         vulkanDll_ = nullptr;
     }
 
@@ -530,7 +434,7 @@ bool VulkanRenderer::createInstance() {
 
     if (requestValidation_) {
         auto pfn_EnumLayers = reinterpret_cast<PFN_vkEnumerateInstanceLayerProperties>(
-            GetProcAddress(g_vkModule, "vkEnumerateInstanceLayerProperties"));
+            GetProcAddress(vk.vkModule, "vkEnumerateInstanceLayerProperties"));
         if (pfn_EnumLayers) {
             uint32_t availLayerCount = 0;
             pfn_EnumLayers(&availLayerCount, nullptr);
@@ -561,7 +465,7 @@ bool VulkanRenderer::createInstance() {
     createInfo.enabledLayerCount = layerCount;
     createInfo.ppEnabledLayerNames = requestedLayers;
 
-    VkResult result = pfn_vkCreateInstance(&createInfo, nullptr, &instance_);
+    VkResult result = vk.createInstance(&createInfo, nullptr, &instance_);
     if (result != VK_SUCCESS) {
         OutputDebugStringA("[VK] Failed to create VkInstance\n");
         return false;
@@ -579,7 +483,7 @@ bool VulkanRenderer::createSurface(HWND hwnd) {
     createInfo.hinstance = GetModuleHandleA(nullptr);
     createInfo.hwnd = hwnd;
 
-    VkResult result = pfn_vkCreateWin32SurfaceKHR(instance_, &createInfo, nullptr, &surface_);
+    VkResult result = vk.createWin32SurfaceKHR(instance_, &createInfo, nullptr, &surface_);
     if (result != VK_SUCCESS) {
         OutputDebugStringA("[VK] Failed to create Win32 surface\n");
         return false;
@@ -591,19 +495,19 @@ bool VulkanRenderer::createSurface(HWND hwnd) {
 // ============================================================================
 bool VulkanRenderer::pickPhysicalDevice() {
     uint32_t deviceCount = 0;
-    pfn_vkEnumeratePhysicalDevices(instance_, &deviceCount, nullptr);
+    vk.enumeratePhysicalDevices(instance_, &deviceCount, nullptr);
     if (deviceCount == 0) {
         OutputDebugStringA("[VK] No Vulkan physical devices found\n");
         return false;
     }
 
     std::vector<VkPhysicalDevice> devices(deviceCount);
-    pfn_vkEnumeratePhysicalDevices(instance_, &deviceCount, devices.data());
+    vk.enumeratePhysicalDevices(instance_, &deviceCount, devices.data());
 
     // Prefer discrete GPU
     for (auto& dev : devices) {
         VkPhysicalDeviceProperties props{};
-        pfn_vkGetPhysicalDeviceProperties(dev, &props);
+        vk.getPhysicalDeviceProperties(dev, &props);
         if (props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
             physDev_ = dev;
             break;
@@ -615,16 +519,16 @@ bool VulkanRenderer::pickPhysicalDevice() {
     }
 
     VkPhysicalDeviceProperties props{};
-    pfn_vkGetPhysicalDeviceProperties(physDev_, &props);
+    vk.getPhysicalDeviceProperties(physDev_, &props);
     char buf[256];
     sprintf_s(buf, "[VK] Using GPU: %s\n", props.deviceName);
     OutputDebugStringA(buf);
 
     // Find queue families
     uint32_t queueFamilyCount = 0;
-    pfn_vkGetPhysicalDeviceQueueFamilyProperties(physDev_, &queueFamilyCount, nullptr);
+    vk.getPhysicalDeviceQueueFamilyProperties(physDev_, &queueFamilyCount, nullptr);
     std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
-    pfn_vkGetPhysicalDeviceQueueFamilyProperties(physDev_, &queueFamilyCount, queueFamilies.data());
+    vk.getPhysicalDeviceQueueFamilyProperties(physDev_, &queueFamilyCount, queueFamilies.data());
 
     graphicsFamily_ = UINT32_MAX;
     presentFamily_ = UINT32_MAX;
@@ -634,7 +538,7 @@ bool VulkanRenderer::pickPhysicalDevice() {
             graphicsFamily_ = i;
         }
         VkBool32 presentSupport = false;
-        pfn_vkGetPhysicalDeviceSurfaceSupportKHR(physDev_, i, surface_, &presentSupport);
+        vk.getPhysicalDeviceSurfaceSupportKHR(physDev_, i, surface_, &presentSupport);
         if (presentSupport) {
             presentFamily_ = i;
         }
@@ -695,7 +599,7 @@ bool VulkanRenderer::createLogicalDevice() {
     createInfo.enabledExtensionCount = 1;
     createInfo.ppEnabledExtensionNames = extensions;
 
-    VkResult result = pfn_vkCreateDevice(physDev_, &createInfo, nullptr, &device_);
+    VkResult result = vk.createDevice(physDev_, &createInfo, nullptr, &device_);
     if (result != VK_SUCCESS) {
         OutputDebugStringA("[VK] Failed to create VkDevice\n");
         return false;
@@ -710,17 +614,17 @@ bool VulkanRenderer::createLogicalDevice() {
 bool VulkanRenderer::createSwapchain(uint32_t width, uint32_t height) {
     // Query surface capabilities
     VkSurfaceCapabilitiesKHR caps{};
-    pfn_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physDev_, surface_, &caps);
+    vk.getPhysicalDeviceSurfaceCapabilitiesKHR(physDev_, surface_, &caps);
 
     uint32_t formatCount = 0;
-    pfn_vkGetPhysicalDeviceSurfaceFormatsKHR(physDev_, surface_, &formatCount, nullptr);
+    vk.getPhysicalDeviceSurfaceFormatsKHR(physDev_, surface_, &formatCount, nullptr);
     std::vector<VkSurfaceFormatKHR> formats(formatCount);
-    pfn_vkGetPhysicalDeviceSurfaceFormatsKHR(physDev_, surface_, &formatCount, formats.data());
+    vk.getPhysicalDeviceSurfaceFormatsKHR(physDev_, surface_, &formatCount, formats.data());
 
     uint32_t presentModeCount = 0;
-    pfn_vkGetPhysicalDeviceSurfacePresentModesKHR(physDev_, surface_, &presentModeCount, nullptr);
+    vk.getPhysicalDeviceSurfacePresentModesKHR(physDev_, surface_, &presentModeCount, nullptr);
     std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-    pfn_vkGetPhysicalDeviceSurfacePresentModesKHR(physDev_, surface_, &presentModeCount, presentModes.data());
+    vk.getPhysicalDeviceSurfacePresentModesKHR(physDev_, surface_, &presentModeCount, presentModes.data());
 
     // Choose surface format (prefer SRGB B8G8R8A8)
     VkSurfaceFormatKHR chosenFormat = formats[0];
@@ -794,7 +698,7 @@ bool VulkanRenderer::createSwapchain(uint32_t width, uint32_t height) {
         createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
     }
 
-    VkResult result = pfn_vkCreateSwapchainKHR(device_, &createInfo, nullptr, &swapchain_);
+    VkResult result = vk.createSwapchainKHR(device_, &createInfo, nullptr, &swapchain_);
     if (result != VK_SUCCESS) {
         OutputDebugStringA("[VK] Failed to create swapchain\n");
         return false;
@@ -802,15 +706,15 @@ bool VulkanRenderer::createSwapchain(uint32_t width, uint32_t height) {
 
     // Destroy old swapchain
     if (oldSwapchain_) {
-        pfn_vkDestroySwapchainKHR(device_, oldSwapchain_, nullptr);
+        vk.destroySwapchainKHR(device_, oldSwapchain_, nullptr);
         oldSwapchain_ = VK_NULL_HANDLE;
     }
 
     // Get swapchain images
     uint32_t swapImageCount = 0;
-    pfn_vkGetSwapchainImagesKHR(device_, swapchain_, &swapImageCount, nullptr);
+    vk.getSwapchainImagesKHR(device_, swapchain_, &swapImageCount, nullptr);
     swapchainImages_.resize(swapImageCount);
-    pfn_vkGetSwapchainImagesKHR(device_, swapchain_, &swapImageCount, swapchainImages_.data());
+    vk.getSwapchainImagesKHR(device_, swapchain_, &swapImageCount, swapchainImages_.data());
 
     // Create image views
     swapchainImageViews_.resize(swapImageCount);
@@ -826,7 +730,7 @@ bool VulkanRenderer::createSwapchain(uint32_t width, uint32_t height) {
         viewInfo.subresourceRange.baseArrayLayer = 0;
         viewInfo.subresourceRange.layerCount = 1;
 
-        result = pfn_vkCreateImageView(device_, &viewInfo, nullptr, &swapchainImageViews_[i]);
+        result = vk.createImageView(device_, &viewInfo, nullptr, &swapchainImageViews_[i]);
         if (result != VK_SUCCESS) {
             OutputDebugStringA("[VK] Failed to create swapchain image view\n");
             return false;
@@ -844,13 +748,13 @@ bool VulkanRenderer::createSwapchain(uint32_t width, uint32_t height) {
 // ============================================================================
 void VulkanRenderer::destroySwapchain() {
     for (auto view : swapchainImageViews_) {
-        if (view) pfn_vkDestroyImageView(device_, view, nullptr);
+        if (view) vk.destroyImageView(device_, view, nullptr);
     }
     swapchainImageViews_.clear();
     swapchainImages_.clear();
 
     if (swapchain_) {
-        pfn_vkDestroySwapchainKHR(device_, swapchain_, nullptr);
+        vk.destroySwapchainKHR(device_, swapchain_, nullptr);
         swapchain_ = VK_NULL_HANDLE;
     }
 }
@@ -860,7 +764,7 @@ void VulkanRenderer::destroySwapchain() {
 // ============================================================================
 void VulkanRenderer::resize(uint32_t width, uint32_t height) {
     if (!initialized_ || width == 0 || height == 0) return;
-    pfn_vkDeviceWaitIdle(device_);
+    vk.deviceWaitIdle(device_);
     destroySwapchain();
     if (!createSwapchain(width, height)) {
         OutputDebugStringA("[VK] resize: FAILED to recreate swapchain — renderer in degraded state\n");
@@ -879,9 +783,9 @@ bool VulkanRenderer::createSyncObjects() {
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
     for (uint32_t i = 0; i < kMaxFramesInFlight; i++) {
-        if (pfn_vkCreateSemaphore(device_, &semInfo, nullptr, &imageAvailableSem_[i]) != VK_SUCCESS ||
-            pfn_vkCreateSemaphore(device_, &semInfo, nullptr, &renderFinishedSem_[i]) != VK_SUCCESS ||
-            pfn_vkCreateFence(device_, &fenceInfo, nullptr, &inFlightFences_[i]) != VK_SUCCESS) {
+        if (vk.createSemaphore(device_, &semInfo, nullptr, &imageAvailableSem_[i]) != VK_SUCCESS ||
+            vk.createSemaphore(device_, &semInfo, nullptr, &renderFinishedSem_[i]) != VK_SUCCESS ||
+            vk.createFence(device_, &fenceInfo, nullptr, &inFlightFences_[i]) != VK_SUCCESS) {
             OutputDebugStringA("[VK] Failed to create sync objects\n");
             return false;
         }
@@ -899,7 +803,7 @@ bool VulkanRenderer::createCommandPool() {
     poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     poolInfo.queueFamilyIndex = graphicsFamily_;
 
-    VkResult result = pfn_vkCreateCommandPool(device_, &poolInfo, nullptr, &cmdPool_);
+    VkResult result = vk.createCommandPool(device_, &poolInfo, nullptr, &cmdPool_);
     return result == VK_SUCCESS;
 }
 
@@ -913,7 +817,7 @@ bool VulkanRenderer::allocateCommandBuffers() {
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = kMaxFramesInFlight;
 
-    VkResult result = pfn_vkAllocateCommandBuffers(device_, &allocInfo, cmdBuffers_.data());
+    VkResult result = vk.allocateCommandBuffers(device_, &allocInfo, cmdBuffers_.data());
     return result == VK_SUCCESS;
 }
 
@@ -933,7 +837,7 @@ bool VulkanRenderer::createDescriptorPool() {
     poolInfo.poolSizeCount = 2;
     poolInfo.pPoolSizes = poolSizes;
 
-    VkResult result = pfn_vkCreateDescriptorPool(device_, &poolInfo, nullptr, &descPool_);
+    VkResult result = vk.createDescriptorPool(device_, &poolInfo, nullptr, &descPool_);
     return result == VK_SUCCESS;
 }
 
@@ -979,15 +883,15 @@ bool VulkanRenderer::beginFrame(uint32_t width, uint32_t height) {
     if (!initialized_ || frameActive_) return false;
 
     // Wait for previous frame (1 second timeout to avoid blocking message loop)
-    VkResult fenceResult = pfn_vkWaitForFences(device_, 1, &inFlightFences_[currentFrame_], VK_TRUE, 1000000000ULL);
+    VkResult fenceResult = vk.waitForFences(device_, 1, &inFlightFences_[currentFrame_], VK_TRUE, 1000000000ULL);
     if (fenceResult == VK_TIMEOUT) {
         OutputDebugStringA("[VK] beginFrame: fence wait timeout, skipping frame\n");
         return false;
     }
-    pfn_vkResetFences(device_, 1, &inFlightFences_[currentFrame_]);
+    vk.resetFences(device_, 1, &inFlightFences_[currentFrame_]);
 
     // Acquire next swapchain image
-    VkResult result = pfn_vkAcquireNextImageKHR(
+    VkResult result = vk.acquireNextImageKHR(
         device_, swapchain_, UINT64_MAX,
         imageAvailableSem_[currentFrame_], VK_NULL_HANDLE,
         &currentImageIndex_);
@@ -1005,7 +909,7 @@ bool VulkanRenderer::beginFrame(uint32_t width, uint32_t height) {
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    pfn_vkBeginCommandBuffer(cmdBuffers_[currentFrame_], &beginInfo);
+    vk.beginCommandBuffer(cmdBuffers_[currentFrame_], &beginInfo);
     frameActive_ = true;
     return true;
 }
@@ -1035,7 +939,7 @@ void VulkanRenderer::endFrame() {
         }
     }
 
-    pfn_vkEndCommandBuffer(cmdBuffers_[currentFrame_]);
+    vk.endCommandBuffer(cmdBuffers_[currentFrame_]);
     frameActive_ = false;
 }
 
@@ -1055,7 +959,7 @@ void VulkanRenderer::present() {
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &renderFinishedSem_[currentFrame_];
 
-    pfn_vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]);
+    vk.queueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]);
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -1065,7 +969,7 @@ void VulkanRenderer::present() {
     presentInfo.pSwapchains = &swapchain_;
     presentInfo.pImageIndices = &currentImageIndex_;
 
-    pfn_vkQueuePresentKHR(presentQueue_, &presentInfo);
+    vk.queuePresentKHR(presentQueue_, &presentInfo);
 
     currentFrame_ = (currentFrame_ + 1) % kMaxFramesInFlight;
 }
@@ -1075,7 +979,7 @@ void VulkanRenderer::present() {
 // ============================================================================
 void VulkanRenderer::waitForIdle() {
     if (device_) {
-        pfn_vkDeviceWaitIdle(device_);
+        vk.deviceWaitIdle(device_);
     }
 }
 
@@ -1084,7 +988,7 @@ void VulkanRenderer::waitForIdle() {
 // ============================================================================
 uint32_t VulkanRenderer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags props) {
     VkPhysicalDeviceMemoryProperties memProps{};
-    pfn_vkGetPhysicalDeviceMemoryProperties(physDev_, &memProps);
+    vk.getPhysicalDeviceMemoryProperties(physDev_, &memProps);
 
     for (uint32_t i = 0; i < memProps.memoryTypeCount; i++) {
         if ((typeFilter & (1 << i)) && (memProps.memoryTypes[i].propertyFlags & props) == props) {
@@ -1097,7 +1001,7 @@ uint32_t VulkanRenderer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFla
 
 bool VulkanRenderer::allocateImageMemory(VkImage image, VkMemoryPropertyFlags props, VkDeviceMemory* outMem) {
     VkMemoryRequirements memReqs{};
-    pfn_vkGetImageMemoryRequirements(device_, image, &memReqs);
+    vk.getImageMemoryRequirements(device_, image, &memReqs);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -1106,11 +1010,11 @@ bool VulkanRenderer::allocateImageMemory(VkImage image, VkMemoryPropertyFlags pr
 
     if (allocInfo.memoryTypeIndex == UINT32_MAX) return false;
 
-    VkResult result = pfn_vkAllocateMemory(device_, &allocInfo, nullptr, outMem);
+    VkResult result = vk.allocateMemory(device_, &allocInfo, nullptr, outMem);
     if (result != VK_SUCCESS) return false;
 
-    if (pfn_vkBindImageMemory(device_, image, *outMem, 0) != VK_SUCCESS) {
-        pfn_vkFreeMemory(device_, *outMem, nullptr);
+    if (vk.bindImageMemory(device_, image, *outMem, 0) != VK_SUCCESS) {
+        vk.freeMemory(device_, *outMem, nullptr);
         *outMem = VK_NULL_HANDLE;
         return false;
     }
@@ -1128,12 +1032,12 @@ bool VulkanRenderer::transitionImageLayoutImmediate(VkImage img, VkImageLayout o
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer cmd;
-    pfn_vkAllocateCommandBuffers(device_, &allocInfo, &cmd);
+    vk.allocateCommandBuffers(device_, &allocInfo, &cmd);
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    pfn_vkBeginCommandBuffer(cmd, &beginInfo);
+    vk.beginCommandBuffer(cmd, &beginInfo);
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1182,20 +1086,20 @@ bool VulkanRenderer::transitionImageLayoutImmediate(VkImage img, VkImageLayout o
         dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     }
 
-    pfn_vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0,
+    vk.cmdPipelineBarrier(cmd, srcStage, dstStage, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
 
-    pfn_vkEndCommandBuffer(cmd);
+    vk.endCommandBuffer(cmd);
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &cmd;
 
-    pfn_vkQueueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE);
-    pfn_vkQueueWaitIdle(graphicsQueue_);
+    vk.queueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE);
+    vk.queueWaitIdle(graphicsQueue_);
 
-    pfn_vkFreeCommandBuffers(device_, cmdPool_, 1, &cmd);
+    vk.freeCommandBuffers(device_, cmdPool_, 1, &cmd);
     return true;
 }
 
@@ -1226,7 +1130,7 @@ VkImageResource VulkanRenderer::createImage(uint32_t w, uint32_t h, VkFormat fmt
         imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     }
 
-    if (pfn_vkCreateImage(device_, &imageInfo, nullptr, &result.image) != VK_SUCCESS) {
+    if (vk.createImage(device_, &imageInfo, nullptr, &result.image) != VK_SUCCESS) {
         return result;
     }
 
@@ -1236,7 +1140,7 @@ VkImageResource VulkanRenderer::createImage(uint32_t w, uint32_t h, VkFormat fmt
         memProps = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
     }
     if (!allocateImageMemory(result.image, memProps, &result.memory)) {
-        pfn_vkDestroyImage(device_, result.image, nullptr);
+        vk.destroyImage(device_, result.image, nullptr);
         result.image = VK_NULL_HANDLE;
         return result;
     }
@@ -1253,9 +1157,9 @@ VkImageResource VulkanRenderer::createImage(uint32_t w, uint32_t h, VkFormat fmt
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    if (pfn_vkCreateImageView(device_, &viewInfo, nullptr, &result.view) != VK_SUCCESS) {
-        pfn_vkDestroyImage(device_, result.image, nullptr);
-        pfn_vkFreeMemory(device_, result.memory, nullptr);
+    if (vk.createImageView(device_, &viewInfo, nullptr, &result.view) != VK_SUCCESS) {
+        vk.destroyImage(device_, result.image, nullptr);
+        vk.freeMemory(device_, result.memory, nullptr);
         result.image = VK_NULL_HANDLE;
         return result;
     }
@@ -1272,9 +1176,9 @@ VkImageResource VulkanRenderer::createImage(uint32_t w, uint32_t h, VkFormat fmt
 // destroyImage
 // ============================================================================
 void VulkanRenderer::destroyImage(VkImageResource& img) {
-    if (img.view) pfn_vkDestroyImageView(device_, img.view, nullptr);
-    if (img.image) pfn_vkDestroyImage(device_, img.image, nullptr);
-    if (img.memory) pfn_vkFreeMemory(device_, img.memory, nullptr);
+    if (img.view) vk.destroyImageView(device_, img.view, nullptr);
+    if (img.image) vk.destroyImage(device_, img.image, nullptr);
+    if (img.memory) vk.freeMemory(device_, img.memory, nullptr);
     img = {};
 }
 
@@ -1311,7 +1215,7 @@ VkSamplerResource VulkanRenderer::createSampler(VkFilter minFilter, VkFilter mag
         // Could use custom border color with VK_EXT_custom_border_color
     }
 
-    if (pfn_vkCreateSampler(device_, &samplerInfo, nullptr, &result.sampler) != VK_SUCCESS) {
+    if (vk.createSampler(device_, &samplerInfo, nullptr, &result.sampler) != VK_SUCCESS) {
         OutputDebugStringA("[VK] Failed to create sampler\n");
     }
     return result;
@@ -1321,7 +1225,7 @@ VkSamplerResource VulkanRenderer::createSampler(VkFilter minFilter, VkFilter mag
 // destroySampler
 // ============================================================================
 void VulkanRenderer::destroySampler(VkSamplerResource& s) {
-    if (s.sampler) pfn_vkDestroySampler(device_, s.sampler, nullptr);
+    if (s.sampler) vk.destroySampler(device_, s.sampler, nullptr);
     s = {};
 }
 
@@ -1338,12 +1242,12 @@ VkBufferResource VulkanRenderer::createBuffer(VkDeviceSize size, VkBufferUsageFl
     bufferInfo.usage = usage;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (pfn_vkCreateBuffer(device_, &bufferInfo, nullptr, &result.buffer) != VK_SUCCESS) {
+    if (vk.createBuffer(device_, &bufferInfo, nullptr, &result.buffer) != VK_SUCCESS) {
         return result;
     }
 
     VkMemoryRequirements memReqs{};
-    pfn_vkGetBufferMemoryRequirements(device_, result.buffer, &memReqs);
+    vk.getBufferMemoryRequirements(device_, result.buffer, &memReqs);
 
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -1351,23 +1255,23 @@ VkBufferResource VulkanRenderer::createBuffer(VkDeviceSize size, VkBufferUsageFl
     allocInfo.memoryTypeIndex = findMemoryType(memReqs.memoryTypeBits, props);
 
     if (allocInfo.memoryTypeIndex == UINT32_MAX) {
-        pfn_vkDestroyBuffer(device_, result.buffer, nullptr);
+        vk.destroyBuffer(device_, result.buffer, nullptr);
         result.buffer = VK_NULL_HANDLE;
         return result;
     }
 
-    if (pfn_vkAllocateMemory(device_, &allocInfo, nullptr, &result.memory) != VK_SUCCESS) {
-        pfn_vkDestroyBuffer(device_, result.buffer, nullptr);
+    if (vk.allocateMemory(device_, &allocInfo, nullptr, &result.memory) != VK_SUCCESS) {
+        vk.destroyBuffer(device_, result.buffer, nullptr);
         result.buffer = VK_NULL_HANDLE;
         return result;
     }
 
-    pfn_vkBindBufferMemory(device_, result.buffer, result.memory, 0);
+    vk.bindBufferMemory(device_, result.buffer, result.memory, 0);
     result.size = size;
 
     // Map if host visible
     if (props & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
-        if (pfn_vkMapMemory(device_, result.memory, 0, size, 0, &result.mapped) != VK_SUCCESS) {
+        if (vk.mapMemory(device_, result.memory, 0, size, 0, &result.mapped) != VK_SUCCESS) {
             OutputDebugStringA("[VK] createBuffer: vkMapMemory failed\n");
             result.mapped = nullptr;
         }
@@ -1381,11 +1285,11 @@ VkBufferResource VulkanRenderer::createBuffer(VkDeviceSize size, VkBufferUsageFl
 // ============================================================================
 void VulkanRenderer::destroyBuffer(VkBufferResource& buf) {
     if (buf.mapped) {
-        pfn_vkUnmapMemory(device_, buf.memory);
+        vk.unmapMemory(device_, buf.memory);
         buf.mapped = nullptr;
     }
-    if (buf.buffer) pfn_vkDestroyBuffer(device_, buf.buffer, nullptr);
-    if (buf.memory) pfn_vkFreeMemory(device_, buf.memory, nullptr);
+    if (buf.buffer) vk.destroyBuffer(device_, buf.buffer, nullptr);
+    if (buf.memory) vk.freeMemory(device_, buf.memory, nullptr);
     buf = {};
 }
 
@@ -1408,7 +1312,7 @@ VkDescriptorSetLayout VulkanRenderer::createDescriptorSetLayout(
     layoutInfo.pBindings = bindings.data();
 
     VkDescriptorSetLayout layout = VK_NULL_HANDLE;
-    pfn_vkCreateDescriptorSetLayout(device_, &layoutInfo, nullptr, &layout);
+    vk.createDescriptorSetLayout(device_, &layoutInfo, nullptr, &layout);
     return layout;
 }
 
@@ -1416,7 +1320,7 @@ VkDescriptorSetLayout VulkanRenderer::createDescriptorSetLayout(
 // destroyDescriptorSetLayout
 // ============================================================================
 void VulkanRenderer::destroyDescriptorSetLayout(VkDescriptorSetLayout layout) {
-    if (layout) pfn_vkDestroyDescriptorSetLayout(device_, layout, nullptr);
+    if (layout) vk.destroyDescriptorSetLayout(device_, layout, nullptr);
 }
 
 // ============================================================================
@@ -1430,7 +1334,7 @@ VkDescriptorSet VulkanRenderer::allocateDescriptorSet(VkDescriptorSetLayout layo
     allocInfo.pSetLayouts = &layout;
 
     VkDescriptorSet set = VK_NULL_HANDLE;
-    pfn_vkAllocateDescriptorSets(device_, &allocInfo, &set);
+    vk.allocateDescriptorSets(device_, &allocInfo, &set);
     return set;
 }
 
@@ -1454,7 +1358,7 @@ void VulkanRenderer::updateDescriptorSetTexture(VkDescriptorSet set, uint32_t bi
     write.descriptorCount = 1;
     write.pImageInfo = &imageInfo;
 
-    pfn_vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+    vk.updateDescriptorSets(device_, 1, &write, 0, nullptr);
 }
 
 // ============================================================================
@@ -1476,7 +1380,7 @@ void VulkanRenderer::updateDescriptorSetUniform(VkDescriptorSet set, uint32_t bi
     write.descriptorCount = 1;
     write.pBufferInfo = &bufferInfo;
 
-    pfn_vkUpdateDescriptorSets(device_, 1, &write, 0, nullptr);
+    vk.updateDescriptorSets(device_, 1, &write, 0, nullptr);
 }
 
 // ============================================================================
@@ -1493,7 +1397,7 @@ VkPipelineLayout VulkanRenderer::createPipelineLayout(
     layoutInfo.pPushConstantRanges = pushRanges.data();
 
     VkPipelineLayout layout = VK_NULL_HANDLE;
-    pfn_vkCreatePipelineLayout(device_, &layoutInfo, nullptr, &layout);
+    vk.createPipelineLayout(device_, &layoutInfo, nullptr, &layout);
     return layout;
 }
 
@@ -1501,7 +1405,7 @@ VkPipelineLayout VulkanRenderer::createPipelineLayout(
 // destroyPipelineLayout
 // ============================================================================
 void VulkanRenderer::destroyPipelineLayout(VkPipelineLayout layout) {
-    if (layout) pfn_vkDestroyPipelineLayout(device_, layout, nullptr);
+    if (layout) vk.destroyPipelineLayout(device_, layout, nullptr);
 }
 
 // ============================================================================
@@ -1634,7 +1538,7 @@ VkPipeline VulkanRenderer::createGraphicsPipeline(
     pipelineInfo.renderPass = VK_NULL_HANDLE;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
-    VkResult result = pfn_vkCreateGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
+    VkResult result = vk.createGraphicsPipelines(device_, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline);
 
     destroyShaderModule(vertMod);
     destroyShaderModule(fragMod);
@@ -1655,7 +1559,7 @@ VkPipeline VulkanRenderer::createGraphicsPipeline(
 // destroyPipeline
 // ============================================================================
 void VulkanRenderer::destroyPipeline(VkPipeline pipeline) {
-    if (pipeline) pfn_vkDestroyPipeline(device_, pipeline, nullptr);
+    if (pipeline) vk.destroyPipeline(device_, pipeline, nullptr);
 }
 
 // ============================================================================
@@ -1687,7 +1591,7 @@ VkShaderModule VulkanRenderer::createShaderModule(std::span<const uint32_t> spir
     // Known driver bug: some drivers hang in vkCreateShaderModule with large SPIR-V
     std::thread worker([this, createInfo, sharedResult, sharedMod, sharedDone]() {
         VkShaderModule mod = VK_NULL_HANDLE;
-        VkResult r = pfn_vkCreateShaderModule(device_, &createInfo, nullptr, &mod);
+        VkResult r = vk.createShaderModule(device_, &createInfo, nullptr, &mod);
         sharedMod->store(mod, std::memory_order_release);
         sharedResult->store(r, std::memory_order_release);
         sharedDone->store(true, std::memory_order_release);
@@ -1723,7 +1627,7 @@ VkShaderModule VulkanRenderer::createShaderModule(std::span<const uint32_t> spir
 // destroyShaderModule
 // ============================================================================
 void VulkanRenderer::destroyShaderModule(VkShaderModule mod) {
-    if (mod) pfn_vkDestroyShaderModule(device_, mod, nullptr);
+    if (mod) vk.destroyShaderModule(device_, mod, nullptr);
 }
 
 // ============================================================================
@@ -1746,28 +1650,28 @@ void VulkanRenderer::cmdBeginRendering(VkImageView colorTarget, uint32_t w, uint
     renderInfo.colorAttachmentCount = 1;
     renderInfo.pColorAttachments = &colorAttachment;
 
-    pfn_vkCmdBeginRendering(cmdBuffers_[currentFrame_], &renderInfo);
+    vk.cmdBeginRendering(cmdBuffers_[currentFrame_], &renderInfo);
 }
 
 // ============================================================================
 // cmdEndRendering
 // ============================================================================
 void VulkanRenderer::cmdEndRendering() {
-    pfn_vkCmdEndRendering(cmdBuffers_[currentFrame_]);
+    vk.cmdEndRendering(cmdBuffers_[currentFrame_]);
 }
 
 // ============================================================================
 // cmdBindPipeline
 // ============================================================================
 void VulkanRenderer::cmdBindPipeline(VkPipeline pipeline, VkPipelineLayout layout) {
-    pfn_vkCmdBindPipeline(cmdBuffers_[currentFrame_], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+    vk.cmdBindPipeline(cmdBuffers_[currentFrame_], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 }
 
 // ============================================================================
 // cmdBindDescriptorSet
 // ============================================================================
 void VulkanRenderer::cmdBindDescriptorSet(VkPipelineLayout layout, VkDescriptorSet set, uint32_t setIdx) {
-    pfn_vkCmdBindDescriptorSets(cmdBuffers_[currentFrame_], VK_PIPELINE_BIND_POINT_GRAPHICS,
+    vk.cmdBindDescriptorSets(cmdBuffers_[currentFrame_], VK_PIPELINE_BIND_POINT_GRAPHICS,
         layout, setIdx, 1, &set, 0, nullptr);
 }
 
@@ -1777,7 +1681,7 @@ void VulkanRenderer::cmdBindDescriptorSet(VkPipelineLayout layout, VkDescriptorS
 void VulkanRenderer::cmdBindVertexBuffer(VkBufferResource& buf) {
     VkBuffer buffers[] = { buf.buffer };
     VkDeviceSize offsets[] = { 0 };
-    pfn_vkCmdBindVertexBuffers(cmdBuffers_[currentFrame_], 0, 1, buffers, offsets);
+    vk.cmdBindVertexBuffers(cmdBuffers_[currentFrame_], 0, 1, buffers, offsets);
 }
 
 // ============================================================================
@@ -1791,7 +1695,7 @@ void VulkanRenderer::cmdSetViewport(uint32_t w, uint32_t h) {
     viewport.height = static_cast<float>(h);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    pfn_vkCmdSetViewport(cmdBuffers_[currentFrame_], 0, 1, &viewport);
+    vk.cmdSetViewport(cmdBuffers_[currentFrame_], 0, 1, &viewport);
 }
 
 // ============================================================================
@@ -1801,7 +1705,7 @@ void VulkanRenderer::cmdSetScissor(uint32_t w, uint32_t h) {
     VkRect2D scissor{};
     scissor.offset = { 0, 0 };
     scissor.extent = { w, h };
-    pfn_vkCmdSetScissor(cmdBuffers_[currentFrame_], 0, 1, &scissor);
+    vk.cmdSetScissor(cmdBuffers_[currentFrame_], 0, 1, &scissor);
 }
 
 // ============================================================================
@@ -1809,14 +1713,14 @@ void VulkanRenderer::cmdSetScissor(uint32_t w, uint32_t h) {
 // ============================================================================
 void VulkanRenderer::cmdPushConstants(VkPipelineLayout layout, VkShaderStageFlags stage,
                                        uint32_t offset, uint32_t size, const void* data) {
-    pfn_vkCmdPushConstants(cmdBuffers_[currentFrame_], layout, stage, offset, size, data);
+    vk.cmdPushConstants(cmdBuffers_[currentFrame_], layout, stage, offset, size, data);
 }
 
 // ============================================================================
 // cmdDraw
 // ============================================================================
 void VulkanRenderer::cmdDraw(uint32_t vertexCount, uint32_t firstVertex) {
-    pfn_vkCmdDraw(cmdBuffers_[currentFrame_], vertexCount, 1, firstVertex, 0);
+    vk.cmdDraw(cmdBuffers_[currentFrame_], vertexCount, 1, firstVertex, 0);
 }
 
 // ============================================================================
@@ -1838,7 +1742,7 @@ void VulkanRenderer::cmdBlitImage(VkImageResource& src, VkImageResource& dst,
     region.dstSubresource.baseArrayLayer = 0;
     region.dstSubresource.layerCount = 1;
 
-    pfn_vkCmdBlitImage(cmdBuffers_[currentFrame_],
+    vk.cmdBlitImage(cmdBuffers_[currentFrame_],
         src.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         dst.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         1, &region, VK_FILTER_LINEAR);
@@ -1860,7 +1764,7 @@ void VulkanRenderer::cmdCopyImageToBuffer(VkImageResource& src, VkBufferResource
     region.imageOffset = { 0, 0, 0 };
     region.imageExtent = { w, h, 1 };
 
-    pfn_vkCmdCopyImageToBuffer(cmdBuffers_[currentFrame_],
+    vk.cmdCopyImageToBuffer(cmdBuffers_[currentFrame_],
         src.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         dst.buffer, 1, &region);
 }
@@ -1881,7 +1785,7 @@ void VulkanRenderer::cmdCopyBufferToImage(VkBufferResource& src, VkImageResource
     region.imageOffset = { 0, 0, 0 };
     region.imageExtent = { w, h, 1 };
 
-    pfn_vkCmdCopyBufferToImage(cmdBuffers_[currentFrame_],
+    vk.cmdCopyBufferToImage(cmdBuffers_[currentFrame_],
         src.buffer, dst.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         1, &region);
 }
@@ -1946,7 +1850,7 @@ bool VulkanRenderer::uploadTextureToImage(const void* bgraPixels, uint32_t w, ui
         region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         region.dstSubresource.layerCount = 1;
 
-        pfn_vkCmdBlitImage(cmdBuffers_[currentFrame_],
+        vk.cmdBlitImage(cmdBuffers_[currentFrame_],
             uploadImage_.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             currentSwapchainImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
             1, &region, VK_FILTER_LINEAR);
@@ -2034,7 +1938,7 @@ void VulkanRenderer::cmdTransitionLayout(VkImageResource& img, VkImageLayout new
         dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     }
 
-    pfn_vkCmdPipelineBarrier(cmdBuffers_[currentFrame_], srcStage, dstStage, 0,
+    vk.cmdPipelineBarrier(cmdBuffers_[currentFrame_], srcStage, dstStage, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
 
     img.currentLayout = newLayout;
@@ -2103,7 +2007,7 @@ void VulkanRenderer::cmdTransitionImage(VkImage img, VkImageLayout oldLayout, Vk
         dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     }
 
-    pfn_vkCmdPipelineBarrier(cmdBuffers_[currentFrame_], srcStage, dstStage, 0,
+    vk.cmdPipelineBarrier(cmdBuffers_[currentFrame_], srcStage, dstStage, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
 }
 
@@ -2113,8 +2017,8 @@ void VulkanRenderer::cmdTransitionImage(VkImage img, VkImageLayout oldLayout, Vk
 void VulkanRenderer::drawFullScreenQuad() {
     VkBuffer buffers[] = { quadVbo_.buffer };
     VkDeviceSize offsets[] = { 0 };
-    pfn_vkCmdBindVertexBuffers(cmdBuffers_[currentFrame_], 0, 1, buffers, offsets);
-    pfn_vkCmdDraw(cmdBuffers_[currentFrame_], 4, 1, 0, 0);
+    vk.cmdBindVertexBuffers(cmdBuffers_[currentFrame_], 0, 1, buffers, offsets);
+    vk.cmdDraw(cmdBuffers_[currentFrame_], 4, 1, 0, 0);
 }
 
 // ============================================================================
@@ -2149,7 +2053,7 @@ VkCommandBuffer VulkanRenderer::currentCommandBuffer() const {
 // ============================================================================
 std::string VulkanRenderer::getVendor() const {
     VkPhysicalDeviceProperties props{};
-    pfn_vkGetPhysicalDeviceProperties(physDev_, &props);
+    vk.getPhysicalDeviceProperties(physDev_, &props);
     switch (props.vendorID) {
         case 0x10DE: return "NVIDIA";
         case 0x1002: return "AMD";
@@ -2161,13 +2065,13 @@ std::string VulkanRenderer::getVendor() const {
 
 std::string VulkanRenderer::getRenderer() const {
     VkPhysicalDeviceProperties props{};
-    pfn_vkGetPhysicalDeviceProperties(physDev_, &props);
+    vk.getPhysicalDeviceProperties(physDev_, &props);
     return props.deviceName;
 }
 
 std::string VulkanRenderer::getVersion() const {
     VkPhysicalDeviceProperties props{};
-    pfn_vkGetPhysicalDeviceProperties(physDev_, &props);
+    vk.getPhysicalDeviceProperties(physDev_, &props);
     char buf[128];
     sprintf_s(buf, "Vulkan %d.%d.%d",
         VK_VERSION_MAJOR(props.apiVersion),
@@ -2264,34 +2168,34 @@ void VulkanRenderer::finalizeScreenshot() {
 // ============================================================================
 void VulkanRenderer::loadInstanceFuncs() {
     if (!instance_) return;
-    pfn_vkDestroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkDestroyInstance"));
-    pfn_vkCreateDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkCreateDebugUtilsMessengerEXT"));
-    pfn_vkDestroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkDestroyDebugUtilsMessengerEXT"));
-    pfn_vkCreateWin32SurfaceKHR = reinterpret_cast<PFN_vkCreateWin32SurfaceKHR>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkCreateWin32SurfaceKHR"));
-    pfn_vkDestroySurfaceKHR = reinterpret_cast<PFN_vkDestroySurfaceKHR>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkDestroySurfaceKHR"));
-    pfn_vkGetPhysicalDeviceProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkGetPhysicalDeviceProperties"));
-    pfn_vkGetPhysicalDeviceMemoryProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkGetPhysicalDeviceMemoryProperties"));
-    pfn_vkGetPhysicalDeviceQueueFamilyProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceQueueFamilyProperties>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkGetPhysicalDeviceQueueFamilyProperties"));
-    pfn_vkGetPhysicalDeviceSurfaceSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceSupportKHR>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkGetPhysicalDeviceSurfaceSupportKHR"));
-    pfn_vkGetPhysicalDeviceSurfaceCapabilitiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR"));
-    pfn_vkGetPhysicalDeviceSurfaceFormatsKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkGetPhysicalDeviceSurfaceFormatsKHR"));
-    pfn_vkGetPhysicalDeviceSurfacePresentModesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfacePresentModesKHR>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkGetPhysicalDeviceSurfacePresentModesKHR"));
-    pfn_vkEnumeratePhysicalDevices = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkEnumeratePhysicalDevices"));
-    pfn_vkEnumerateDeviceExtensionProperties = reinterpret_cast<PFN_vkEnumerateDeviceExtensionProperties>(
-        pfn_vkGetInstanceProcAddr(instance_, "vkEnumerateDeviceExtensionProperties"));
+    vk.destroyInstance = reinterpret_cast<PFN_vkDestroyInstance>(
+        vk.getInstanceProcAddr(instance_, "vkDestroyInstance"));
+    vk.createDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkCreateDebugUtilsMessengerEXT>(
+        vk.getInstanceProcAddr(instance_, "vkCreateDebugUtilsMessengerEXT"));
+    vk.destroyDebugUtilsMessengerEXT = reinterpret_cast<PFN_vkDestroyDebugUtilsMessengerEXT>(
+        vk.getInstanceProcAddr(instance_, "vkDestroyDebugUtilsMessengerEXT"));
+    vk.createWin32SurfaceKHR = reinterpret_cast<PFN_vkCreateWin32SurfaceKHR>(
+        vk.getInstanceProcAddr(instance_, "vkCreateWin32SurfaceKHR"));
+    vk.destroySurfaceKHR = reinterpret_cast<PFN_vkDestroySurfaceKHR>(
+        vk.getInstanceProcAddr(instance_, "vkDestroySurfaceKHR"));
+    vk.getPhysicalDeviceProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceProperties>(
+        vk.getInstanceProcAddr(instance_, "vkGetPhysicalDeviceProperties"));
+    vk.getPhysicalDeviceMemoryProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(
+        vk.getInstanceProcAddr(instance_, "vkGetPhysicalDeviceMemoryProperties"));
+    vk.getPhysicalDeviceQueueFamilyProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceQueueFamilyProperties>(
+        vk.getInstanceProcAddr(instance_, "vkGetPhysicalDeviceQueueFamilyProperties"));
+    vk.getPhysicalDeviceSurfaceSupportKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceSupportKHR>(
+        vk.getInstanceProcAddr(instance_, "vkGetPhysicalDeviceSurfaceSupportKHR"));
+    vk.getPhysicalDeviceSurfaceCapabilitiesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR>(
+        vk.getInstanceProcAddr(instance_, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR"));
+    vk.getPhysicalDeviceSurfaceFormatsKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfaceFormatsKHR>(
+        vk.getInstanceProcAddr(instance_, "vkGetPhysicalDeviceSurfaceFormatsKHR"));
+    vk.getPhysicalDeviceSurfacePresentModesKHR = reinterpret_cast<PFN_vkGetPhysicalDeviceSurfacePresentModesKHR>(
+        vk.getInstanceProcAddr(instance_, "vkGetPhysicalDeviceSurfacePresentModesKHR"));
+    vk.enumeratePhysicalDevices = reinterpret_cast<PFN_vkEnumeratePhysicalDevices>(
+        vk.getInstanceProcAddr(instance_, "vkEnumeratePhysicalDevices"));
+    vk.enumerateDeviceExtensionProperties = reinterpret_cast<PFN_vkEnumerateDeviceExtensionProperties>(
+        vk.getInstanceProcAddr(instance_, "vkEnumerateDeviceExtensionProperties"));
 }
 
 // ============================================================================
@@ -2299,72 +2203,72 @@ void VulkanRenderer::loadInstanceFuncs() {
 // ============================================================================
 void VulkanRenderer::loadDeviceFuncs() {
     if (!device_) return;
-#define LOAD(fn) if (!pfn_##fn) pfn_##fn = reinterpret_cast<PFN_##fn>(pfn_vkGetDeviceProcAddr(device_, #fn));
-    LOAD(vkDestroyDevice)
-    LOAD(vkGetDeviceQueue)
-    LOAD(vkCreateSwapchainKHR)
-    LOAD(vkDestroySwapchainKHR)
-    LOAD(vkGetSwapchainImagesKHR)
-    LOAD(vkAcquireNextImageKHR)
-    LOAD(vkQueuePresentKHR)
-    LOAD(vkQueueWaitIdle)
-    LOAD(vkDeviceWaitIdle)
-    LOAD(vkCreateCommandPool)
-    LOAD(vkDestroyCommandPool)
-    LOAD(vkAllocateCommandBuffers)
-    LOAD(vkFreeCommandBuffers)
-    LOAD(vkBeginCommandBuffer)
-    LOAD(vkEndCommandBuffer)
-    LOAD(vkCmdBeginRendering)
-    LOAD(vkCmdEndRendering)
-    LOAD(vkCmdBindPipeline)
-    LOAD(vkCmdSetViewport)
-    LOAD(vkCmdSetScissor)
-    LOAD(vkCmdDraw)
-    LOAD(vkCmdBlitImage)
-    LOAD(vkCmdCopyImageToBuffer)
-    LOAD(vkCmdPipelineBarrier)
-    LOAD(vkCmdBindVertexBuffers)
-    LOAD(vkCmdPushConstants)
-    LOAD(vkCmdBindDescriptorSets)
-    LOAD(vkCreateFence)
-    LOAD(vkDestroyFence)
-    LOAD(vkWaitForFences)
-    LOAD(vkResetFences)
-    LOAD(vkCreateSemaphore)
-    LOAD(vkDestroySemaphore)
-    LOAD(vkCreateImage)
-    LOAD(vkDestroyImage)
-    LOAD(vkGetImageMemoryRequirements)
-    LOAD(vkAllocateMemory)
-    LOAD(vkFreeMemory)
-    LOAD(vkBindImageMemory)
-    LOAD(vkCreateImageView)
-    LOAD(vkDestroyImageView)
-    LOAD(vkCreateSampler)
-    LOAD(vkDestroySampler)
-    LOAD(vkCreateBuffer)
-    LOAD(vkDestroyBuffer)
-    LOAD(vkGetBufferMemoryRequirements)
-    LOAD(vkBindBufferMemory)
-    LOAD(vkMapMemory)
-    LOAD(vkUnmapMemory)
-    LOAD(vkCreateShaderModule)
-    LOAD(vkDestroyShaderModule)
-    LOAD(vkCreatePipelineLayout)
-    LOAD(vkDestroyPipelineLayout)
-    LOAD(vkCreateGraphicsPipelines)
-    LOAD(vkDestroyPipeline)
-    LOAD(vkCreateDescriptorSetLayout)
-    LOAD(vkDestroyDescriptorSetLayout)
-    LOAD(vkCreateDescriptorPool)
-    LOAD(vkDestroyDescriptorPool)
-    LOAD(vkAllocateDescriptorSets)
-    LOAD(vkUpdateDescriptorSets)
-    LOAD(vkQueueSubmit)
-    LOAD(vkCmdCopyBufferToImage)
-    LOAD(vkGetImageSubresourceLayout)
-    LOAD(vkFlushMappedMemoryRanges)
+#define LOAD(member, vkname) if (!vk.member) vk.member = reinterpret_cast<PFN_vkname>(vk.getDeviceProcAddr(device_, #vkname));
+    LOAD(destroyDevice, vkDestroyDevice)
+    LOAD(getDeviceQueue, vkGetDeviceQueue)
+    LOAD(createSwapchainKHR, vkCreateSwapchainKHR)
+    LOAD(destroySwapchainKHR, vkDestroySwapchainKHR)
+    LOAD(getSwapchainImagesKHR, vkGetSwapchainImagesKHR)
+    LOAD(acquireNextImageKHR, vkAcquireNextImageKHR)
+    LOAD(queuePresentKHR, vkQueuePresentKHR)
+    LOAD(queueWaitIdle, vkQueueWaitIdle)
+    LOAD(deviceWaitIdle, vkDeviceWaitIdle)
+    LOAD(createCommandPool, vkCreateCommandPool)
+    LOAD(destroyCommandPool, vkDestroyCommandPool)
+    LOAD(allocateCommandBuffers, vkAllocateCommandBuffers)
+    LOAD(freeCommandBuffers, vkFreeCommandBuffers)
+    LOAD(beginCommandBuffer, vkBeginCommandBuffer)
+    LOAD(endCommandBuffer, vkEndCommandBuffer)
+    LOAD(cmdBeginRendering, vkCmdBeginRendering)
+    LOAD(cmdEndRendering, vkCmdEndRendering)
+    LOAD(cmdBindPipeline, vkCmdBindPipeline)
+    LOAD(cmdSetViewport, vkCmdSetViewport)
+    LOAD(cmdSetScissor, vkCmdSetScissor)
+    LOAD(cmdDraw, vkCmdDraw)
+    LOAD(cmdBlitImage, vkCmdBlitImage)
+    LOAD(cmdCopyImageToBuffer, vkCmdCopyImageToBuffer)
+    LOAD(cmdPipelineBarrier, vkCmdPipelineBarrier)
+    LOAD(cmdBindVertexBuffers, vkCmdBindVertexBuffers)
+    LOAD(cmdPushConstants, vkCmdPushConstants)
+    LOAD(cmdBindDescriptorSets, vkCmdBindDescriptorSets)
+    LOAD(createFence, vkCreateFence)
+    LOAD(destroyFence, vkDestroyFence)
+    LOAD(waitForFences, vkWaitForFences)
+    LOAD(resetFences, vkResetFences)
+    LOAD(createSemaphore, vkCreateSemaphore)
+    LOAD(destroySemaphore, vkDestroySemaphore)
+    LOAD(createImage, vkCreateImage)
+    LOAD(destroyImage, vkDestroyImage)
+    LOAD(getImageMemoryRequirements, vkGetImageMemoryRequirements)
+    LOAD(allocateMemory, vkAllocateMemory)
+    LOAD(freeMemory, vkFreeMemory)
+    LOAD(bindImageMemory, vkBindImageMemory)
+    LOAD(createImageView, vkCreateImageView)
+    LOAD(destroyImageView, vkDestroyImageView)
+    LOAD(createSampler, vkCreateSampler)
+    LOAD(destroySampler, vkDestroySampler)
+    LOAD(createBuffer, vkCreateBuffer)
+    LOAD(destroyBuffer, vkDestroyBuffer)
+    LOAD(getBufferMemoryRequirements, vkGetBufferMemoryRequirements)
+    LOAD(bindBufferMemory, vkBindBufferMemory)
+    LOAD(mapMemory, vkMapMemory)
+    LOAD(unmapMemory, vkUnmapMemory)
+    LOAD(createShaderModule, vkCreateShaderModule)
+    LOAD(destroyShaderModule, vkDestroyShaderModule)
+    LOAD(createPipelineLayout, vkCreatePipelineLayout)
+    LOAD(destroyPipelineLayout, vkDestroyPipelineLayout)
+    LOAD(createGraphicsPipelines, vkCreateGraphicsPipelines)
+    LOAD(destroyPipeline, vkDestroyPipeline)
+    LOAD(createDescriptorSetLayout, vkCreateDescriptorSetLayout)
+    LOAD(destroyDescriptorSetLayout, vkDestroyDescriptorSetLayout)
+    LOAD(createDescriptorPool, vkCreateDescriptorPool)
+    LOAD(destroyDescriptorPool, vkDestroyDescriptorPool)
+    LOAD(allocateDescriptorSets, vkAllocateDescriptorSets)
+    LOAD(updateDescriptorSets, vkUpdateDescriptorSets)
+    LOAD(queueSubmit, vkQueueSubmit)
+    LOAD(cmdCopyBufferToImage, vkCmdCopyBufferToImage)
+    LOAD(getImageSubresourceLayout, vkGetImageSubresourceLayout)
+    LOAD(flushMappedMemoryRanges, vkFlushMappedMemoryRanges)
 #undef LOAD
 }
 
@@ -2722,7 +2626,7 @@ bool VulkanRenderer::blitAppContentOverPreset(uint32_t width, uint32_t height) {
     region.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     region.dstSubresource.layerCount = 1;
 
-    pfn_vkCmdBlitImage(cmdBuffers_[currentFrame_],
+    vk.cmdBlitImage(cmdBuffers_[currentFrame_],
         uploadImage_.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
         currentSwapchainImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
         1, &region, VK_FILTER_LINEAR);
