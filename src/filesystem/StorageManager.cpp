@@ -49,7 +49,16 @@ std::string StorageManager::store_folder(const std::string& item_id, const std::
     std::string dest_base = get_item_file_dir(item_id);
     std::error_code ec;
 
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(source_dir, ec)) {
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(
+            source_dir, std::filesystem::directory_options::skip_permission_denied, ec)) {
+        std::error_code status_ec;
+        auto status = entry.status(status_ec);
+        if (status_ec) continue;
+
+        if (status.type() == std::filesystem::file_type::symlink) {
+            continue;
+        }
+
         if (entry.is_regular_file()) {
             std::string relative = std::filesystem::relative(entry.path(), source_dir).string();
             std::string dest_path = dest_base + "/" + relative;

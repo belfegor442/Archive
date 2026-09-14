@@ -315,13 +315,13 @@ core::ConsistencyReport IntegrityService::check_consistency() {
 
     auto abandoned = storage_.staging().detect_abandoned_staging();
     for (const auto& op : abandoned) {
-        if (!op.completed) {
+        if (op.state != "committed" && op.state != "rolled_back") {
             core::ConsistencyIssue issue;
             issue.severity = core::ConsistencyIssue::Severity::Warning;
             issue.kind = core::ConsistencyIssue::Kind::OrphanStaging;
             issue.entity_id = op.operation_id;
             issue.details = "Abandoned staging operation: " + op.operation_type
-                + " at " + op.staging_path;
+                + " (state: " + op.state + ") at " + op.staging_path;
             report.add_issue(std::move(issue));
         }
     }

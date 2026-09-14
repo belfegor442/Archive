@@ -890,6 +890,510 @@ static void test_permanent_delete_consistency() {
     TEST_PASS();
 }
 
+// === FilesystemTracker Backup/Restore Tests ===
+
+static void test_tracker_backup_restore_replaced_file() {
+    TEST_BEGIN("FilesystemTracker: backup and restore replaced file on compensate");
+    std::string dir = TEST_BASE + "/tracker_backup_test";
+    std::string backup = TEST_BASE + "/tracker_backup_dir";
+    FileUtils::create_directories(dir);
+
+    std::string file1 = dir + "/replaced.txt";
+    create_test_file(file1, "original content");
+
+    FilesystemTracker tracker(backup);
+    std::string dest = dir + "/replaced.txt";
+    tracker.track_replaced_file(dest, file1);
+
+    create_test_file(dest, "new content that overwrites");
+    ASSERT_TRUE(FileUtils::file_exists(dest));
+
+    tracker.compensate();
+
+    {
+        std::ifstream f(dest);
+        std::string content((std::istreambuf_iterator<char>(f)),
+                            std::istreambuf_iterator<char>());
+        ASSERT_EQ(content, "original content");
+    }
+
+    std::filesystem::remove_all(dir);
+    std::filesystem::remove_all(backup);
+    TEST_PASS();
+}
+
+static void test_tracker_mark_success_cleans_backup() {
+    TEST_BEGIN("FilesystemTracker: mark_success cleans backup dir");
+    std::string dir = TEST_BASE + "/tracker_success_test";
+    std::string backup = TEST_BASE + "/tracker_success_backup";
+    FileUtils::create_directories(dir);
+
+    std::string file1 = dir + "/file.txt";
+    create_test_file(file1, "data");
+
+    FilesystemTracker tracker(backup);
+    tracker.track_copied_file(file1);
+
+    tracker.mark_success();
+
+    ASSERT_TRUE(!std::filesystem::exists(backup));
+
+    std::filesystem::remove_all(dir);
+    TEST_PASS();
+}
+
+static void test_tracker_compensate_restores_multiple_replaced() {
+    TEST_BEGIN("FilesystemTracker: compensate restores multiple replaced files");
+    std::string dir = TEST_BASE + "/tracker_multi_replace";
+    std::string backup = TEST_BASE + "/tracker_multi_backup";
+    FileUtils::create_directories(dir);
+
+    std::string f1 = dir + "/a.txt";
+    std::string f2 = dir + "/b.txt";
+    std::string f3 = dir + "/c.txt";
+    create_test_file(f1, "original_a");
+    create_test_file(f2, "original_b");
+    create_test_file(f3, "original_c");
+
+    FilesystemTracker tracker(backup);
+    tracker.track_replaced_file(f1, f1);
+    tracker.track_replaced_file(f2, f2);
+    tracker.track_replaced_file(f3, f3);
+
+    create_test_file(f1, "new_a");
+    create_test_file(f2, "new_b");
+    create_test_file(f3, "new_c");
+
+    tracker.compensate();
+
+    auto read = [](const std::string& path) {
+        std::ifstream f(path);
+        std::string content((std::istreambuf_iterator<char>(f)),
+                            std::istreambuf_iterator<char>());
+        return content;
+    };
+
+    ASSERT_EQ(read(f1), "original_a");
+    ASSERT_EQ(read(f2), "original_b");
+    ASSERT_EQ(read(f3), "original_c");
+
+    std::filesystem::remove_all(dir);
+    std::filesystem::remove_all(backup);
+    TEST_PASS();
+}
+
+// === StagingManager State Machine Tests ===
+
+static void test_staging_state_transitions() {
+    TEST_BEGIN("StagingManager: state transitions tracked in metadata");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_state", "item123");
+
+    StagingOperation op = staging.detect_abandoned_staging()[0];
+    ASSERT_EQ(op.state, "preparing");
+    ASSERT_EQ(op.item_id, "item123");
+
+    staging.mark_staged(op_id, "ver456", "abc123");
+    op = staging.detect_abandoned_staging()[0];
+    ASSERT_EQ(op.state, "staged");
+    ASSERT_EQ(op.version_id, "ver456");
+    ASSERT_EQ(op.expected_checksum, "abc123");
+
+    staging.mark_finalizing(op_id);
+    op = staging.detect_abandoned_staging()[0];
+    ASSERT_EQ(op.state, "finalizing");
+
+    staging.mark_committed(op_id);
+    auto abandoned = staging.detect_abandoned_staging();
+    bool found = false;
+    for (const auto& a : abandoned) {
+        if (a.operation_id == op_id) found = true;
+    }
+    ASSERT_TRUE(!found);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_staging_validate_reject_collision() {
+    TEST_BEGIN("StagingManager: validate rejects collision with Reject policy");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_validate");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "staged content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    create_test_file(dest_dir + "/" + FileUtils::file_name(src), "existing content");
+
+    bool valid = staging.validate_staging(op_id, dest_dir, CollisionPolicy::Reject);
+    ASSERT_TRUE(!valid);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_staging_validate_skip_identical() {
+    TEST_BEGIN("StagingManager: validate accepts identical with SkipIfIdentical");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_skip_identical");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "same content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    create_test_file(dest_dir + "/" + FileUtils::file_name(src), "same content");
+
+    bool valid = staging.validate_staging(op_id, dest_dir, CollisionPolicy::SkipIfIdentical);
+    ASSERT_TRUE(valid);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_staging_validate_reject_different_skip() {
+    TEST_BEGIN("StagingManager: validate rejects different content with SkipIfIdentical");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_reject_diff");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "new content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    create_test_file(dest_dir + "/" + FileUtils::file_name(src), "old content");
+
+    bool valid = staging.validate_staging(op_id, dest_dir, CollisionPolicy::SkipIfIdentical);
+    ASSERT_TRUE(!valid);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_staging_finalize_backup_and_replace() {
+    TEST_BEGIN("StagingManager: finalize with BackupAndReplace backs up original");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_backup_replace");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "new version");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/" + FileUtils::file_name(src);
+    create_test_file(dest_file, "old version");
+
+    staging.finalize_staging(op_id, dest_dir, CollisionPolicy::BackupAndReplace);
+
+    std::string content;
+    {
+        std::ifstream f(dest_file);
+        content = std::string((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(content, "new version");
+
+    std::string backup_file = dest_file + ".backup";
+    ASSERT_TRUE(FileUtils::file_exists(backup_file));
+    std::string backup_content;
+    {
+        std::ifstream bf(backup_file);
+        backup_content = std::string((std::istreambuf_iterator<char>(bf)),
+                                     std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(backup_content, "old version");
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_staging_rollback_cleans_up() {
+    TEST_BEGIN("StagingManager: rollback marks rolled_back and cleans");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_rollback");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "content");
+    staging.stage_file(op_id, src);
+
+    ASSERT_TRUE(staging.staging_dir_exists(op_id));
+
+    staging.rollback_staging(op_id);
+
+    ASSERT_TRUE(!staging.staging_dir_exists(op_id));
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_staging_detect_corrupted() {
+    TEST_BEGIN("StagingManager: detect corrupted staging in finalizing state");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_corrupted");
+
+    staging.mark_finalizing(op_id);
+
+    auto corrupted = staging.detect_corrupted_staging();
+    ASSERT_EQ(corrupted.size(), 1u);
+    ASSERT_EQ(corrupted[0].operation_id, op_id);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Import Atomicity Protocol Tests ===
+
+static void test_import_rollback_restores_replaced_files() {
+    TEST_BEGIN("Import rollback: restores replaced files on DB failure");
+    setup_base();
+
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    CategoryRepository cat_repo(db);
+    TagRepository tag_repo(db);
+    ActivityRepository act_repo(db);
+    VersionRepository ver_repo(db);
+    StoredObjectRepository so_repo(db);
+    StorageManager storage(TEST_BASE, TEST_ITEMS);
+    ProjectDetector detector;
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+
+    std::string src = TEST_BASE + "/replace_test.txt";
+    create_test_file(src, "original data");
+
+    auto r1 = import_svc.import_single(src, std::nullopt);
+    ASSERT_EQ(r1.success_count(), 1);
+
+    std::string item_id = r1.items[0].id;
+    auto item = item_repo.find_by_id(item_id);
+    std::string storage_path = item->storage_path;
+
+    std::string src2 = TEST_BASE + "/replace_test_v2.txt";
+    create_test_file(src2, "v2 content");
+    auto r2 = import_svc.import_single(src2, std::nullopt);
+    ASSERT_EQ(r2.success_count(), 1);
+
+    ASSERT_TRUE(FileUtils::file_exists(storage_path));
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_version_restore_atomicity() {
+    TEST_BEGIN("Version restore: FS and DB consistent after restore");
+    setup_base();
+
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    CategoryRepository cat_repo(db);
+    TagRepository tag_repo(db);
+    ActivityRepository act_repo(db);
+    VersionRepository ver_repo(db);
+    StoredObjectRepository so_repo(db);
+    StorageManager storage(TEST_BASE, TEST_ITEMS);
+    ProjectDetector detector;
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    VersionService version_svc(db, ver_repo, item_repo, act_repo, so_repo, storage);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
+
+    std::string src1 = TEST_BASE + "/atomic_restore.txt";
+    create_test_file(src1, "version 1 content");
+    auto r1 = import_svc.import_single(src1, std::nullopt);
+    std::string item_id = r1.items[0].id;
+
+    std::string src2 = TEST_BASE + "/atomic_restore_v2.txt";
+    create_test_file(src2, "version 2 content");
+    version_svc.create_version(item_id, src2, "v2");
+
+    auto versions = ver_repo.find_by_item(item_id);
+    ASSERT_EQ(versions.size(), 2u);
+    std::string v1_id = versions[1].id;
+
+    version_svc.restore(item_id, v1_id);
+
+    auto item = item_repo.find_by_id(item_id);
+    ASSERT_TRUE(item.has_value());
+    ASSERT_EQ(item->current_version, 1);
+    ASSERT_TRUE(FileUtils::file_exists(item->storage_path));
+
+    auto check = integrity.verify_item(item_id);
+    ASSERT_EQ(check.items[0].state, IntegrityState::Valid);
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Symlink Protection Tests ===
+
+static void test_symlink_not_traversed() {
+    TEST_BEGIN("StorageManager: symlinks skipped during folder store");
+    setup_base();
+
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    CategoryRepository cat_repo(db);
+    TagRepository tag_repo(db);
+    ActivityRepository act_repo(db);
+    VersionRepository ver_repo(db);
+    StoredObjectRepository so_repo(db);
+    StorageManager storage(TEST_BASE, TEST_ITEMS);
+
+    std::string src = TEST_BASE + "/symlink_src";
+    FileUtils::create_directories(src);
+    create_test_file(src + "/real.txt", "real content");
+
+    std::string link_target = TEST_BASE + "/symlink_target.txt";
+    create_test_file(link_target, "should not be copied");
+
+    std::error_code ec;
+    std::filesystem::create_symlink(link_target, src + "/link.txt", ec);
+
+    if (!ec) {
+        auto item_id = "test_symlink_item";
+        storage.create_item_dir(item_id);
+        auto result_path = storage.store_folder(item_id, src);
+
+        ASSERT_TRUE(FileUtils::file_exists(result_path + "/real.txt"));
+        ASSERT_TRUE(!FileUtils::file_exists(result_path + "/link.txt"));
+    }
+
+    std::filesystem::remove_all(src);
+    std::filesystem::remove_all(TEST_BASE + "/items/test_symlink_item");
+    cleanup_base();
+    TEST_PASS();
+}
+
+// === Consistency Report Enhanced Tests ===
+
+static void test_consistency_corrupted_staging_detected() {
+    TEST_BEGIN("ConsistencyReport: corrupted staging detected");
+    setup_base();
+
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    CategoryRepository cat_repo(db);
+    TagRepository tag_repo(db);
+    ActivityRepository act_repo(db);
+    VersionRepository ver_repo(db);
+    StoredObjectRepository so_repo(db);
+    StorageManager storage(TEST_BASE, TEST_ITEMS);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
+
+    auto op_id = storage.staging().create_staging_dir("test_corrupted_consistency");
+    storage.staging().mark_finalizing(op_id);
+
+    auto report = integrity.check_consistency();
+    ASSERT_TRUE(!report.issues.empty());
+    ASSERT_TRUE(report.warning_count > 0);
+
+    storage.staging().cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_consistency_after_version_create_failure() {
+    TEST_BEGIN("ConsistencyReport: clean after version create failure");
+    setup_base();
+
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    CategoryRepository cat_repo(db);
+    TagRepository tag_repo(db);
+    ActivityRepository act_repo(db);
+    VersionRepository ver_repo(db);
+    StoredObjectRepository so_repo(db);
+    StorageManager storage(TEST_BASE, TEST_ITEMS);
+    ProjectDetector detector;
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    VersionService version_svc(db, ver_repo, item_repo, act_repo, so_repo, storage);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
+
+    std::string src = TEST_BASE + "/consistency_version.txt";
+    create_test_file(src, "content");
+    auto r = import_svc.import_single(src, std::nullopt);
+    std::string item_id = r.items[0].id;
+
+    ASSERT_THROW(version_svc.create_version(item_id, "/nonexistent.txt"));
+
+    auto report = integrity.check_consistency();
+    ASSERT_TRUE(report.is_clean());
+
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_consistency_full_lifecycle_with_staging() {
+    TEST_BEGIN("ConsistencyReport: clean after full lifecycle with staging");
+    setup_base();
+
+    DatabaseManager db(":memory:");
+    db.initialize();
+    ArchiveItemRepository item_repo(db);
+    CategoryRepository cat_repo(db);
+    TagRepository tag_repo(db);
+    ActivityRepository act_repo(db);
+    VersionRepository ver_repo(db);
+    StoredObjectRepository so_repo(db);
+    StorageManager storage(TEST_BASE, TEST_ITEMS);
+    ProjectDetector detector;
+    ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
+    VersionService version_svc(db, ver_repo, item_repo, act_repo, so_repo, storage);
+    UpdateService update_svc(item_repo, act_repo, storage);
+    IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
+
+    std::string src1 = TEST_BASE + "/full_staging.txt";
+    create_test_file(src1, "content v1");
+    auto r1 = import_svc.import_single(src1, std::nullopt);
+    std::string item_id = r1.items[0].id;
+
+    std::string src2 = TEST_BASE + "/full_staging_v2.txt";
+    create_test_file(src2, "content v2");
+    version_svc.create_version(item_id, src2, "v2");
+
+    update_svc.move_to_trash(item_id);
+    update_svc.restore_from_trash(item_id);
+
+    auto report = integrity.check_consistency();
+    ASSERT_TRUE(report.is_clean());
+
+    auto verification = integrity.verify_item(item_id);
+    ASSERT_EQ(verification.items[0].state, IntegrityState::Valid);
+
+    cleanup_base();
+    TEST_PASS();
+}
+
 void run_atomic_tests() {
     std::cout << "=== Atomic Operations Tests ===" << std::endl;
 
@@ -898,15 +1402,27 @@ void run_atomic_tests() {
     test_transaction_explicit_rollback();
     test_tracker_compensate();
     test_tracker_dirs_and_files();
+    test_tracker_backup_restore_replaced_file();
+    test_tracker_mark_success_cleans_backup();
+    test_tracker_compensate_restores_multiple_replaced();
     test_staging_create_and_detect();
     test_staging_finalize();
+    test_staging_state_transitions();
+    test_staging_validate_reject_collision();
+    test_staging_validate_skip_identical();
+    test_staging_validate_reject_different_skip();
+    test_staging_finalize_backup_and_replace();
+    test_staging_rollback_cleans_up();
+    test_staging_detect_corrupted();
     test_import_rollback_no_ghost_item();
     test_import_rollback_no_stored_object();
+    test_import_rollback_restores_replaced_files();
     test_version_create_rollback();
     test_version_create_rollback_no_orphan();
     test_version_v1_v2_integrity();
     test_restore_v1_then_v2();
     test_restore_rollback();
+    test_version_restore_atomicity();
     test_consistency_clean();
     test_consistency_item_without_version();
     test_consistency_stored_object_without_file();
@@ -918,4 +1434,8 @@ void run_atomic_tests() {
     test_stored_object_unique_version_constraint();
     test_multiple_sequential_imports();
     test_permanent_delete_consistency();
+    test_symlink_not_traversed();
+    test_consistency_corrupted_staging_detected();
+    test_consistency_after_version_create_failure();
+    test_consistency_full_lifecycle_with_staging();
 }
