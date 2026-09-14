@@ -16,6 +16,7 @@
 #include "../storage/StoredObjectRepository.h"
 #include "../hashing/FileHasher.h"
 #include "../filesystem/StorageManager.h"
+#include "../filesystem/FilesystemTracker.h"
 #include "ProjectDetector.h"
 
 namespace archive::services {
@@ -23,6 +24,7 @@ namespace archive::services {
 class ImportService {
 public:
     ImportService(
+        storage::DatabaseManager& db,
         storage::ArchiveItemRepository& items,
         storage::CategoryRepository& categories,
         storage::TagRepository& tags,
@@ -38,6 +40,7 @@ public:
     core::ImportResult import_folder(const std::string& path, const std::optional<std::string>& category_id);
 
 private:
+    storage::DatabaseManager& db_;
     storage::ArchiveItemRepository& items_;
     storage::CategoryRepository& categories_;
     storage::TagRepository& tags_;

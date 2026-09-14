@@ -1,6 +1,7 @@
 #include "ImportService.h"
 #include "../filesystem/FileUtils.h"
 #include "../core/utils/Uuid.h"
+#include "../storage/Transaction.h"
 
 #include <filesystem>
 #include <algorithm>
@@ -8,6 +9,7 @@
 namespace archive::services {
 
 ImportService::ImportService(
+    storage::DatabaseManager& db,
     storage::ArchiveItemRepository& items,
     storage::CategoryRepository& categories,
     storage::TagRepository& tags,
@@ -16,7 +18,8 @@ ImportService::ImportService(
     storage::StoredObjectRepository& stored_objects,
     filesystem::StorageManager& storage,
     ProjectDetector& detector
-) : items_(items)
+) : db_(db)
+  , items_(items)
   , categories_(categories)
   , tags_(tags)
   , activities_(activities)
@@ -67,14 +70,18 @@ core::ImportResult ImportService::import_single(const std::string& path,
 
     auto item = create_item_from_path(path, category_id);
     std::string item_id = item.id;
+    filesystem::FilesystemTracker fs_tracker;
 
     try {
         storage_.create_item_dir(item_id);
+        fs_tracker.track_created_dir(storage_.get_item_dir(item_id));
+
         std::string stored_path = storage_.store_file(item_id, path);
+        fs_tracker.track_copied_file(stored_path);
 
         uint64_t dest_size = filesystem::FileUtils::file_size(stored_path);
         if (dest_size != item.size) {
-            rollback_filesystem(item_id);
+            fs_tracker.compensate();
             throw std::runtime_error("File size mismatch after copy: expected "
                 + std::to_string(item.size) + " got " + std::to_string(dest_size));
         }
@@ -83,39 +90,46 @@ core::ImportResult ImportService::import_single(const std::string& path,
         item.storage_path = stored_path;
         item.checksum = copy_checksum;
 
-        items_.insert(item);
+        {
+            storage::Transaction tx(db_);
 
-        core::Version ver;
-        ver.id = core::utils::generate_id();
-        ver.item_id = item_id;
-        ver.version_number = 1;
-        ver.storage_path = stored_path;
-        ver.checksum = copy_checksum;
-        ver.size = item.size;
-        ver.created_at = core::utils::now_iso();
-        versions_.insert(ver);
+            items_.insert(item);
 
-        core::StoredObject so;
-        so.id = core::utils::generate_id();
-        so.item_id = item_id;
-        so.version_id = ver.id;
-        so.storage_path = stored_path;
-        so.size = item.size;
-        so.checksum = copy_checksum;
-        so.created_at = core::utils::now_iso();
-        stored_objects_.insert(so);
+            core::Version ver;
+            ver.id = core::utils::generate_id();
+            ver.item_id = item_id;
+            ver.version_number = 1;
+            ver.storage_path = stored_path;
+            ver.checksum = copy_checksum;
+            ver.size = item.size;
+            ver.created_at = core::utils::now_iso();
+            versions_.insert(ver);
 
-        core::Activity act;
-        act.id = core::utils::generate_id();
-        act.item_id = item_id;
-        act.action = core::ActivityAction::Imported;
-        act.details = "Archived file from " + path;
-        act.created_at = core::utils::now_iso();
-        activities_.insert(act);
+            core::StoredObject so;
+            so.id = core::utils::generate_id();
+            so.item_id = item_id;
+            so.version_id = ver.id;
+            so.storage_path = stored_path;
+            so.size = item.size;
+            so.checksum = copy_checksum;
+            so.created_at = core::utils::now_iso();
+            stored_objects_.insert(so);
+
+            core::Activity act;
+            act.id = core::utils::generate_id();
+            act.item_id = item_id;
+            act.action = core::ActivityAction::Imported;
+            act.details = "Archived file from " + path;
+            act.created_at = core::utils::now_iso();
+            activities_.insert(act);
+
+            tx.commit();
+        }
 
         result.items.push_back(std::move(item));
     } catch (const std::exception& e) {
-        rollback_filesystem(item_id);
+        fs_tracker.compensate();
+
         core::ImportError err;
         err.path = path;
         err.error = e.what();
@@ -140,53 +154,62 @@ core::ImportResult ImportService::import_folder(const std::string& path,
     }
 
     std::string item_id = item.id;
+    filesystem::FilesystemTracker fs_tracker;
 
     try {
         storage_.create_item_dir(item_id);
+        fs_tracker.track_created_dir(storage_.get_item_dir(item_id));
 
         std::string stored_path = storage_.store_folder(item_id, path);
         item.storage_path = stored_path;
 
-        item.file_count = filesystem::FileUtils::count_files(path);
-        item.size = filesystem::FileUtils::total_size(path);
+        item.file_count = filesystem::FileUtils::count_files(stored_path);
+        item.size = filesystem::FileUtils::total_size(stored_path);
         item.checksum = hashing::FileHasher::hash_folder(stored_path);
 
-        items_.insert(item);
+        {
+            storage::Transaction tx(db_);
 
-        core::Version ver;
-        ver.id = core::utils::generate_id();
-        ver.item_id = item_id;
-        ver.version_number = 1;
-        ver.storage_path = stored_path;
-        ver.checksum = item.checksum;
-        ver.size = item.size;
-        ver.notes = "Initial folder import";
-        ver.created_at = core::utils::now_iso();
-        versions_.insert(ver);
+            items_.insert(item);
 
-        core::StoredObject so;
-        so.id = core::utils::generate_id();
-        so.item_id = item_id;
-        so.version_id = ver.id;
-        so.storage_path = stored_path;
-        so.size = item.size;
-        so.checksum = item.checksum;
-        so.created_at = core::utils::now_iso();
-        stored_objects_.insert(so);
+            core::Version ver;
+            ver.id = core::utils::generate_id();
+            ver.item_id = item_id;
+            ver.version_number = 1;
+            ver.storage_path = stored_path;
+            ver.checksum = item.checksum;
+            ver.size = item.size;
+            ver.notes = "Initial folder import";
+            ver.created_at = core::utils::now_iso();
+            versions_.insert(ver);
 
-        core::Activity act;
-        act.id = core::utils::generate_id();
-        act.item_id = item_id;
-        act.action = core::ActivityAction::Imported;
-        act.details = "Archived folder from " + path
-            + (detection.is_project ? " (" + detection.project_type + ")" : "")
-            + " - " + std::to_string(item.file_count) + " files";
-        act.created_at = core::utils::now_iso();
-        activities_.insert(act);
+            core::StoredObject so;
+            so.id = core::utils::generate_id();
+            so.item_id = item_id;
+            so.version_id = ver.id;
+            so.storage_path = stored_path;
+            so.size = item.size;
+            so.checksum = item.checksum;
+            so.created_at = core::utils::now_iso();
+            stored_objects_.insert(so);
+
+            core::Activity act;
+            act.id = core::utils::generate_id();
+            act.item_id = item_id;
+            act.action = core::ActivityAction::Imported;
+            act.details = "Archived folder from " + path
+                + (detection.is_project ? " (" + detection.project_type + ")" : "")
+                + " - " + std::to_string(item.file_count) + " files";
+            act.created_at = core::utils::now_iso();
+            activities_.insert(act);
+
+            tx.commit();
+        }
 
         result.items.push_back(std::move(item));
     } catch (const std::exception& e) {
-        rollback_filesystem(item_id);
+        fs_tracker.compensate();
+
         core::ImportError err;
         err.path = path;
         err.error = e.what();
