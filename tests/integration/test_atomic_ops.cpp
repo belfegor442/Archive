@@ -2302,6 +2302,119 @@ static void test_backup_and_replace_collision_accepted() {
     TEST_PASS();
 }
 
+// === Backup Journal Roundtrip Tests ===
+
+static void test_backup_journal_roundtrip() {
+    TEST_BEGIN("Backup journal roundtrip: all fields preserved");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_roundtrip");
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+
+    std::string dest_a = dest_dir + "/file_a.txt";
+    std::string dest_b = dest_dir + "/sub/file_b.dat";
+    std::filesystem::create_directories(dest_dir + "/sub");
+    create_test_file(dest_a, "original_a");
+    create_test_file(dest_b, "original_b");
+
+    std::string backup_a = staging.get_staging_path(op_id) + "/.meta/backups/file_a.txt";
+    std::string backup_b = staging.get_staging_path(op_id) + "/.meta/backups/sub_file_b.dat";
+
+    staging.backup_file_strict(dest_a, backup_a);
+    staging.backup_file_strict(dest_b, backup_b);
+
+    std::vector<BackupEntry> entries;
+    entries.push_back({dest_a, backup_a, "created"});
+    entries.push_back({dest_b, backup_b, "created"});
+    staging.write_backup_journal(op_id, entries);
+
+    std::vector<BackupEntry> read_back = staging.read_backup_journal(op_id);
+    ASSERT_EQ(read_back.size(), 2u);
+    ASSERT_EQ(read_back[0].destination, dest_a);
+    ASSERT_EQ(read_back[0].backup_path, backup_a);
+    ASSERT_EQ(read_back[0].state, "created");
+    ASSERT_EQ(read_back[1].destination, dest_b);
+    ASSERT_EQ(read_back[1].backup_path, backup_b);
+    ASSERT_EQ(read_back[1].state, "created");
+
+    std::ofstream f_a(dest_a, std::ios::trunc);
+    f_a << "modified_a";
+    f_a.close();
+    std::ofstream f_b(dest_b, std::ios::trunc);
+    f_b << "modified_b";
+    f_b.close();
+
+    staging.restore_backups(op_id);
+
+    std::string content_a;
+    {
+        std::ifstream f(dest_a);
+        content_a = std::string((std::istreambuf_iterator<char>(f)),
+                                std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(content_a, "original_a");
+
+    std::string content_b;
+    {
+        std::ifstream f(dest_b);
+        content_b = std::string((std::istreambuf_iterator<char>(f)),
+                                std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(content_b, "original_b");
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_backup_journal_roundtrip_special_chars() {
+    TEST_BEGIN("Backup journal roundtrip: paths with spaces and special chars");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_roundtrip_special");
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+
+    std::string dest_file = dest_dir + "/my file (v2) - copy.txt";
+    std::string backup_file = staging.get_staging_path(op_id) + "/.meta/backups/my file (v2) - copy.txt";
+    create_test_file(dest_file, "original special");
+
+    staging.backup_file_strict(dest_file, backup_file);
+
+    std::vector<BackupEntry> entries;
+    entries.push_back({dest_file, backup_file, "created"});
+    staging.write_backup_journal(op_id, entries);
+
+    std::vector<BackupEntry> read_back = staging.read_backup_journal(op_id);
+    ASSERT_EQ(read_back.size(), 1u);
+    ASSERT_EQ(read_back[0].destination, dest_file);
+    ASSERT_EQ(read_back[0].backup_path, backup_file);
+    ASSERT_EQ(read_back[0].state, "created");
+
+    std::ofstream f(dest_file, std::ios::trunc);
+    f << "modified special";
+    f.close();
+
+    staging.restore_backups(op_id);
+
+    std::string content;
+    {
+        std::ifstream f(dest_file);
+        content = std::string((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(content, "original special");
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
 void run_atomic_tests() {
     std::cout << "=== Atomic Operations Tests ===" << std::endl;
 
@@ -2378,4 +2491,6 @@ void run_atomic_tests() {
     test_cleanup_corrupted_survives();
     test_cleanup_committed_staging_removed();
     test_backup_and_replace_collision_accepted();
+    test_backup_journal_roundtrip();
+    test_backup_journal_roundtrip_special_chars();
 }

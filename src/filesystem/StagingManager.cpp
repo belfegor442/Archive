@@ -366,91 +366,71 @@ std::vector<BackupEntry> StagingManager::read_backup_journal(const std::string& 
     std::ifstream f(journal);
     if (!f.is_open()) return entries;
 
-    std::string line;
-    while (std::getline(f, line)) {
-        auto trim = [](std::string s) {
-            while (!s.empty() && (s.front() == ' ' || s.front() == '"' || s.front() == '\t'))
-                s.erase(s.begin());
-            while (!s.empty() && (s.back() == ' ' || s.back() == '"' || s.back() == '\t'
-                                  || s.back() == ',' || s.back() == '}'))
-                s.pop_back();
-            return s;
-        };
-
-        if (line.find("{") != std::string::npos) continue;
-        if (line.find("}") != std::string::npos) continue;
-        if (line.find("[") != std::string::npos) continue;
-        if (line.find("]") != std::string::npos) continue;
-
-        std::string key;
-        std::string value;
-        BackupEntry be;
-        bool in_entry = false;
-
-        auto colon = line.find(':');
-        if (colon == std::string::npos) continue;
-
-        key = trim(line.substr(0, colon));
-        value = trim(line.substr(colon + 1));
-
-        if (key == "destination") {
-            be.destination = value;
-            in_entry = true;
-        }
-
-        if (in_entry) {
-            entries.push_back(be);
-        }
-    }
-
-    std::vector<BackupEntry> result;
-    std::ifstream f2(journal);
-    if (!f2.is_open()) return result;
-
-    std::string content((std::istreambuf_iterator<char>(f2)),
+    std::string content((std::istreambuf_iterator<char>(f)),
                         std::istreambuf_iterator<char>());
+    f.close();
+
+    auto extract_quoted = [](const std::string& s, size_t start_after) -> std::string {
+        auto q1 = s.find('"', start_after);
+        if (q1 == std::string::npos) return "";
+        size_t i = q1 + 1;
+        std::string result;
+        while (i < s.size()) {
+            if (s[i] == '\\' && i + 1 < s.size()) {
+                result += s[i + 1];
+                i += 2;
+            } else if (s[i] == '"') {
+                return result;
+            } else {
+                result += s[i];
+                i++;
+            }
+        }
+        return result;
+    };
 
     size_t pos = 0;
-    while (true) {
-        auto start = content.find("{", pos);
-        if (start == std::string::npos) break;
-        auto end = content.find("}", start);
-        if (end == std::string::npos) break;
+    while (pos < content.size()) {
+        auto obj_start = content.find('{', pos);
+        if (obj_start == std::string::npos) break;
 
-        std::string obj = content.substr(start + 1, end - start - 1);
+        size_t depth = 1;
+        size_t obj_end = obj_start + 1;
+        while (obj_end < content.size() && depth > 0) {
+            if (content[obj_end] == '{') depth++;
+            else if (content[obj_end] == '}') depth--;
+            obj_end++;
+        }
+        if (depth != 0) break;
+        obj_end--;
+
+        std::string obj = content.substr(obj_start + 1, obj_end - obj_start - 1);
+
         BackupEntry be;
 
         auto d_pos = obj.find("\"destination\"");
-        auto b_pos = obj.find("\"backup_path\"");
-        auto s_pos = obj.find("\"state\"");
-
         if (d_pos != std::string::npos) {
-            auto dv = obj.find("\"", d_pos + 14);
-            auto de = obj.find("\"", dv + 1);
-            if (dv != std::string::npos && de != std::string::npos)
-                be.destination = obj.substr(dv + 1, de - dv - 1);
+            be.destination = extract_quoted(obj, d_pos + 13);
         }
+
+        auto b_pos = obj.find("\"backup_path\"");
         if (b_pos != std::string::npos) {
-            auto bv = obj.find("\"", b_pos + 14);
-            auto be2 = obj.find("\"", bv + 1);
-            if (bv != std::string::npos && be2 != std::string::npos)
-                be.backup_path = obj.substr(bv + 1, be2 - bv - 1);
+            be.backup_path = extract_quoted(obj, b_pos + 13);
         }
+
+        auto s_pos = obj.find("\"state\"");
         if (s_pos != std::string::npos) {
-            auto sv = obj.find("\"", s_pos + 8);
-            auto se = obj.find("\"", sv + 1);
-            if (sv != std::string::npos && se != std::string::npos)
-                be.state = obj.substr(sv + 1, se - sv - 1);
+            be.state = extract_quoted(obj, s_pos + 7);
         }
 
         if (!be.destination.empty()) {
-            result.push_back(std::move(be));
+            entries.push_back(std::move(be));
         }
 
-        pos = end + 1;
+        pos = obj_end + 1;
     }
 
-    return result;
+    return entries;
 }
 
 void StagingManager::write_backup_journal(const std::string& operation_id,

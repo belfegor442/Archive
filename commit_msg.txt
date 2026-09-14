@@ -1,22 +1,12 @@
-Final hardening closure: atomic finalize rollback, committed cleanup, 173/173 tests
+Fix read_backup_journal: single-pass deterministic parser, 175/175 tests
 
-- StagingManager::finalize_staging: wrap entire copy+verify in try/catch;
-  on any failure (copy or verify), restore_backups undoes all modifications,
-  state transitions to RolledBack, original destinations preserved
-- StagingManager: added cleanup_committed() method that finds and removes
-  Committed staging dirs still lingering with residual files
-- Application: calls cleanup_committed() on startup alongside cleanup_abandoned
-- FileUtils::is_path_within: pure lexical component-based comparison with
-  Windows backslash support (no weakly_canonical dependency)
-- FileUtils::sanitize_relative_path: rejects absolute paths and .. traversal
-- test_finalize_verification_failure_restores_backup: rewritten to actually
-  test successful finalize with verify (old test was misleadingly named)
-- test_verify_finalized_detects_mismatch: new test proving verify_finalized
-  detects size/checksum mismatch
-- test_finalize_copy_failure_restores_backup: new test proving collision
-  rejection during finalize leaves destinations unchanged
-- 5 new cleanup state tests: Staged, Finalizing, Abandoned, Corrupted,
-  cleanup_committed removes committed staging dirs
-- setup_base/cleanup_base: error_code overwrites prevent leftover files
-  from crashing subsequent test runs
-- 173/173 tests passed, build clean
+- read_backup_journal: replaced fragile two-pass line+object parser with
+  single-pass deterministic parser that reads file once, finds {...} objects
+  via brace-depth tracking, extracts quoted string values with backslash
+  escape handling; correctly handles paths containing : , . _ - () [] and spaces
+- Added test_backup_journal_roundtrip: writes two entries with different
+  paths, reads back, verifies all three fields (destination, backup_path,
+  state) match, restores from journal and verifies file content
+- Added test_backup_journal_roundtrip_special_chars: roundtrip test with
+  path containing spaces, parentheses, and dashes
+- 175/175 tests passed, build clean
