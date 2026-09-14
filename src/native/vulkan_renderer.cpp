@@ -910,7 +910,13 @@ bool VulkanRenderer::beginFrame(uint32_t width, uint32_t height) {
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-    pfn_vkBeginCommandBuffer(cmdBuffers_[currentFrame_], &beginInfo);
+    VkResult beginResult = pfn_vkBeginCommandBuffer(cmdBuffers_[currentFrame_], &beginInfo);
+    if (beginResult != VK_SUCCESS) {
+        char buf[128];
+        sprintf_s(buf, "[VK] vkBeginCommandBuffer failed: %d\n", beginResult);
+        OutputDebugStringA(buf);
+        return false;
+    }
     frameActive_ = true;
     return true;
 }
@@ -940,7 +946,12 @@ void VulkanRenderer::endFrame() {
         }
     }
 
-    pfn_vkEndCommandBuffer(cmdBuffers_[currentFrame_]);
+    VkResult endRes = pfn_vkEndCommandBuffer(cmdBuffers_[currentFrame_]);
+    if (endRes != VK_SUCCESS) {
+        char buf[128];
+        sprintf_s(buf, "[VK] vkEndCommandBuffer failed: %d\n", endRes);
+        OutputDebugStringA(buf);
+    }
     frameActive_ = false;
 }
 
@@ -960,7 +971,14 @@ void VulkanRenderer::present() {
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = &renderFinishedSem_[currentFrame_];
 
-    pfn_vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]);
+    VkResult submitRes = pfn_vkQueueSubmit(graphicsQueue_, 1, &submitInfo, inFlightFences_[currentFrame_]);
+    if (submitRes != VK_SUCCESS) {
+        char buf[128];
+        sprintf_s(buf, "[VK] vkQueueSubmit failed: %d\n", submitRes);
+        OutputDebugStringA(buf);
+        frameActive_ = false;
+        return;
+    }
 
     VkPresentInfoKHR presentInfo{};
     presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
@@ -970,7 +988,12 @@ void VulkanRenderer::present() {
     presentInfo.pSwapchains = &swapchain_;
     presentInfo.pImageIndices = &currentImageIndex_;
 
-    pfn_vkQueuePresentKHR(presentQueue_, &presentInfo);
+    VkResult presentRes = pfn_vkQueuePresentKHR(presentQueue_, &presentInfo);
+    if (presentRes != VK_SUCCESS) {
+        char buf[128];
+        sprintf_s(buf, "[VK] vkQueuePresentKHR failed: %d\n", presentRes);
+        OutputDebugStringA(buf);
+    }
 
     currentFrame_ = (currentFrame_ + 1) % kMaxFramesInFlight;
 }
@@ -1014,7 +1037,12 @@ bool VulkanRenderer::allocateImageMemory(VkImage image, VkMemoryPropertyFlags pr
     VkResult result = pfn_vkAllocateMemory(device_, &allocInfo, nullptr, outMem);
     if (result != VK_SUCCESS) return false;
 
-    pfn_vkBindImageMemory(device_, image, *outMem, 0);
+    VkResult bindRes = pfn_vkBindImageMemory(device_, image, *outMem, 0);
+    if (bindRes != VK_SUCCESS) {
+        pfn_vkFreeMemory(device_, *outMem, nullptr);
+        *outMem = VK_NULL_HANDLE;
+        return false;
+    }
     return true;
 }
 
@@ -1029,12 +1057,17 @@ bool VulkanRenderer::transitionImageLayoutImmediate(VkImage img, VkImageLayout o
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer cmd;
-    pfn_vkAllocateCommandBuffers(device_, &allocInfo, &cmd);
+    VkResult allocRes = pfn_vkAllocateCommandBuffers(device_, &allocInfo, &cmd);
+    if (allocRes != VK_SUCCESS) return false;
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    pfn_vkBeginCommandBuffer(cmd, &beginInfo);
+    VkResult beginRes = pfn_vkBeginCommandBuffer(cmd, &beginInfo);
+    if (beginRes != VK_SUCCESS) {
+        pfn_vkFreeCommandBuffers(device_, cmdPool_, 1, &cmd);
+        return false;
+    }
 
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -1086,14 +1119,22 @@ bool VulkanRenderer::transitionImageLayoutImmediate(VkImage img, VkImageLayout o
     pfn_vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0,
         0, nullptr, 0, nullptr, 1, &barrier);
 
-    pfn_vkEndCommandBuffer(cmd);
+    VkResult endRes = pfn_vkEndCommandBuffer(cmd);
+    if (endRes != VK_SUCCESS) {
+        pfn_vkFreeCommandBuffers(device_, cmdPool_, 1, &cmd);
+        return false;
+    }
 
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &cmd;
 
-    pfn_vkQueueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE);
+    VkResult submitRes = pfn_vkQueueSubmit(graphicsQueue_, 1, &submitInfo, VK_NULL_HANDLE);
+    if (submitRes != VK_SUCCESS) {
+        pfn_vkFreeCommandBuffers(device_, cmdPool_, 1, &cmd);
+        return false;
+    }
     pfn_vkQueueWaitIdle(graphicsQueue_);
 
     pfn_vkFreeCommandBuffers(device_, cmdPool_, 1, &cmd);
@@ -1263,12 +1304,24 @@ VkBufferResource VulkanRenderer::createBuffer(VkDeviceSize size, VkBufferUsageFl
         return result;
     }
 
-    pfn_vkBindBufferMemory(device_, result.buffer, result.memory, 0);
+    VkResult bindRes = pfn_vkBindBufferMemory(device_, result.buffer, result.memory, 0);
+    if (bindRes != VK_SUCCESS) {
+        pfn_vkFreeMemory(device_, result.memory, nullptr);
+        pfn_vkDestroyBuffer(device_, result.buffer, nullptr);
+        result.buffer = VK_NULL_HANDLE;
+        return result;
+    }
     result.size = size;
 
     // Map if host visible
     if (props & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
-        pfn_vkMapMemory(device_, result.memory, 0, size, 0, &result.mapped);
+        VkResult mapRes = pfn_vkMapMemory(device_, result.memory, 0, size, 0, &result.mapped);
+        if (mapRes != VK_SUCCESS) {
+            pfn_vkFreeMemory(device_, result.memory, nullptr);
+            pfn_vkDestroyBuffer(device_, result.buffer, nullptr);
+            result.buffer = VK_NULL_HANDLE;
+            return result;
+        }
     }
 
     return result;

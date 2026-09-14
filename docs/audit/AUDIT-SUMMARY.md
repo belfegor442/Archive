@@ -1,95 +1,92 @@
 # Monix Technical Audit — Executive Summary
 
 **Date:** September 14, 2026
-**Repository:** Monix-31ago-stable (HEAD: 44e9941)
+**Repository:** Monix-31ago-stable (HEAD: 2f054f7 → pending commit)
 
 ---
 
-## Audit Documents Created
+## Audit Documents
 
-| # | Document | Focus |
-|---|----------|-------|
-| 1 | REPOSITORY-INVENTORY.md | Full file inventory (482 .cpp, 499 .hpp, 48 shaders, dual build) |
-| 2 | CURRENT-FINDINGS.md | 30 findings (4 CRITICAL, 6 HIGH, 9 MEDIUM) |
-| 3 | BUILD-AUDIT.md | CMake analysis (broken, build.ps1 authoritative) |
-| 4 | VULKAN-OWNERSHIP.md | Vulkan lifecycle (6 CRITICAL, resource leak on init failure) |
-| 5 | THREADING-MODEL.md | Concurrency (8 threads, 13 data races) |
-| 6 | ARCHITECTURE.md | Structure + 10-phase extraction plan |
-| 7 | MONIXAPP-RESPONSIBILITIES.md | Class map (67 members, 65 methods) |
-| 8 | TEST-AUDIT.md | Test system (tests linked into production) |
-| 9 | AUDIT-SUMMARY.md | This document |
+| # | Document | Status |
+|---|----------|--------|
+| 1 | REPOSITORY-INVENTORY.md | Updated with accurate counts |
+| 2 | CURRENT-FINDINGS.md | Current findings with severity |
+| 3 | BUILD-AUDIT.md | CMake + build.ps1 analysis |
+| 4 | VULKAN-OWNERSHIP.md | Resource lifecycle analysis |
+| 5 | THREADING-MODEL.md | Concurrency audit |
+| 6 | ARCHITECTURE.md | Structure + extraction plan |
+| 7 | MONIXAPP-RESPONSIBILITIES.md | Class map |
+| 8 | TEST-AUDIT.md | Test system analysis |
+| 9 | VALIDATION-REPORT.md | Build/test verification |
+| 10 | AUDIT-SUMMARY.md | This document |
 
 **Location:** `docs/audit/`
 
 ---
 
-## Fixes Already Applied (Remote Commits 316ea2d → 44e9941)
+## All Fixes Applied
 
-| # | Fix | Commit | Impact |
-|---|-----|--------|--------|
-| FIX-01 | Vulkan lifecycle cleanup on failed init | 316ea2d | CRITICAL |
-| FIX-02 | Validation mutex on count functions | 316ea2d | CRITICAL |
-| FIX-03 | Shader module timeout (shared_ptr) | 316ea2d | CRITICAL |
-| FIX-04 | ScramEngine thread safety | 316ea2d | HIGH |
-| FIX-05 | VK decomposition sources in CMake | 99f5f1a | HIGH |
-| FIX-06 | Collectors/SettingsRegistry paths | 99f5f1a | HIGH |
-| FIX-07 | wtsapi32.lib added | 99f5f1a | HIGH |
-| FIX-08 | Kernel test guard (MONIX_KERNEL_TEST_BUILD) | 99f5f1a | MEDIUM |
-| FIX-09 | hardware.c AF_INET include | 99f5f1a | MEDIUM |
-| FIX-10 | vulkan_renderer.h public for decomposition | 99f5f1a | MEDIUM |
-| FIX-11 | MASM excluded from C++ flags | 92c3e05 | MEDIUM |
-| FIX-12 | GLOB replaced with explicit source lists | 92c3e05 | MEDIUM |
-| FIX-13 | RAII wrappers for HFONT/HICON | 743b118 | HIGH |
-| FIX-14 | recursive_mutex → mutex | d7c0e2a | MEDIUM |
-| FIX-15 | 84 statics → VkFuncs struct | 1a9f79d | HIGH |
-| FIX-16 | ThreadHandle RAII for telemetry | 44e9941 | HIGH |
+### Remote Commits (316ea2d → 44e9941)
+| # | Fix | Impact |
+|---|-----|--------|
+| FIX-01 | Vulkan lifecycle cleanup on failed init | CRITICAL |
+| FIX-02 | Validation mutex on count functions | CRITICAL |
+| FIX-03 | Shader module timeout (shared_ptr) | CRITICAL |
+| FIX-04 | ScramEngine thread safety | HIGH |
+| FIX-05-12 | CMake build system fixes | HIGH/MEDIUM |
+| FIX-13 | RAII wrappers HFONT/HICON | HIGH |
+| FIX-14 | recursive_mutex → mutex | MEDIUM |
+| FIX-15 | 84 statics → VkFuncs struct | HIGH |
+| FIX-16 | ThreadHandle RAII for telemetry | HIGH |
 
-**Total:** 16 remote fixes (12 already in AUDIT-REPORT.md)
-
----
-
-## Fixes Applied This Session (FASE 7)
-
-Applied to main source files (not in Monix-2ago-unestable):
-
-| Fix | File(s) | Severity | Change |
-|-----|---------|----------|--------|
-| Idempotent shutdown | vulkan_renderer.cpp (both) | CRITICAL | Removed `!initialized_` guard |
-| DLL cleanup | src/native/vulkan_renderer.cpp | CRITICAL | `FreeLibrary(g_vkModule)` after instance destroy |
-| VkResult: BeginCommandBuffer | src/native/vulkan_renderer.cpp | HIGH | Return error + log |
-| VkResult: AllocateCommandBuffers | src/native/vulkan_renderer.cpp | HIGH | Return error |
-| VkResult: BindBufferMemory | src/native/vulkan_renderer.cpp | HIGH | Cleanup + return |
-| VkResult: MapMemory | src/native/vulkan_renderer.cpp | HIGH | Cleanup + return |
-| VkResult: QueueSubmit | src/native/vulkan_renderer.cpp | HIGH | Log error, abort frame |
-| VkResult: QueuePresentKHR | src/native/vulkan_renderer.cpp | MEDIUM | Log error |
-| VkResult: EndCommandBuffer | src/native/vulkan_renderer.cpp | MEDIUM | Cleanup + return |
+### Session Fixes (2f054f7)
+| Fix | Files | Impact |
+|-----|-------|--------|
+| Idempotent shutdown | vulkan_renderer.cpp (both) | CRITICAL |
+| DLL cleanup | src/native/vulkan_renderer.cpp | CRITICAL |
+| VkResult checks (11 calls) | src/native/vulkan_renderer.cpp | HIGH |
+| /w → /W4 | CMakeLists.txt (both) | MEDIUM |
+| /external:anglebrackets | CMakeLists.txt (both) | MEDIUM |
 
 ---
 
-## Remaining Issues
+## Current Status
 
-### CRITICAL
-- **CF-004:** CMakeLists.txt still references non-existent files (Draw.cpp, Telemetry.cpp, Input.cpp) in `Monix-2ago-unestable/`
-- **CF-005:** Production binary contains test code (low risk)
-
-### HIGH
-- Dual code tree (`src/` vs `Monix/Monix/`) — decision needed
-- God Object (MonixApp) — 67 members, needs extraction
-- Data races in PollNativeSnapshot, PushLog, FlushLogQueues (not yet fixed)
-
-### MEDIUM
-- No test framework
-- Missing header tracking in CMake
-- Redundant compile definitions
+| Area | Status |
+|------|--------|
+| Build | Needs verification (no MSVC on audit machine) |
+| Tests | Needs verification |
+| Vulkan lifecycle | Fixed (idempotent shutdown + DLL cleanup) |
+| Vulkan error handling | Fixed (11 VkResult checks) |
+| Validation mutex | Fixed (all count functions locked) |
+| Warning level | Fixed (/w → /W4 with external header suppression) |
+| Architecture | Documented, extraction plan ready |
+| Threading | Documented, data races identified |
+| Tests | Documented, separation needed |
 
 ---
 
-## Next Steps
+## Remaining Work
 
-1. **Verify build** on dev machine with MSVC 2022
-2. **Push remaining fixes** to GitHub
-3. **Merge dual trees** into single `Monix/Monix/src/native/`
-4. **Fix CMakeLists.txt** to match build.ps1
-5. **Extract MonixApp** responsibilities (see ARCHITECTURE.md)
-6. **Add test framework** and move tests out of production binary
-7. **Fix remaining data races** (threading audit)
+### P1 (High Priority)
+- Test runner separation (tests linked into production)
+- Config snapshot safety (GetConfigSnapshot)
+- Remaining data races (PollNativeSnapshot, PushLog, FlushLogQueues)
+
+### P2 (Medium Priority)
+- MonixApp decomposition (10-phase plan in ARCHITECTURE.md)
+- Dual tree merge (src/ → Monix/Monix/)
+- Test framework adoption
+- CMakeLists.txt completion
+
+### P3 (Low Priority)
+- Naming consistency
+- Dead code removal
+- Documentation improvements
+
+---
+
+## Archive Status
+
+- **Target:** https://github.com/belfegor442/Archive
+- **Status:** Pending push

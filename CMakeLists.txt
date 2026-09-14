@@ -152,10 +152,13 @@ target_link_libraries(monix PRIVATE
 
 # MSVC-specific flags matching build.ps1
 target_compile_options(monix PRIVATE
-    /MT /Zm800 /bigobj /EHsc /utf-8 /w
+    /MT /Zm800 /bigobj /EHsc /utf-8 /W4
+    /external:anglebrackets /external:W0
 )
 target_compile_options(monix_core PRIVATE
-    /MT /EHsc /utf-8 /w /DWIN32_LEAN_AND_MEAN /DMONIX_KERNEL_BUILD
+    /MT /EHsc /utf-8 /W4
+    /external:anglebrackets /external:W0
+    /DWIN32_LEAN_AND_MEAN /DMONIX_KERNEL_BUILD
 )
 
 # --- Test executable ---
@@ -180,4 +183,4 @@ target_compile_definitions(monix_tests PRIVATE
     MONIX_KERNEL_BUILD
     UNICODE _UNICODE
 )
-target_compile_options(monix_tests PRIVATE /MT /EHsc /utf-8 /w)
+target_compile_options(monix_tests PRIVATE /MT /EHsc /utf-8 /W4)
