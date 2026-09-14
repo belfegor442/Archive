@@ -31,4 +31,11 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo === Build successful! ===
-echo Binary: build\bin\archive.exe
+echo CLI:     build\bin\archive-cli.exe
+echo GUI:     build\bin\archive.exe (requires Qt6)
+echo Tests:   build\bin\archive_tests.exe
+echo.
+echo Quick start:
+echo   build\bin\archive-cli.exe --help
+echo   build\bin\archive-cli.exe import C:\path\to\folder
+echo   build\bin\archive-cli.exe list

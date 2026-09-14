@@ -71,6 +71,7 @@ set(ARCHIVE_LIB_SOURCES
     src/services/TagService.cpp
     src/services/UpdateService.cpp
     src/core/utils/Logger.cpp
+    src/app/AppConfig.cpp
 )
 
 # Static library for all core code
@@ -92,6 +93,11 @@ target_link_directories(archive_lib PUBLIC
     ${OPENSSL_LIBRARY_DIRS}
 )
 
+# CLI executable (no Qt dependency)
+add_executable(archive-cli src/cli/main.cpp)
+target_link_libraries(archive-cli PRIVATE archive_lib)
+target_include_directories(archive-cli PRIVATE ${CMAKE_SOURCE_DIR}/src)
+
 # Qt6 (optional — UI requires Qt6)
 find_package(Qt6 QUIET COMPONENTS Widgets)
 if(Qt6_FOUND)
@@ -100,7 +106,6 @@ if(Qt6_FOUND)
     set(CMAKE_AUTOUIC ON)
 
     set(ARCHIVE_UI_SOURCES
-        src/app/AppConfig.cpp
         src/app/Application.cpp
         src/ui/MainWindow.cpp
         src/ui/SidebarWidget.cpp
@@ -124,11 +129,12 @@ if(Qt6_FOUND)
         ${CMAKE_SOURCE_DIR}/src
     )
 
-    # Install targets
     include(GNUInstallDirs)
-    install(TARGETS archive RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(TARGETS archive archive-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 else()
-    message(STATUS "Qt6 not found — skipping UI build (core library still built)")
+    message(STATUS "Qt6 not found — skipping UI build (CLI and core library still built)")
+    include(GNUInstallDirs)
+    install(TARGETS archive-cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 # Tests
