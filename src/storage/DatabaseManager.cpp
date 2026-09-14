@@ -147,7 +147,8 @@ void DatabaseManager::create_schema() {
             checksum TEXT DEFAULT '',
             size INTEGER NOT NULL DEFAULT 0,
             notes TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(item_id, version_number)
         )
     )");
 
@@ -179,7 +180,8 @@ void DatabaseManager::create_schema() {
             storage_path TEXT NOT NULL,
             size INTEGER NOT NULL DEFAULT 0,
             checksum TEXT DEFAULT '',
-            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(version_id)
         )
     )");
 

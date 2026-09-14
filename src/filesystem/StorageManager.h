@@ -5,6 +5,8 @@
 
 #include "../storage/DatabaseManager.h"
 #include "../core/models/ArchiveItem.h"
+#include "StagingManager.h"
+#include "FilesystemTracker.h"
 
 namespace archive::filesystem {
 
@@ -29,9 +31,13 @@ public:
     bool item_dir_exists(const std::string& item_id) const;
     bool version_file_exists(const std::string& item_id, int version) const;
 
+    StagingManager& staging() { return staging_; }
+    const StagingManager& staging() const { return staging_; }
+
 private:
     std::string base_dir_;
     std::string items_dir_;
+    StagingManager staging_;
 };
 
 } // namespace archive::filesystem

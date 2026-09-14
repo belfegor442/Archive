@@ -9,6 +9,7 @@ namespace archive::filesystem {
 StorageManager::StorageManager(const std::string& base_dir, const std::string& items_dir)
     : base_dir_(base_dir)
     , items_dir_(items_dir)
+    , staging_(base_dir)
 {}
 
 std::string StorageManager::create_item_dir(const std::string& item_id) {
@@ -30,7 +31,8 @@ std::string StorageManager::store_file_in_dir(const std::string& item_id,
     std::string dest_dir = get_item_file_dir(item_id);
     std::string dest_path = dest_dir + "/" + relative_path;
     std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
-    return FileUtils::copy_file_safe(source_path, std::filesystem::path(dest_path).parent_path().string());
+    FileUtils::copy_file(source_path, dest_path);
+    return dest_path;
 }
 
 std::string StorageManager::store_version(const std::string& item_id, int version,
@@ -38,12 +40,9 @@ std::string StorageManager::store_version(const std::string& item_id, int versio
     std::string versions_dir = get_item_versions_dir(item_id);
     std::string ext = FileUtils::extension(source_path);
     std::string name = "v" + std::to_string(version);
-    std::string candidate = versions_dir + "/" + name + ext;
-    if (!std::filesystem::exists(candidate)) {
-        FileUtils::copy_file(source_path, candidate);
-        return candidate;
-    }
-    return FileUtils::copy_file_safe(source_path, versions_dir);
+    std::string dest = versions_dir + "/" + name + ext;
+    FileUtils::copy_file(source_path, dest);
+    return dest;
 }
 
 std::string StorageManager::store_folder(const std::string& item_id, const std::string& source_dir) {

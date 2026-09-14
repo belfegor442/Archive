@@ -24,13 +24,6 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(SQLITE3 REQUIRED sqlite3)
 pkg_check_modules(OPENSSL REQUIRED openssl)
 
-# Qt6
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
-
-set(CMAKE_AUTOMOC ON)
-set(CMAKE_AUTORCC ON)
-set(CMAKE_AUTOUIC ON)
-
 # Common sources (core library — no Qt)
 set(ARCHIVE_LIB_SOURCES
     src/core/models/ArchiveItem.cpp
@@ -51,6 +44,8 @@ set(ARCHIVE_LIB_SOURCES
     src/hashing/FileHasher.cpp
     src/filesystem/FileUtils.cpp
     src/filesystem/StorageManager.cpp
+    src/filesystem/FilesystemTracker.cpp
+    src/filesystem/StagingManager.cpp
     src/services/ProjectDetector.cpp
     src/services/ImportService.cpp
     src/services/SearchService.cpp
@@ -83,31 +78,40 @@ target_link_directories(archive_lib PUBLIC
     ${OPENSSL_LIBRARY_DIRS}
 )
 
-# Qt6 UI sources + app bootstrap
-set(ARCHIVE_UI_SOURCES
-    src/app/AppConfig.cpp
-    src/app/Application.cpp
-    src/ui/MainWindow.cpp
-    src/ui/SidebarWidget.cpp
-    src/ui/DashboardWidget.cpp
-    src/ui/ItemsListWidget.cpp
-    src/ui/ItemDetailWidget.cpp
-    src/ui/ImportDialog.cpp
-)
+# Qt6 (optional for tests)
+find_package(Qt6 QUIET COMPONENTS Widgets)
+if(Qt6_FOUND)
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+    set(CMAKE_AUTOUIC ON)
 
-add_executable(archive
-    src/main.cpp
-    ${ARCHIVE_UI_SOURCES}
-)
+    set(ARCHIVE_UI_SOURCES
+        src/app/AppConfig.cpp
+        src/app/Application.cpp
+        src/ui/MainWindow.cpp
+        src/ui/SidebarWidget.cpp
+        src/ui/DashboardWidget.cpp
+        src/ui/ItemsListWidget.cpp
+        src/ui/ItemDetailWidget.cpp
+        src/ui/ImportDialog.cpp
+    )
 
-target_link_libraries(archive PRIVATE
-    archive_lib
-    Qt6::Widgets
-)
+    add_executable(archive
+        src/main.cpp
+        ${ARCHIVE_UI_SOURCES}
+    )
 
-target_include_directories(archive PRIVATE
-    ${CMAKE_SOURCE_DIR}/src
-)
+    target_link_libraries(archive PRIVATE
+        archive_lib
+        Qt6::Widgets
+    )
+
+    target_include_directories(archive PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+    )
+else()
+    message(STATUS "Qt6 not found — skipping UI build")
+endif()
 
 # Tests
 option(ARCHIVE_BUILD_TESTS "Build tests" ON)
