@@ -1162,6 +1162,8 @@ MonixApp::~MonixApp() {
   FlushLogQueues(true);
   ShutdownOpenGlBootstrap();
   DestroyUiFonts();
+  win98Fonts_.Destroy();
+  win98Assets_.Clear();
   largeIcon_.reset();
   smallIcon_.reset();
   if (privateFontLoaded_) {
