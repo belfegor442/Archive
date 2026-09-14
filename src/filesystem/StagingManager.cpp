@@ -6,6 +6,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <cstdio>
 
 namespace archive::filesystem {
 
@@ -51,30 +52,35 @@ std::string json_unescape(const std::string& s, size_t& pos) {
                 case 'r':  out += '\r'; break;
                 case 't':  out += '\t'; break;
                 case 'u': {
-                    if (pos + 4 < s.size()) {
-                        std::string hex = s.substr(pos + 1, 4);
-                        unsigned int cp = 0;
-                        for (char h : hex) {
-                            cp <<= 4;
-                            if (h >= '0' && h <= '9') cp += h - '0';
-                            else if (h >= 'a' && h <= 'f') cp += 10 + h - 'a';
-                            else if (h >= 'A' && h <= 'F') cp += 10 + h - 'A';
-                        }
-                        if (cp < 0x80) {
-                            out += static_cast<char>(cp);
-                        } else if (cp < 0x800) {
-                            out += static_cast<char>(0xC0 | (cp >> 6));
-                            out += static_cast<char>(0x80 | (cp & 0x3F));
-                        } else {
-                            out += static_cast<char>(0xE0 | (cp >> 12));
-                            out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
-                            out += static_cast<char>(0x80 | (cp & 0x3F));
-                        }
-                        pos += 4;
+                    if (pos + 4 >= s.size()) {
+                        throw std::runtime_error("Journal parse error: incomplete \\u escape at position " + std::to_string(pos - 1));
                     }
+                    unsigned int cp = 0;
+                    for (int i = 1; i <= 4; i++) {
+                        char h = s[pos + i];
+                        cp <<= 4;
+                        if (h >= '0' && h <= '9') cp += h - '0';
+                        else if (h >= 'a' && h <= 'f') cp += 10 + h - 'a';
+                        else if (h >= 'A' && h <= 'F') cp += 10 + h - 'A';
+                        else {
+                            throw std::runtime_error("Journal parse error: invalid hex digit '" + std::string(1, h) + "' in \\u escape at position " + std::to_string(pos + i));
+                        }
+                    }
+                    if (cp < 0x80) {
+                        out += static_cast<char>(cp);
+                    } else if (cp < 0x800) {
+                        out += static_cast<char>(0xC0 | (cp >> 6));
+                        out += static_cast<char>(0x80 | (cp & 0x3F));
+                    } else {
+                        out += static_cast<char>(0xE0 | (cp >> 12));
+                        out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+                        out += static_cast<char>(0x80 | (cp & 0x3F));
+                    }
+                    pos += 4;
                     break;
                 }
-                default: out += s[pos]; break;
+                default:
+                    throw std::runtime_error("Journal parse error: invalid escape sequence '\\" + std::string(1, s[pos]) + "' at position " + std::to_string(pos - 1));
             }
         } else {
             out += s[pos];
@@ -540,6 +546,9 @@ std::vector<BackupEntry> StagingManager::read_backup_journal(const std::string& 
 
         if (be.destination.empty()) {
             throw std::runtime_error("Journal parse error: entry missing required 'destination' field");
+        }
+        if (be.backup_path.empty()) {
+            throw std::runtime_error("Journal parse error: entry missing required 'backup_path' field");
         }
 
         entries.push_back(std::move(be));
