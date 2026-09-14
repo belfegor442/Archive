@@ -129,6 +129,7 @@ static std::string TrimQuoted(const std::string& s) {
 
 
 #include "runtime_state.h"
+#include "Win32RAII.hpp"
 
 
 struct OpenGlState {
@@ -847,14 +848,14 @@ private:
   int VisibleTaskRows(const RECT& tableRect) const;
 
   HWND hwnd_ = nullptr;
-  HICON largeIcon_ = nullptr;
-  HICON smallIcon_ = nullptr;
-  HFONT tabFont_ = nullptr;
-  HFONT bodyFont_ = nullptr;
-  HFONT smallFont_ = nullptr;
-  HFONT titleFont_ = nullptr;
-  HFONT logFont_ = nullptr;
-  HFONT logoFont_ = nullptr;
+  winraii::GdiIcon largeIcon_;
+  winraii::GdiIcon smallIcon_;
+  winraii::GdiFont tabFont_;
+  winraii::GdiFont bodyFont_;
+  winraii::GdiFont smallFont_;
+  winraii::GdiFont titleFont_;
+  winraii::GdiFont logFont_;
+  winraii::GdiFont logoFont_;
   int bodyLineHeight_ = 32;
   int smallLineHeight_ = 24;
   int logLineHeight_ = 28;
@@ -1154,12 +1155,8 @@ MonixApp::~MonixApp() {
   FlushLogQueues(true);
   ShutdownOpenGlBootstrap();
   DestroyUiFonts();
-  if (largeIcon_) {
-    DestroyIcon(largeIcon_);
-  }
-  if (smallIcon_) {
-    DestroyIcon(smallIcon_);
-  }
+  largeIcon_.reset();
+  smallIcon_.reset();
   if (privateFontLoaded_) {
     if (!paths_.fontList.empty() && state_.currentFontIndex < static_cast<int>(paths_.fontList.size())) {
       const auto& font = paths_.fontList[state_.currentFontIndex];
@@ -1959,18 +1956,12 @@ void MonixApp::CommitSettingMutation(const SettingMutation& mutation) {
 }
 
 void MonixApp::DestroyUiFonts() {
-  if (tabFont_) DeleteObject(tabFont_);
-  if (bodyFont_) DeleteObject(bodyFont_);
-  if (smallFont_) DeleteObject(smallFont_);
-  if (titleFont_) DeleteObject(titleFont_);
-  if (logFont_) DeleteObject(logFont_);
-  if (logoFont_) DeleteObject(logoFont_);
-  tabFont_ = nullptr;
-  bodyFont_ = nullptr;
-  smallFont_ = nullptr;
-  titleFont_ = nullptr;
-  logFont_ = nullptr;
-  logoFont_ = nullptr;
+  tabFont_.reset();
+  bodyFont_.reset();
+  smallFont_.reset();
+  titleFont_.reset();
+  logFont_.reset();
+  logoFont_.reset();
 }
 
 void MonixApp::MeasureFontMetrics() {
@@ -1983,10 +1974,10 @@ void MonixApp::MeasureFontMetrics() {
     return metrics.tmHeight + metrics.tmExternalLeading;
   };
 
-  if (bodyFont_) bodyLineHeight_ = measure(bodyFont_);
-  if (smallFont_) smallLineHeight_ = measure(smallFont_);
-  if (logFont_) logLineHeight_ = measure(logFont_);
-  if (logoFont_) logoLineHeight_ = measure(logoFont_);
+  if (bodyFont_) bodyLineHeight_ = measure(bodyFont_.get());
+  if (smallFont_) smallLineHeight_ = measure(smallFont_.get());
+  if (logFont_) logLineHeight_ = measure(logFont_.get());
+  if (logoFont_) logoLineHeight_ = measure(logoFont_.get());
   ReleaseDC(nullptr, screen);
 }
 
@@ -2002,12 +1993,12 @@ void MonixApp::CreateUiFonts() {
 
   const LONG fontCharset = DEFAULT_CHARSET;
   const DWORD quality = IsCoreMonitorThemeActive() ? NONANTIALIASED_QUALITY : ANTIALIASED_QUALITY;
-  tabFont_ = CreateFontW(-scale(30), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str());
-  bodyFont_ = CreateFontW(-scale(22), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str());
-  smallFont_ = CreateFontW(-scale(17), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str());
-  titleFont_ = CreateFontW(-scale(34), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str());
-  logFont_ = CreateFontW(-scale(18), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str());
-  logoFont_ = CreateFontW(-scale(20), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, OEM_CHARSET, OUT_RASTER_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, FIXED_PITCH | FF_MODERN, L"Terminal");
+  tabFont_.reset(CreateFontW(-scale(30), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str()));
+  bodyFont_.reset(CreateFontW(-scale(22), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str()));
+  smallFont_.reset(CreateFontW(-scale(17), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str()));
+  titleFont_.reset(CreateFontW(-scale(34), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str()));
+  logFont_.reset(CreateFontW(-scale(18), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, fontCharset, OUT_TT_PRECIS, CLIP_DEFAULT_PRECIS, quality, FIXED_PITCH | FF_MODERN, fontFace_.c_str()));
+  logoFont_.reset(CreateFontW(-scale(20), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE, OEM_CHARSET, OUT_RASTER_PRECIS, CLIP_DEFAULT_PRECIS, NONANTIALIASED_QUALITY, FIXED_PITCH | FF_MODERN, L"Terminal"));
 
   MeasureFontMetrics();
 }
@@ -2485,18 +2476,18 @@ bool MonixApp::CreateMainWindow(HINSTANCE instance, int showCommand) {
   wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
   wc.hbrBackground = reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
 
-  largeIcon_ = reinterpret_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(kMainIconResourceId), IMAGE_ICON, 256, 256, LR_DEFAULTCOLOR));
-  smallIcon_ = reinterpret_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(kMainIconResourceId), IMAGE_ICON, 48, 48, LR_DEFAULTCOLOR));
+  largeIcon_.reset(reinterpret_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(kMainIconResourceId), IMAGE_ICON, 256, 256, LR_DEFAULTCOLOR)));
+  smallIcon_.reset(reinterpret_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(kMainIconResourceId), IMAGE_ICON, 48, 48, LR_DEFAULTCOLOR)));
   if (std::filesystem::exists(paths_.iconFile)) {
     if (!largeIcon_) {
-      largeIcon_ = reinterpret_cast<HICON>(LoadImageW(nullptr, paths_.iconFile.c_str(), IMAGE_ICON, 256, 256, LR_LOADFROMFILE));
+      largeIcon_.reset(reinterpret_cast<HICON>(LoadImageW(nullptr, paths_.iconFile.c_str(), IMAGE_ICON, 256, 256, LR_LOADFROMFILE)));
     }
     if (!smallIcon_) {
-      smallIcon_ = reinterpret_cast<HICON>(LoadImageW(nullptr, paths_.iconFile.c_str(), IMAGE_ICON, 48, 48, LR_LOADFROMFILE));
+      smallIcon_.reset(reinterpret_cast<HICON>(LoadImageW(nullptr, paths_.iconFile.c_str(), IMAGE_ICON, 48, 48, LR_LOADFROMFILE)));
     }
   }
-  wc.hIcon = largeIcon_;
-  wc.hIconSm = smallIcon_;
+  wc.hIcon = largeIcon_.get();
+  wc.hIconSm = smallIcon_.get();
 
   if (!RegisterClassExW(&wc)) {
     return false;
@@ -8907,7 +8898,7 @@ void MonixApp::DrawTabs(HDC dc, const RECT& clientRect) {
     const bool active = state_.activeTab == tab;
     FillSolid(dc, rect, active ? RGB(22, 86, 38) : RGB(8, 12, 8));
     DrawRectOutline(dc, rect, active ? ResolveColor(ColorRole::Primary) : ResolveColor(ColorRole::Accent));
-    DrawTextRect(dc, rect, labels[i], active ? ColorRole::White : ColorRole::Primary, tabFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, rect, labels[i], active ? ColorRole::White : ColorRole::Primary, tabFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   }
 
   RECT badge {
@@ -8919,7 +8910,7 @@ void MonixApp::DrawTabs(HDC dc, const RECT& clientRect) {
   FillSolid(dc, badge, RGB(8, 12, 8));
   DrawRectOutline(dc, badge, ResolveColor(ColorRole::Accent));
   const std::wstring badgeText = L"MONIX CORE 3.0 :: " + state_.snapshot.host;
-  DrawTextRect(dc, badge, badgeText, ColorRole::Primary, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, badge, badgeText, ColorRole::Primary, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 }
 
 void MonixApp::DrawFooter(HDC dc, const RECT& clientRect) {
@@ -8938,7 +8929,7 @@ void MonixApp::DrawFooter(HDC dc, const RECT& clientRect) {
     + shaderName + L" | "
     L"View " + LogViewModeText(config_.logViewMode) + L" | "
     L"F1 debug | F2 cache | F3 feedback | F4 textures | F5 reload | F6 JSON | F7 CSV | F8 triage | F9 font | F10 shot | F11 demo";
-  DrawTextRect(dc, RECT { footer.left + 12, footer.top + 2, footer.right - 12, footer.bottom }, footerText, ColorRole::Dim, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { footer.left + 12, footer.top + 2, footer.right - 12, footer.bottom }, footerText, ColorRole::Dim, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 }
 
 void MonixApp::DrawToast(HDC dc, const RECT& clientRect) {
@@ -8954,7 +8945,7 @@ void MonixApp::DrawToast(HDC dc, const RECT& clientRect) {
   };
   FillSolid(dc, toast, RGB(10, 16, 10));
   DrawRectOutline(dc, toast, ResolveColor(ColorRole::UserInput));
-  DrawTextRect(dc, RECT { toast.left + 10, toast.top + 2, toast.right - 10, toast.bottom }, state_.toastMessage, ColorRole::UserInput, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { toast.left + 10, toast.top + 2, toast.right - 10, toast.bottom }, state_.toastMessage, ColorRole::UserInput, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 }
 
 void MonixApp::DrawClickDebug(HDC dc, const RECT& clientRect) {
@@ -9005,7 +8996,7 @@ void MonixApp::DrawClickDebug(HDC dc, const RECT& clientRect) {
     DeleteObject(hitBrush);
   }
 
-  HFONT oldFont = static_cast<HFONT>(SelectObject(dc, smallFont_));
+  HFONT oldFont = static_cast<HFONT>(SelectObject(dc, smallFont_.get()));
   SetBkMode(dc, OPAQUE);
   SetBkColor(dc, RGB(0, 0, 0));
   SetTextColor(dc, RGB(255, 255, 255));
@@ -9041,8 +9032,8 @@ void MonixApp::DrawNotifications(HDC dc, const RECT& clientRect) {
     };
     FillSolid(dc, card, RGB(10, 14, 10));
     DrawRectOutline(dc, card, ResolveColor(item.color));
-    DrawTextRect(dc, RECT { card.left + 12, card.top + 8, card.right - 12, card.top + 28 }, item.title, item.color, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
-    DrawTextRect(dc, RECT { card.left + 12, card.top + 28, card.right - 12, card.bottom - 8 }, item.message, ColorRole::White, smallFont_, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+    DrawTextRect(dc, RECT { card.left + 12, card.top + 8, card.right - 12, card.top + 28 }, item.title, item.color, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+    DrawTextRect(dc, RECT { card.left + 12, card.top + 28, card.right - 12, card.bottom - 8 }, item.message, ColorRole::White, smallFont_.get(), DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
     y += kNotificationHeight + 10;
   }
 }
@@ -9072,10 +9063,10 @@ void MonixApp::DrawIntro(HDC dc, const RECT& clientRect) {
 
   if (state_.intro.settledAtMs != 0 && GetTickCount64() - state_.intro.settledAtMs >= config_.introCreditDelayMs) {
     const int creditY = state_.intro.logoY + logoHeight + 20 - state_.intro.creditOffset;
-    DrawTextRect(dc, RECT { clientRect.left, creditY, clientRect.right, creditY + smallLineHeight_ + 10 }, L"Created by: belfegor442", ColorRole::Dim, bodyFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, RECT { clientRect.left, creditY, clientRect.right, creditY + smallLineHeight_ + 10 }, L"Created by: belfegor442", ColorRole::Dim, bodyFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   }
 
-  DrawTextRect(dc, RECT { clientRect.left, clientRect.bottom - 140, clientRect.right, clientRect.bottom - 88 }, L"Booting native telemetry, S.C.R.A.M watcher and kernel probes...", ColorRole::Dim, bodyFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { clientRect.left, clientRect.bottom - 140, clientRect.right, clientRect.bottom - 88 }, L"Booting native telemetry, S.C.R.A.M watcher and kernel probes...", ColorRole::Dim, bodyFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 }
 
 bool MonixApp::IsCoreMonitorThemeActive() const {
@@ -9093,10 +9084,10 @@ void MonixApp::RenderCoreMonitorTheme(HDC dc, const RECT& clientRect) {
   ctx.netHistory = &state_.netHistory;
   ctx.netUploadHistory = &state_.netUploadHistory;
   ctx.config = config_;
-  ctx.fonts.title = titleFont_;
-  ctx.fonts.body = bodyFont_;
-  ctx.fonts.smallText = smallFont_;
-  ctx.fonts.logText = logFont_;
+  ctx.fonts.title = titleFont_.get();
+  ctx.fonts.body = bodyFont_.get();
+  ctx.fonts.smallText = smallFont_.get();
+  ctx.fonts.logText = logFont_.get();
   ctx.fonts.bodyLineHeight = bodyLineHeight_;
   ctx.fonts.smallLineHeight = smallLineHeight_;
   ctx.fonts.logLineHeight = logLineHeight_;
@@ -9119,7 +9110,7 @@ void MonixApp::Render(HDC dc, const RECT& clientRect) {
   if (!state_.loggedIn) {
     kernel_.Update();
     if (!kernel_.IsRunning()) {
-      kernelDisplay_.Draw(dc, clientRect, kernel_, bodyFont_, smallFont_, dpiScale_);
+      kernelDisplay_.Draw(dc, clientRect, kernel_, bodyFont_.get(), smallFont_.get(), dpiScale_);
       DrawToast(dc, clientRect);
       DrawClickDebug(dc, clientRect);
       return;
@@ -9289,7 +9280,7 @@ void MonixApp::DrawLogToolbar(HDC dc, const RECT& clientRect) {
   auto drawBtn = [&](RECT btn, const std::wstring& label, ColorRole accent) {
     FillSolid(dc, btn, RGB(8, 12, 8));
     DrawRectOutline(dc, btn, ResolveColor(accent));
-    DrawTextRect(dc, btn, label, accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, btn, label, accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   };
 
   drawBtn(r.clear, L"CLEAR", ColorRole::White);
@@ -9327,7 +9318,7 @@ void MonixApp::DrawLogFilterBadges(HDC dc, const RECT& clientRect) {
     DrawRectOutline(dc, rects[i], active ? ResolveColor(colors[i]) : ResolveColor(ColorRole::Accent));
     std::wstring text = labels[i] + L": " + std::to_wstring(counts[i]);
     RECT textRect = { rects[i].left + 4, rects[i].top, rects[i].right - 4, rects[i].bottom };
-    DrawTextRect(dc, textRect, text, active ? colors[i] : ColorRole::Dim, smallFont_,
+    DrawTextRect(dc, textRect, text, active ? colors[i] : ColorRole::Dim, smallFont_.get(),
       DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   }
 }
@@ -9345,17 +9336,17 @@ void MonixApp::DrawLogColumnHeaders(HDC dc, const RECT& logArea) {
   const int contentW = totalW - timeW - catW - subcatW;
 
   int x = header.left + 10;
-  DrawTextRect(dc, { x, header.top, x + timeW, header.bottom }, L"TIME", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, { x, header.top, x + timeW, header.bottom }, L"TIME", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   x += timeW;
-  DrawTextRect(dc, { x, header.top, x + catW, header.bottom }, L"CATEGORY", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, { x, header.top, x + catW, header.bottom }, L"CATEGORY", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   x += catW;
-  DrawTextRect(dc, { x, header.top, x + subcatW, header.bottom }, L"SUB-CATEGORY", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, { x, header.top, x + subcatW, header.bottom }, L"SUB-CATEGORY", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   x += subcatW;
-  DrawTextRect(dc, { x, header.top, header.right - 10, header.bottom }, L"CONTENT", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, { x, header.top, header.right - 10, header.bottom }, L"CONTENT", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 }
 
 void MonixApp::DrawLogSidebar(HDC dc, const RECT& sidebarRect) {
-  DrawPanel(dc, sidebarRect, L"STATUS", ColorRole::Primary, smallFont_);
+  DrawPanel(dc, sidebarRect, L"STATUS", ColorRole::Primary, smallFont_.get());
 
   const int chartH = 150;
   RECT chartRect = { sidebarRect.left + 14, sidebarRect.top + 46, sidebarRect.right - 14, sidebarRect.top + 46 + chartH };
@@ -9394,7 +9385,7 @@ void MonixApp::DrawLogSidebar(HDC dc, const RECT& sidebarRect) {
     FillRect(dc, &dot, br);
     DeleteObject(br);
     RECT lr = { x + 10, legendRect.top, x + 50, legendRect.bottom };
-    DrawTextRect(dc, lr, label, ColorRole::Dim, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, lr, label, ColorRole::Dim, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   };
   int lx = legendRect.left;
   drawDot(lx, L"WARN", ColorRole::Warning);   lx += dotSpacing;
@@ -9410,16 +9401,16 @@ void MonixApp::DrawLogSidebar(HDC dc, const RECT& sidebarRect) {
   RECT cTitle = counterPanel;
   cTitle.bottom = cTitle.top + 30;
   FillSolid(dc, cTitle, RGB(10, 14, 10));
-  DrawTextRect(dc, cTitle, L"COUNTER", ColorRole::Engine, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, cTitle, L"COUNTER", ColorRole::Engine, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   const int rowH = 28;
   int y = cTitle.bottom + 6;
   auto drawCounter = [&](const std::wstring& label, int value, ColorRole color) {
     if (y + rowH > counterPanel.bottom) return;
     RECT row = { counterPanel.left + 8, y, counterPanel.right - 8, y + rowH };
-    DrawTextRect(dc, row, label, ColorRole::Dim, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, row, label, ColorRole::Dim, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     RECT valRect = { counterPanel.right - 70, y, counterPanel.right - 8, y + rowH };
-    DrawTextRect(dc, valRect, std::to_wstring(value), color, smallFont_, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, valRect, std::to_wstring(value), color, smallFont_.get(), DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     y += rowH;
   };
 
@@ -9432,7 +9423,7 @@ void MonixApp::DrawLogSidebar(HDC dc, const RECT& sidebarRect) {
 
 void MonixApp::DrawLogView(HDC dc, const RECT& clientRect) {
   const RECT outer = ContentRect(clientRect);
-  DrawPanel(dc, outer, L"LOG CORE", ColorRole::Engine, smallFont_);
+  DrawPanel(dc, outer, L"LOG CORE", ColorRole::Engine, smallFont_.get());
 
   const std::wstring counterText =
     L"TOTAL " + std::to_wstring(CountFilteredLogs()) +
@@ -9440,7 +9431,7 @@ void MonixApp::DrawLogView(HDC dc, const RECT& clientRect) {
     L" | WARN " + std::to_wstring(state_.counters.warnings) +
     L" | ERROR " + std::to_wstring(state_.counters.errors) +
     L" | CRIT " + std::to_wstring(state_.counters.critical);
-  DrawTextRect(dc, RECT { outer.left + 220, outer.top + 10, outer.right - 18, outer.top + 38 }, counterText, ColorRole::Dim, smallFont_, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { outer.left + 220, outer.top + 10, outer.right - 18, outer.top + 38 }, counterText, ColorRole::Dim, smallFont_.get(), DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   DrawLogToolbar(dc, clientRect);
   DrawLogFilterBadges(dc, clientRect);
@@ -9491,7 +9482,7 @@ void MonixApp::DrawLogView(HDC dc, const RECT& clientRect) {
   int y = listRect.top;
   if (filteredIndices.empty()) {
     DrawTextRect(dc, listRect, state_.logs.empty() ? L"Waiting for live telemetry logs..." : L"No logs match the current filter.",
-      ColorRole::Dim, bodyFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+      ColorRole::Dim, bodyFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     return;
   }
 
@@ -9513,13 +9504,13 @@ void MonixApp::DrawLogView(HDC dc, const RECT& clientRect) {
     if (entry.sessionId.size() > 4) {
       timeLabel += L" " + entry.sessionId.substr(entry.sessionId.size() - 4);
     }
-    DrawTextRect(dc, { x, y, x + timeW - 4, y + logLineHeight_ }, timeLabel, ColorRole::Dim, logFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, { x, y, x + timeW - 4, y + logLineHeight_ }, timeLabel, ColorRole::Dim, logFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     x += timeW;
-    DrawTextRect(dc, { x, y, x + catW - 4, y + logLineHeight_ }, L"[" + entry.domain + L"]", entry.color, logFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, { x, y, x + catW - 4, y + logLineHeight_ }, L"[" + entry.domain + L"]", entry.color, logFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     x += catW;
-    DrawTextRect(dc, { x, y, x + subcatW - 4, y + logLineHeight_ }, entry.severity, entry.color, logFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, { x, y, x + subcatW - 4, y + logLineHeight_ }, entry.severity, entry.color, logFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     x += subcatW;
-    DrawTextRect(dc, { x, y, listRect.right - 4, y + logLineHeight_ }, entry.message, entry.color, logFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
+    DrawTextRect(dc, { x, y, listRect.right - 4, y + logLineHeight_ }, entry.message, entry.color, logFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_END_ELLIPSIS);
 
     y += logLineHeight_ + 2;
   }
@@ -9532,8 +9523,8 @@ void MonixApp::DrawTasksView(HDC dc, const RECT& clientRect) {
   RECT detailPanel = outer;
   detailPanel.left = tablePanel.right + 14;
 
-  DrawPanel(dc, tablePanel, L"TASK SURFACE", ColorRole::Primary, smallFont_);
-  DrawPanel(dc, detailPanel, L"PROCESS INSPECTOR", ColorRole::Scram, smallFont_);
+  DrawPanel(dc, tablePanel, L"TASK SURFACE", ColorRole::Primary, smallFont_.get());
+  DrawPanel(dc, detailPanel, L"PROCESS INSPECTOR", ColorRole::Scram, smallFont_.get());
 
   RECT tableRect = ShrinkRect(tablePanel, 14);
   tableRect.top += 34;
@@ -9551,13 +9542,13 @@ void MonixApp::DrawTasksView(HDC dc, const RECT& clientRect) {
   const int gpuEnd = tableRect.left + static_cast<int>(width * 0.79);
   const int priEnd = tableRect.left + static_cast<int>(width * 0.89);
 
-  DrawTextRect(dc, RECT { tableRect.left + 10, header.top, nameEnd - 6, header.bottom }, L"PROCESS", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-  DrawTextRect(dc, RECT { nameEnd + 6, header.top, pidEnd - 6, header.bottom }, L"PID", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-  DrawTextRect(dc, RECT { pidEnd + 6, header.top, cpuEnd - 6, header.bottom }, L"CPU", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-  DrawTextRect(dc, RECT { cpuEnd + 6, header.top, ramEnd - 6, header.bottom }, L"RAM", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-  DrawTextRect(dc, RECT { ramEnd + 6, header.top, gpuEnd - 6, header.bottom }, L"GPU", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-  DrawTextRect(dc, RECT { gpuEnd + 6, header.top, priEnd - 6, header.bottom }, L"PRI", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-  DrawTextRect(dc, RECT { priEnd + 6, header.top, tableRect.right - 6, header.bottom }, L"STATE", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { tableRect.left + 10, header.top, nameEnd - 6, header.bottom }, L"PROCESS", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { nameEnd + 6, header.top, pidEnd - 6, header.bottom }, L"PID", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { pidEnd + 6, header.top, cpuEnd - 6, header.bottom }, L"CPU", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { cpuEnd + 6, header.top, ramEnd - 6, header.bottom }, L"RAM", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { ramEnd + 6, header.top, gpuEnd - 6, header.bottom }, L"GPU", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { gpuEnd + 6, header.top, priEnd - 6, header.bottom }, L"PRI", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { priEnd + 6, header.top, tableRect.right - 6, header.bottom }, L"STATE", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   const int rowHeight = std::max(38, bodyLineHeight_ + 14);
   const int visibleRows = VisibleTaskRows(tableRect);
@@ -9605,36 +9596,36 @@ void MonixApp::DrawTasksView(HDC dc, const RECT& clientRect) {
     FillSolid(dc, rowRect, selected ? RGB(18, 44, 20) : RGB(4, 12, 5));
     DrawRectOutline(dc, rowRect, tracked ? ResolveColor(ColorRole::Scram) : ResolveColor(ColorRole::Accent));
 
-    DrawTextLine(dc, rowRect.left + 10, rowRect.top + 7, nameEnd - rowRect.left - 16, process.name, ColorRole::White, bodyFont_);
-    DrawTextLine(dc, nameEnd + 6, rowRect.top + 7, pidEnd - nameEnd - 12, std::to_wstring(process.pid), ColorRole::Dim, bodyFont_);
-    DrawTextLine(dc, pidEnd + 6, rowRect.top + 7, cpuEnd - pidEnd - 12, FormatPercent(process.cpuPct), cpuColor(process), bodyFont_);
-    DrawTextLine(dc, cpuEnd + 6, rowRect.top + 7, ramEnd - cpuEnd - 12, FormatBytes(process.ramBytes), ramColor(process), bodyFont_);
-    DrawTextLine(dc, ramEnd + 6, rowRect.top + 7, gpuEnd - ramEnd - 12, FormatPercent(process.gpuPct), gpuColor(process), bodyFont_);
-    DrawTextLine(dc, gpuEnd + 6, rowRect.top + 7, priEnd - gpuEnd - 12, process.priority, ColorRole::Dim, bodyFont_);
-    DrawTextLine(dc, priEnd + 6, rowRect.top + 7, tableRect.right - priEnd - 12, process.status, tracked ? ColorRole::Scram : ColorRole::Primary, bodyFont_);
+    DrawTextLine(dc, rowRect.left + 10, rowRect.top + 7, nameEnd - rowRect.left - 16, process.name, ColorRole::White, bodyFont_.get());
+    DrawTextLine(dc, nameEnd + 6, rowRect.top + 7, pidEnd - nameEnd - 12, std::to_wstring(process.pid), ColorRole::Dim, bodyFont_.get());
+    DrawTextLine(dc, pidEnd + 6, rowRect.top + 7, cpuEnd - pidEnd - 12, FormatPercent(process.cpuPct), cpuColor(process), bodyFont_.get());
+    DrawTextLine(dc, cpuEnd + 6, rowRect.top + 7, ramEnd - cpuEnd - 12, FormatBytes(process.ramBytes), ramColor(process), bodyFont_.get());
+    DrawTextLine(dc, ramEnd + 6, rowRect.top + 7, gpuEnd - ramEnd - 12, FormatPercent(process.gpuPct), gpuColor(process), bodyFont_.get());
+    DrawTextLine(dc, gpuEnd + 6, rowRect.top + 7, priEnd - gpuEnd - 12, process.priority, ColorRole::Dim, bodyFont_.get());
+    DrawTextLine(dc, priEnd + 6, rowRect.top + 7, tableRect.right - priEnd - 12, process.status, tracked ? ColorRole::Scram : ColorRole::Primary, bodyFont_.get());
   }
 
   const int selectedIndex = std::clamp(state_.selectedTaskIndex, 0, std::max(0, static_cast<int>(state_.snapshot.processes.size()) - 1));
   const ProcessInfo* selected = state_.snapshot.processes.empty() ? nullptr : &state_.snapshot.processes[selectedIndex];
 
   if (selected) {
-    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 56, detailPanel.right - detailPanel.left - 36, L"Name: " + selected->name, ColorRole::White, bodyFont_);
-    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 96, detailPanel.right - detailPanel.left - 36, L"PID: " + std::to_wstring(selected->pid), ColorRole::Dim, bodyFont_);
-    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 136, detailPanel.right - detailPanel.left - 36, L"PPID: " + std::to_wstring(selected->parentPid) + L" | Session: " + std::to_wstring(selected->sessionId), ColorRole::Dim, bodyFont_);
-    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 176, detailPanel.right - detailPanel.left - 36, L"CPU: " + FormatPercent(selected->cpuPct), cpuColor(*selected), bodyFont_);
-    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 216, detailPanel.right - detailPanel.left - 36, L"RAM: " + FormatBytes(selected->ramBytes), ramColor(*selected), bodyFont_);
-    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 256, detailPanel.right - detailPanel.left - 36, L"GPU: " + FormatPercent(selected->gpuPct), gpuColor(*selected), bodyFont_);
-    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 296, detailPanel.right - detailPanel.left - 36, L"Priority: " + selected->priority + L" | " + selected->status, ColorRole::White, bodyFont_);
-    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 336, detailPanel.right - detailPanel.left - 36, L"GUID: " + selected->processGuid, ColorRole::Dim, smallFont_);
-    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 370, detailPanel.right - detailPanel.left - 36, L"Tracked in S.C.R.A.M: " + std::wstring(selected->pid == state_.trackedPid ? L"YES" : L"NO"), selected->pid == state_.trackedPid ? ColorRole::Scram : ColorRole::Dim, bodyFont_);
+    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 56, detailPanel.right - detailPanel.left - 36, L"Name: " + selected->name, ColorRole::White, bodyFont_.get());
+    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 96, detailPanel.right - detailPanel.left - 36, L"PID: " + std::to_wstring(selected->pid), ColorRole::Dim, bodyFont_.get());
+    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 136, detailPanel.right - detailPanel.left - 36, L"PPID: " + std::to_wstring(selected->parentPid) + L" | Session: " + std::to_wstring(selected->sessionId), ColorRole::Dim, bodyFont_.get());
+    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 176, detailPanel.right - detailPanel.left - 36, L"CPU: " + FormatPercent(selected->cpuPct), cpuColor(*selected), bodyFont_.get());
+    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 216, detailPanel.right - detailPanel.left - 36, L"RAM: " + FormatBytes(selected->ramBytes), ramColor(*selected), bodyFont_.get());
+    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 256, detailPanel.right - detailPanel.left - 36, L"GPU: " + FormatPercent(selected->gpuPct), gpuColor(*selected), bodyFont_.get());
+    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 296, detailPanel.right - detailPanel.left - 36, L"Priority: " + selected->priority + L" | " + selected->status, ColorRole::White, bodyFont_.get());
+    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 336, detailPanel.right - detailPanel.left - 36, L"GUID: " + selected->processGuid, ColorRole::Dim, smallFont_.get());
+    DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 370, detailPanel.right - detailPanel.left - 36, L"Tracked in S.C.R.A.M: " + std::wstring(selected->pid == state_.trackedPid ? L"YES" : L"NO"), selected->pid == state_.trackedPid ? ColorRole::Scram : ColorRole::Dim, bodyFont_.get());
   }
 
-  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 414, detailPanel.right - detailPanel.left - 36, L"Process count: " + std::to_wstring(state_.snapshot.processCount), ColorRole::Dim, smallFont_);
-  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 446, detailPanel.right - detailPanel.left - 36, L"Thread count: " + std::to_wstring(state_.snapshot.threadCount), ColorRole::Dim, smallFont_);
-  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 478, detailPanel.right - detailPanel.left - 36, L"Handles: " + std::to_wstring(state_.snapshot.handleCount), ColorRole::Dim, smallFont_);
-  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 510, detailPanel.right - detailPanel.left - 36, L"Queue length: " + std::to_wstring(state_.snapshot.processorQueueLength), ColorRole::Kernel, smallFont_);
+  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 414, detailPanel.right - detailPanel.left - 36, L"Process count: " + std::to_wstring(state_.snapshot.processCount), ColorRole::Dim, smallFont_.get());
+  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 446, detailPanel.right - detailPanel.left - 36, L"Thread count: " + std::to_wstring(state_.snapshot.threadCount), ColorRole::Dim, smallFont_.get());
+  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 478, detailPanel.right - detailPanel.left - 36, L"Handles: " + std::to_wstring(state_.snapshot.handleCount), ColorRole::Dim, smallFont_.get());
+  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 510, detailPanel.right - detailPanel.left - 36, L"Queue length: " + std::to_wstring(state_.snapshot.processorQueueLength), ColorRole::Kernel, smallFont_.get());
 
-  DrawTextRect(dc, RECT { detailPanel.left + 16, detailPanel.bottom - 170, detailPanel.right - 16, detailPanel.bottom - 20 }, L"Custom menu:\nInspect\nTrack in S.C.R.A.M\nCopy PID\nPriority HIGH\nPriority LOW\nRefresh snapshot\n\nRight click any row to open it.", ColorRole::Dim, smallFont_, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { detailPanel.left + 16, detailPanel.bottom - 170, detailPanel.right - 16, detailPanel.bottom - 20 }, L"Custom menu:\nInspect\nTrack in S.C.R.A.M\nCopy PID\nPriority HIGH\nPriority LOW\nRefresh snapshot\n\nRight click any row to open it.", ColorRole::Dim, smallFont_.get(), DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
 }
 
 void MonixApp::DrawHardwareView(HDC dc, const RECT& clientRect) {
@@ -9662,20 +9653,20 @@ void MonixApp::DrawHardwareView(HDC dc, const RECT& clientRect) {
   botRight.left = midLeft.right + 14;
   botRight.bottom = botRight.top + 160;
 
-  DrawPanel(dc, topPanel, L"HARDWARE OVERVIEW", ColorRole::Primary, smallFont_);
-  DrawPanel(dc, midLeft, L"CPU & THERMAL", ColorRole::Warning, smallFont_);
-  DrawPanel(dc, midRight, L"MEMORY", ColorRole::Thermal, smallFont_);
-  DrawPanel(dc, botLeft, L"STORAGE & DISK", ColorRole::Storage, smallFont_);
-  DrawPanel(dc, botRight, L"NETWORK ADAPTER", ColorRole::Network, smallFont_);
+  DrawPanel(dc, topPanel, L"HARDWARE OVERVIEW", ColorRole::Primary, smallFont_.get());
+  DrawPanel(dc, midLeft, L"CPU & THERMAL", ColorRole::Warning, smallFont_.get());
+  DrawPanel(dc, midRight, L"MEMORY", ColorRole::Thermal, smallFont_.get());
+  DrawPanel(dc, botLeft, L"STORAGE & DISK", ColorRole::Storage, smallFont_.get());
+  DrawPanel(dc, botRight, L"NETWORK ADAPTER", ColorRole::Network, smallFont_.get());
 
   RECT cpuBar { topPanel.left + 22, topPanel.top + 64, topPanel.right - 320, topPanel.top + 88 };
   RECT ramBar { topPanel.left + 22, topPanel.top + 112, topPanel.right - 320, topPanel.top + 136 };
   RECT gpuBar { topPanel.left + 22, topPanel.top + 160, topPanel.right - 320, topPanel.top + 184 };
-  DrawTextLine(dc, cpuBar.left, cpuBar.top - 24, 320, L"CPU  " + BuildBar(state_.snapshot.cpuPct) + L"  " + FormatPercent(state_.snapshot.cpuPct), ColorRole::Primary, bodyFont_);
+  DrawTextLine(dc, cpuBar.left, cpuBar.top - 24, 320, L"CPU  " + BuildBar(state_.snapshot.cpuPct) + L"  " + FormatPercent(state_.snapshot.cpuPct), ColorRole::Primary, bodyFont_.get());
   DrawProgressBar(dc, cpuBar, state_.snapshot.cpuPct, state_.snapshot.cpuPct >= 85.0 ? ColorRole::Warning : ColorRole::Success);
-  DrawTextLine(dc, ramBar.left, ramBar.top - 24, 320, L"RAM  " + BuildBar(ramPct) + L"  " + FormatPercent(ramPct), ColorRole::Primary, bodyFont_);
+  DrawTextLine(dc, ramBar.left, ramBar.top - 24, 320, L"RAM  " + BuildBar(ramPct) + L"  " + FormatPercent(ramPct), ColorRole::Primary, bodyFont_.get());
   DrawProgressBar(dc, ramBar, ramPct, ramPct >= 82.0 ? ColorRole::Warning : ColorRole::Success);
-  DrawTextLine(dc, gpuBar.left, gpuBar.top - 24, 320, L"GPU  " + BuildBar(state_.snapshot.gpuPct) + L"  " + FormatPercent(state_.snapshot.gpuPct), ColorRole::Primary, bodyFont_);
+  DrawTextLine(dc, gpuBar.left, gpuBar.top - 24, 320, L"GPU  " + BuildBar(state_.snapshot.gpuPct) + L"  " + FormatPercent(state_.snapshot.gpuPct), ColorRole::Primary, bodyFont_.get());
   DrawProgressBar(dc, gpuBar, state_.snapshot.gpuPct, state_.snapshot.gpuPct >= 85.0 ? ColorRole::Warning : ColorRole::Success);
 
   RECT cpuSpark { topPanel.right - 290, topPanel.top + 56, topPanel.right - 24, topPanel.top + 102 };
@@ -9687,25 +9678,25 @@ void MonixApp::DrawHardwareView(HDC dc, const RECT& clientRect) {
 
   DrawTextLine(dc, topPanel.left + 22, topPanel.top + 210, topPanel.right - topPanel.left - 44,
     L"Host: " + state_.snapshot.host + L"  |  Uptime: " + FormatDuration(state_.snapshot.uptimeSeconds),
-    ColorRole::Dim, smallFont_);
+    ColorRole::Dim, smallFont_.get());
 
-  DrawTextLine(dc, midLeft.left + 20, midLeft.top + 56, midLeft.right - midLeft.left - 40, L"CPU temp: " + FormatTemperature(state_.snapshot.cpuTempC, state_.snapshot.cpuTempEstimated), ColorRole::Warning, bodyFont_);
-  DrawTextLine(dc, midLeft.left + 20, midLeft.top + 96, midLeft.right - midLeft.left - 40, L"GPU temp: " + FormatTemperature(state_.snapshot.gpuTempC, state_.snapshot.gpuTempEstimated), ColorRole::Warning, bodyFont_);
-  DrawTextLine(dc, midLeft.left + 20, midLeft.top + 136, midLeft.right - midLeft.left - 40, L"Storage temp: " + FormatTemperature(state_.snapshot.storageTempC, state_.snapshot.storageTempEstimated), ColorRole::Warning, bodyFont_);
-  DrawTextLine(dc, midLeft.left + 20, midLeft.top + 176, midLeft.right - midLeft.left - 40, L"Queue: " + std::to_wstring(state_.snapshot.processorQueueLength) + L"  |  Ctx sw/s: " + std::to_wstring(state_.snapshot.contextSwitchesPerSec), ColorRole::Kernel, bodyFont_);
+  DrawTextLine(dc, midLeft.left + 20, midLeft.top + 56, midLeft.right - midLeft.left - 40, L"CPU temp: " + FormatTemperature(state_.snapshot.cpuTempC, state_.snapshot.cpuTempEstimated), ColorRole::Warning, bodyFont_.get());
+  DrawTextLine(dc, midLeft.left + 20, midLeft.top + 96, midLeft.right - midLeft.left - 40, L"GPU temp: " + FormatTemperature(state_.snapshot.gpuTempC, state_.snapshot.gpuTempEstimated), ColorRole::Warning, bodyFont_.get());
+  DrawTextLine(dc, midLeft.left + 20, midLeft.top + 136, midLeft.right - midLeft.left - 40, L"Storage temp: " + FormatTemperature(state_.snapshot.storageTempC, state_.snapshot.storageTempEstimated), ColorRole::Warning, bodyFont_.get());
+  DrawTextLine(dc, midLeft.left + 20, midLeft.top + 176, midLeft.right - midLeft.left - 40, L"Queue: " + std::to_wstring(state_.snapshot.processorQueueLength) + L"  |  Ctx sw/s: " + std::to_wstring(state_.snapshot.contextSwitchesPerSec), ColorRole::Kernel, bodyFont_.get());
 
-  DrawTextLine(dc, midRight.left + 20, midRight.top + 56, midRight.right - midRight.left - 40, L"Total: " + FormatBytes(state_.snapshot.ramTotalBytes), ColorRole::Primary, bodyFont_);
-  DrawTextLine(dc, midRight.left + 20, midRight.top + 96, midRight.right - midRight.left - 40, L"Used: " + FormatBytes(state_.snapshot.ramUsedBytes), ColorRole::Warning, bodyFont_);
-  DrawTextLine(dc, midRight.left + 20, midRight.top + 136, midRight.right - midRight.left - 40, L"Pagefile: " + FormatBytes(state_.snapshot.pageFileUsedBytes) + L" / " + FormatBytes(state_.snapshot.pageFileTotalBytes), ColorRole::Dim, bodyFont_);
-  DrawTextLine(dc, midRight.left + 20, midRight.top + 176, midRight.right - midRight.left - 40, L"IRPs/s: " + std::to_wstring(state_.snapshot.interruptsPerSec) + L"  |  Syscalls: " + std::to_wstring(state_.snapshot.systemCallsPerSec), ColorRole::Kernel, bodyFont_);
+  DrawTextLine(dc, midRight.left + 20, midRight.top + 56, midRight.right - midRight.left - 40, L"Total: " + FormatBytes(state_.snapshot.ramTotalBytes), ColorRole::Primary, bodyFont_.get());
+  DrawTextLine(dc, midRight.left + 20, midRight.top + 96, midRight.right - midRight.left - 40, L"Used: " + FormatBytes(state_.snapshot.ramUsedBytes), ColorRole::Warning, bodyFont_.get());
+  DrawTextLine(dc, midRight.left + 20, midRight.top + 136, midRight.right - midRight.left - 40, L"Pagefile: " + FormatBytes(state_.snapshot.pageFileUsedBytes) + L" / " + FormatBytes(state_.snapshot.pageFileTotalBytes), ColorRole::Dim, bodyFont_.get());
+  DrawTextLine(dc, midRight.left + 20, midRight.top + 176, midRight.right - midRight.left - 40, L"IRPs/s: " + std::to_wstring(state_.snapshot.interruptsPerSec) + L"  |  Syscalls: " + std::to_wstring(state_.snapshot.systemCallsPerSec), ColorRole::Kernel, bodyFont_.get());
 
-  DrawTextLine(dc, botLeft.left + 20, botLeft.top + 56, botLeft.right - botLeft.left - 40, L"Disk read: " + FormatRate(state_.snapshot.diskReadBytesPerSec), ColorRole::Primary, bodyFont_);
-  DrawTextLine(dc, botLeft.left + 20, botLeft.top + 96, botLeft.right - botLeft.left - 40, L"Disk write: " + FormatRate(state_.snapshot.diskWriteBytesPerSec), ColorRole::Primary, bodyFont_);
-  DrawTextLine(dc, botLeft.left + 20, botLeft.top + 136, botLeft.right - botLeft.left - 40, L"Processes: " + std::to_wstring(state_.snapshot.processCount) + L"  |  Threads: " + std::to_wstring(state_.snapshot.threadCount) + L"  |  Handles: " + std::to_wstring(state_.snapshot.handleCount), ColorRole::Dim, bodyFont_);
+  DrawTextLine(dc, botLeft.left + 20, botLeft.top + 56, botLeft.right - botLeft.left - 40, L"Disk read: " + FormatRate(state_.snapshot.diskReadBytesPerSec), ColorRole::Primary, bodyFont_.get());
+  DrawTextLine(dc, botLeft.left + 20, botLeft.top + 96, botLeft.right - botLeft.left - 40, L"Disk write: " + FormatRate(state_.snapshot.diskWriteBytesPerSec), ColorRole::Primary, bodyFont_.get());
+  DrawTextLine(dc, botLeft.left + 20, botLeft.top + 136, botLeft.right - botLeft.left - 40, L"Processes: " + std::to_wstring(state_.snapshot.processCount) + L"  |  Threads: " + std::to_wstring(state_.snapshot.threadCount) + L"  |  Handles: " + std::to_wstring(state_.snapshot.handleCount), ColorRole::Dim, bodyFont_.get());
 
-  DrawTextLine(dc, botRight.left + 20, botRight.top + 56, botRight.right - botRight.left - 40, L"Upload: " + FormatRate(state_.snapshot.netUpBytesPerSec), ColorRole::Network, bodyFont_);
-  DrawTextLine(dc, botRight.left + 20, botRight.top + 96, botRight.right - botRight.left - 40, L"Download: " + FormatRate(state_.snapshot.netDownBytesPerSec), ColorRole::Network, bodyFont_);
-  DrawTextLine(dc, botRight.left + 20, botRight.top + 136, botRight.right - botRight.left - 40, L"Inbound: " + std::to_wstring(state_.snapshot.inboundConnections) + L"  |  Outbound: " + std::to_wstring(state_.snapshot.outboundConnections), ColorRole::Dim, bodyFont_);
+  DrawTextLine(dc, botRight.left + 20, botRight.top + 56, botRight.right - botRight.left - 40, L"Upload: " + FormatRate(state_.snapshot.netUpBytesPerSec), ColorRole::Network, bodyFont_.get());
+  DrawTextLine(dc, botRight.left + 20, botRight.top + 96, botRight.right - botRight.left - 40, L"Download: " + FormatRate(state_.snapshot.netDownBytesPerSec), ColorRole::Network, bodyFont_.get());
+  DrawTextLine(dc, botRight.left + 20, botRight.top + 136, botRight.right - botRight.left - 40, L"Inbound: " + std::to_wstring(state_.snapshot.inboundConnections) + L"  |  Outbound: " + std::to_wstring(state_.snapshot.outboundConnections), ColorRole::Dim, bodyFont_.get());
 }
 
 void MonixApp::DrawNetworkView(HDC dc, const RECT& clientRect) {
@@ -9723,10 +9714,10 @@ void MonixApp::DrawNetworkView(HDC dc, const RECT& clientRect) {
   RECT logPanel = outer;
   logPanel.top = flowPanel.bottom + 14;
 
-  DrawPanel(dc, statsPanel, L"NETWORK OVERVIEW", ColorRole::Engine, smallFont_);
-  DrawPanel(dc, flowPanel, L"LIVE SOCKET FLOWS", ColorRole::Network, smallFont_);
-  DrawPanel(dc, detailPanel, L"NETWORK DIAGNOSTICS", ColorRole::Primary, smallFont_);
-  DrawPanel(dc, logPanel, L"NETWORK EVENT LOG", ColorRole::Engine, smallFont_);
+  DrawPanel(dc, statsPanel, L"NETWORK OVERVIEW", ColorRole::Engine, smallFont_.get());
+  DrawPanel(dc, flowPanel, L"LIVE SOCKET FLOWS", ColorRole::Network, smallFont_.get());
+  DrawPanel(dc, detailPanel, L"NETWORK DIAGNOSTICS", ColorRole::Primary, smallFont_.get());
+  DrawPanel(dc, logPanel, L"NETWORK EVENT LOG", ColorRole::Engine, smallFont_.get());
 
   const auto historyMax = [](const std::vector<double>& values, double minimum) {
     double peak = minimum;
@@ -9765,7 +9756,7 @@ void MonixApp::DrawNetworkView(HDC dc, const RECT& clientRect) {
     };
     FillSolid(dc, card, RGB(8, 18, 10));
     DrawRectOutline(dc, card, ResolveColor(ColorRole::Accent));
-    DrawTextRect(dc, card, captions[i], i < 2 ? ColorRole::Network : (i == 2 ? ColorRole::Primary : ColorRole::White), smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, card, captions[i], i < 2 ? ColorRole::Network : (i == 2 ? ColorRole::Primary : ColorRole::White), smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   }
 
   RECT downSpark { detailPanel.left + 18, detailPanel.top + 56, detailPanel.right - 18, detailPanel.top + 106 };
@@ -9775,18 +9766,18 @@ void MonixApp::DrawNetworkView(HDC dc, const RECT& clientRect) {
   DrawSparkline(dc, upSpark, state_.netUploadHistory, historyMax(state_.netUploadHistory, 4.0), ColorRole::Primary);
   DrawSparkline(dc, latencySpark, state_.latencyHistory, historyMax(state_.latencyHistory, 25.0), ColorRole::UserInput);
 
-  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 252, detailPanel.right - detailPanel.left - 36, L"DNS estimator: " + std::to_wstring(state_.snapshot.dnsPseudo) + L"/s", ColorRole::Engine, smallFont_);
-  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 282, detailPanel.right - detailPanel.left - 36, L"Tracked process count: " + std::to_wstring(static_cast<int>(state_.snapshot.flows.size())), ColorRole::Dim, smallFont_);
-  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 312, detailPanel.right - detailPanel.left - 36, L"Collector: TCP inventory grouped by owning process", ColorRole::Dim, smallFont_);
-  DrawTextRect(dc, RECT { detailPanel.left + 18, detailPanel.top + 346, detailPanel.right - 18, detailPanel.bottom - 18 }, L"Charts are stable and non-reactive: traffic, latency and noise do not alter the CRT treatment. Only the data changes, never the display personality.", ColorRole::Dim, smallFont_, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 252, detailPanel.right - detailPanel.left - 36, L"DNS estimator: " + std::to_wstring(state_.snapshot.dnsPseudo) + L"/s", ColorRole::Engine, smallFont_.get());
+  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 282, detailPanel.right - detailPanel.left - 36, L"Tracked process count: " + std::to_wstring(static_cast<int>(state_.snapshot.flows.size())), ColorRole::Dim, smallFont_.get());
+  DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 312, detailPanel.right - detailPanel.left - 36, L"Collector: TCP inventory grouped by owning process", ColorRole::Dim, smallFont_.get());
+  DrawTextRect(dc, RECT { detailPanel.left + 18, detailPanel.top + 346, detailPanel.right - 18, detailPanel.bottom - 18 }, L"Charts are stable and non-reactive: traffic, latency and noise do not alter the CRT treatment. Only the data changes, never the display personality.", ColorRole::Dim, smallFont_.get(), DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
 
   RECT header { flowPanel.left + 14, flowPanel.top + 46, flowPanel.right - 14, flowPanel.top + 88 };
   FillSolid(dc, header, RGB(8, 18, 10));
   DrawRectOutline(dc, header, ResolveColor(ColorRole::Accent));
-  DrawTextRect(dc, RECT { header.left + 10, header.top, header.left + 220, header.bottom }, L"PROCESS", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-  DrawTextRect(dc, RECT { header.left + 230, header.top, header.left + 350, header.bottom }, L"EST.", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-  DrawTextRect(dc, RECT { header.left + 360, header.top, header.right - 110, header.bottom }, L"REMOTE", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-  DrawTextRect(dc, RECT { header.right - 104, header.top, header.right - 12, header.bottom }, L"STATE", ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { header.left + 10, header.top, header.left + 220, header.bottom }, L"PROCESS", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { header.left + 230, header.top, header.left + 350, header.bottom }, L"EST.", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { header.left + 360, header.top, header.right - 110, header.bottom }, L"REMOTE", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, RECT { header.right - 104, header.top, header.right - 12, header.bottom }, L"STATE", ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   int y = header.bottom;
   const int rowHeight = std::max(36, bodyLineHeight_ + 12);
@@ -9796,10 +9787,10 @@ void MonixApp::DrawNetworkView(HDC dc, const RECT& clientRect) {
     FillSolid(dc, row, RGB(4, 12, 5));
     DrawRectOutline(dc, row, ResolveColor(ColorRole::Accent));
     const auto& flow = state_.snapshot.flows[i];
-    DrawTextLine(dc, row.left + 10, row.top + 6, 200, flow.name, ColorRole::White, smallFont_);
-    DrawTextLine(dc, row.left + 230, row.top + 6, 110, std::to_wstring(flow.activeConnections), ColorRole::Network, smallFont_);
-    DrawTextLine(dc, row.left + 360, row.top + 6, row.right - row.left - 490, flow.remote, ColorRole::Dim, smallFont_);
-    DrawTextLine(dc, row.right - 104, row.top + 6, 90, flow.state, flow.state == L"ACTIVE" ? ColorRole::Success : ColorRole::Dim, smallFont_);
+    DrawTextLine(dc, row.left + 10, row.top + 6, 200, flow.name, ColorRole::White, smallFont_.get());
+    DrawTextLine(dc, row.left + 230, row.top + 6, 110, std::to_wstring(flow.activeConnections), ColorRole::Network, smallFont_.get());
+    DrawTextLine(dc, row.left + 360, row.top + 6, row.right - row.left - 490, flow.remote, ColorRole::Dim, smallFont_.get());
+    DrawTextLine(dc, row.right - 104, row.top + 6, 90, flow.state, flow.state == L"ACTIVE" ? ColorRole::Success : ColorRole::Dim, smallFont_.get());
     y += rowHeight;
   }
 
@@ -9811,20 +9802,20 @@ void MonixApp::DrawNetworkView(HDC dc, const RECT& clientRect) {
   }
   y = logPanel.top + 52;
   if (networkLogs.empty()) {
-    DrawTextRect(dc, RECT { logPanel.left + 16, logPanel.top + 50, logPanel.right - 16, logPanel.bottom - 18 }, L"No network events emitted yet.", ColorRole::Dim, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, RECT { logPanel.left + 16, logPanel.top + 50, logPanel.right - 16, logPanel.bottom - 18 }, L"No network events emitted yet.", ColorRole::Dim, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     return;
   }
 
   for (std::size_t i = 0; i < networkLogs.size() && i < 6; ++i) {
-    DrawTextLine(dc, logPanel.left + 16, y, logPanel.right - logPanel.left - 32, ComposeLogLine(networkLogs[i]), networkLogs[i].color, smallFont_);
+    DrawTextLine(dc, logPanel.left + 16, y, logPanel.right - logPanel.left - 32, ComposeLogLine(networkLogs[i]), networkLogs[i].color, smallFont_.get());
     y += logLineHeight_ + 6;
   }
 }
 
 void MonixApp::DrawScramView(HDC dc, const RECT& clientRect) {
   const RECT outer = ContentRect(clientRect);
-  DrawPanel(dc, outer, L"SCRAM", ColorRole::Scram, smallFont_);
-  DrawTextRect(dc, outer, L"...", ColorRole::Dim, bodyFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawPanel(dc, outer, L"SCRAM", ColorRole::Scram, smallFont_.get());
+  DrawTextRect(dc, outer, L"...", ColorRole::Dim, bodyFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 }
 
 void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
@@ -9852,27 +9843,27 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
 
   FillSolid(dc, generalTab, showGeneral ? RGB(22, 86, 38) : RGB(8, 12, 8));
   DrawRectOutline(dc, generalTab, ResolveColor(showGeneral ? ColorRole::Primary : ColorRole::Accent));
-  DrawTextRect(dc, generalTab, L"GENERAL", showGeneral ? ColorRole::White : ColorRole::Primary, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, generalTab, L"GENERAL", showGeneral ? ColorRole::White : ColorRole::Primary, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   FillSolid(dc, displayTab, showDisplay ? RGB(22, 86, 38) : RGB(8, 12, 8));
   DrawRectOutline(dc, displayTab, ResolveColor(showDisplay ? ColorRole::Primary : ColorRole::Accent));
-  DrawTextRect(dc, displayTab, L"DISPLAY", showDisplay ? ColorRole::White : ColorRole::Primary, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, displayTab, L"DISPLAY", showDisplay ? ColorRole::White : ColorRole::Primary, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   FillSolid(dc, loggingTab, showLogging ? RGB(22, 86, 38) : RGB(8, 12, 8));
   DrawRectOutline(dc, loggingTab, ResolveColor(showLogging ? ColorRole::Primary : ColorRole::Accent));
-  DrawTextRect(dc, loggingTab, L"LOGGING", showLogging ? ColorRole::White : ColorRole::Primary, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, loggingTab, L"LOGGING", showLogging ? ColorRole::White : ColorRole::Primary, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   FillSolid(dc, shadersTab, showShaders ? RGB(22, 86, 38) : RGB(8, 12, 8));
   DrawRectOutline(dc, shadersTab, ResolveColor(showShaders ? ColorRole::Primary : ColorRole::Accent));
-  DrawTextRect(dc, shadersTab, L"SHADERS", showShaders ? ColorRole::White : ColorRole::Primary, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, shadersTab, L"SHADERS", showShaders ? ColorRole::White : ColorRole::Primary, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   FillSolid(dc, systemTab, showSystem ? RGB(22, 86, 38) : RGB(8, 12, 8));
   DrawRectOutline(dc, systemTab, ResolveColor(showSystem ? ColorRole::Primary : ColorRole::Accent));
-  DrawTextRect(dc, systemTab, L"SYSTEM", showSystem ? ColorRole::White : ColorRole::Primary, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, systemTab, L"SYSTEM", showSystem ? ColorRole::White : ColorRole::Primary, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   FillSolid(dc, perfTab, showPerf ? RGB(22, 86, 38) : RGB(8, 12, 8));
   DrawRectOutline(dc, perfTab, ResolveColor(showPerf ? ColorRole::Primary : ColorRole::Accent));
-  DrawTextRect(dc, perfTab, L"PERF", showPerf ? ColorRole::White : ColorRole::Primary, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+  DrawTextRect(dc, perfTab, L"PERF", showPerf ? ColorRole::White : ColorRole::Primary, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
   const RECT contentArea { outer.left, outer.top + subTabH + 8, outer.right, outer.bottom };
 
@@ -9882,8 +9873,8 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
     RECT rightPanel = contentArea;
     rightPanel.left = leftPanel.right + 14;
 
-    DrawPanel(dc, leftPanel, L"RUNTIME", ColorRole::Security, smallFont_);
-    DrawPanel(dc, rightPanel, L"UI PREFERENCES", ColorRole::Engine, smallFont_);
+    DrawPanel(dc, leftPanel, L"RUNTIME", ColorRole::Security, smallFont_.get());
+    DrawPanel(dc, rightPanel, L"UI PREFERENCES", ColorRole::Engine, smallFont_.get());
 
     const auto rows = BuildSettingActionRects(clientRect);
     state_.selectedSettingIndex = std::clamp(state_.selectedSettingIndex, 0, static_cast<int>(rows.size()) - 1);
@@ -9898,10 +9889,10 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
         FillSolid(dc, action.increase, selected ? RGB(18, 34, 18) : RGB(10, 16, 10));
         DrawRectOutline(dc, action.decrease, ResolveColor(accent));
         DrawRectOutline(dc, action.increase, ResolveColor(accent));
-        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextRect(dc, action.increase, L"+", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_);
-        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.increase, L"+", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_.get());
+        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_.get(), DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
       }
     };
 
@@ -9930,7 +9921,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
     rightBottom2.left = leftPanel.right + 14;
     rightBottom2.top = rightBottom.bottom + 14;
 
-    DrawPanel(dc, rightBottom2, L"BORDER OVERLAY", ColorRole::Engine, smallFont_);
+    DrawPanel(dc, rightBottom2, L"BORDER OVERLAY", ColorRole::Engine, smallFont_.get());
 
     const auto rows = BuildSettingActionRects(clientRect);
     state_.selectedSettingIndex = std::clamp(state_.selectedSettingIndex, 0, static_cast<int>(rows.size()) - 1);
@@ -9945,10 +9936,10 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
         FillSolid(dc, action.increase, selected ? RGB(18, 34, 18) : RGB(10, 16, 10));
         DrawRectOutline(dc, action.decrease, ResolveColor(accent));
         DrawRectOutline(dc, action.increase, ResolveColor(accent));
-        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextRect(dc, action.increase, L"+", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_);
-        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.increase, L"+", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_.get());
+        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_.get(), DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
       }
     };
 
@@ -9960,8 +9951,8 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
     RECT rightPanel = contentArea;
     rightPanel.left = leftPanel.right + 14;
 
-    DrawPanel(dc, leftPanel, L"LOGGING CONFIGURATION", ColorRole::Engine, smallFont_);
-    DrawPanel(dc, rightPanel, L"LOG OUTPUT INFO", ColorRole::Accent, smallFont_);
+    DrawPanel(dc, leftPanel, L"LOGGING CONFIGURATION", ColorRole::Engine, smallFont_.get());
+    DrawPanel(dc, rightPanel, L"LOG OUTPUT INFO", ColorRole::Accent, smallFont_.get());
 
     const auto rows = BuildSettingActionRects(clientRect);
     state_.selectedSettingIndex = std::clamp(state_.selectedSettingIndex, 0, static_cast<int>(rows.size()) - 1);
@@ -9976,10 +9967,10 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
         FillSolid(dc, action.increase, selected ? RGB(18, 34, 18) : RGB(10, 16, 10));
         DrawRectOutline(dc, action.decrease, ResolveColor(accent));
         DrawRectOutline(dc, action.increase, ResolveColor(accent));
-        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextRect(dc, action.increase, L"+", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_);
-        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.increase, L"+", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_.get());
+        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_.get(), DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
       }
     };
 
@@ -9995,7 +9986,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
       L"Live logs: " + std::wstring(config_.pauseLiveLogs ? L"PAUSED" : L"STREAMING") + L"\n\n"
       L"Log files rotate daily and are compressed\n"
       L"after the configured retention period.";
-    DrawTextRect(dc, RECT { rightPanel.left + 18, rightPanel.top + 56, rightPanel.right - 18, rightPanel.bottom - 18 }, logInfo, ColorRole::Primary, smallFont_, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
+    DrawTextRect(dc, RECT { rightPanel.left + 18, rightPanel.top + 56, rightPanel.right - 18, rightPanel.bottom - 18 }, logInfo, ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
   } else if (showShaders) {
     const int listW = static_cast<int>((contentArea.right - contentArea.left) * 0.50);
     const int detailW = contentArea.right - contentArea.left - listW - 14;
@@ -10021,7 +10012,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
       const bool active = state_.shaderBrowser.filter == tabFilter;
       FillSolid(dc, btn, active ? RGB(22, 86, 38) : RGB(8, 12, 8));
       DrawRectOutline(dc, btn, ResolveColor(active ? ColorRole::Primary : ColorRole::Accent));
-      DrawTextRect(dc, btn, label, active ? ColorRole::White : ColorRole::Primary, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+      DrawTextRect(dc, btn, label, active ? ColorRole::White : ColorRole::Primary, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
       fx += filterBtnW + filterGap;
     };
 
@@ -10032,7 +10023,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
     RECT favBtn { fx, filterBar.top + 4, fx + filterBtnW + 20, filterBar.top + 4 + filterBtnH };
     FillSolid(dc, favBtn, state_.shaderShowFavoritesOnly ? RGB(22, 86, 38) : RGB(8, 12, 8));
     DrawRectOutline(dc, favBtn, ResolveColor(state_.shaderShowFavoritesOnly ? ColorRole::Warning : ColorRole::Accent));
-    DrawTextRect(dc, favBtn, L"\x2605 Favorites", state_.shaderShowFavoritesOnly ? ColorRole::Warning : ColorRole::Dim, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, favBtn, L"\x2605 Favorites", state_.shaderShowFavoritesOnly ? ColorRole::Warning : ColorRole::Dim, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     fx += filterBtnW + 20 + filterGap;
 
     RECT searchBox { fx, filterBar.top + 4, contentArea.left + listW - 14, filterBar.top + 4 + filterBtnH };
@@ -10041,10 +10032,10 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
     std::wstring searchText = state_.shaderSearchText.empty() && !state_.shaderSearchFocused
       ? L"Search shaders..." : state_.shaderSearchText;
     if (state_.shaderSearchFocused) searchText += L"_";
-    DrawTextRect(dc, searchBox, searchText, state_.shaderSearchText.empty() ? ColorRole::Dim : ColorRole::White, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_EDITCONTROL);
+    DrawTextRect(dc, searchBox, searchText, state_.shaderSearchText.empty() ? ColorRole::Dim : ColorRole::White, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_EDITCONTROL);
 
-    DrawPanel(dc, listPanel, L"SHADER LIBRARY", ColorRole::Security, smallFont_);
-    DrawPanel(dc, detailPanel, L"SHADER DETAIL", ColorRole::Primary, smallFont_);
+    DrawPanel(dc, listPanel, L"SHADER LIBRARY", ColorRole::Security, smallFont_.get());
+    DrawPanel(dc, detailPanel, L"SHADER DETAIL", ColorRole::Primary, smallFont_.get());
 
     const int rowH = std::max(26, smallLineHeight_ + 4);
     const int innerPad = 18;
@@ -10060,7 +10051,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
       RECT catRect { listPanel.left + innerPad, y, listPanel.right - innerPad, y + rowH };
       FillSolid(dc, catRect, RGB(10, 18, 12));
       const std::wstring catLabel = L"\x25BC " + Utf8ToWide(cat.name);
-      DrawTextLine(dc, catRect.left + 6, catRect.top + 2, catRect.right - catRect.left - 12, catLabel, ColorRole::Dim, smallFont_);
+      DrawTextLine(dc, catRect.left + 6, catRect.top + 2, catRect.right - catRect.left - 12, catLabel, ColorRole::Dim, smallFont_.get());
       y += rowH + 2;
 
       for (const size_t libIdx : cat.entryIndices) {
@@ -10097,10 +10088,10 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
               return ColorRole::Dim;
             }();
 
-            DrawTextLine(dc, rowRect.left + 6, rowRect.top + 2, 20, indicator, indicatorColor, smallFont_);
-            DrawTextLine(dc, rowRect.left + 28, rowRect.top + 2, rowRect.right - rowRect.left - 56, Utf8ToWide(entry->name), selected ? ColorRole::White : ColorRole::Dim, smallFont_);
+            DrawTextLine(dc, rowRect.left + 6, rowRect.top + 2, 20, indicator, indicatorColor, smallFont_.get());
+            DrawTextLine(dc, rowRect.left + 28, rowRect.top + 2, rowRect.right - rowRect.left - 56, Utf8ToWide(entry->name), selected ? ColorRole::White : ColorRole::Dim, smallFont_.get());
             if (shaderBrowserPanel_ && shaderBrowserPanel_->isFavorite(libIdx)) {
-              DrawTextLine(dc, rowRect.right - 24, rowRect.top + 2, 18, L"\x2605", ColorRole::Warning, smallFont_);
+              DrawTextLine(dc, rowRect.right - 24, rowRect.top + 2, 18, L"\x2605", ColorRole::Warning, smallFont_.get());
             }
           }
           y += rowH + 2;
@@ -10121,7 +10112,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
       RECT btn { abx, actionBar.top + 2, abx + actionBtnW, actionBar.top + 2 + actionBtnH };
       FillSolid(dc, btn, RGB(22, 86, 38));
       DrawRectOutline(dc, btn, ResolveColor(ColorRole::Primary));
-      DrawTextRect(dc, btn, label, ColorRole::White, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+      DrawTextRect(dc, btn, label, ColorRole::White, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
       abx += actionBtnW + actionGap;
     };
 
@@ -10134,7 +10125,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
     const auto summary = shaderBrowserPanel_ ? shaderBrowserPanel_->statusSummary() : std::string();
 
     RECT summaryBar { listPanel.left + innerPad, actionBar.top - 20, listPanel.right - innerPad, actionBar.top - 2 };
-    DrawTextLine(dc, summaryBar.left, summaryBar.top, summaryBar.right - summaryBar.left, Utf8ToWide(summary), ColorRole::Dim, smallFont_);
+    DrawTextLine(dc, summaryBar.left, summaryBar.top, summaryBar.right - summaryBar.left, Utf8ToWide(summary), ColorRole::Dim, smallFont_.get());
 
     if (shaderBrowserPanel_ && shaderBrowserPanel_->hasSelection()) {
       const auto detail = shaderBrowserPanel_->detailInfo();
@@ -10144,16 +10135,16 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
 
       auto drawDetailLine = [&](const wchar_t* label, const std::wstring& value) {
         if (dy + lineH > detailPanel.bottom - 180) return;
-        DrawTextLine(dc, detailPanel.left + 18, dy, labelW, label, ColorRole::Dim, smallFont_);
-        DrawTextLine(dc, detailPanel.left + 18 + labelW, dy, detailPanel.right - detailPanel.left - 36 - labelW, value, ColorRole::White, smallFont_);
+        DrawTextLine(dc, detailPanel.left + 18, dy, labelW, label, ColorRole::Dim, smallFont_.get());
+        DrawTextLine(dc, detailPanel.left + 18 + labelW, dy, detailPanel.right - detailPanel.left - 36 - labelW, value, ColorRole::White, smallFont_.get());
         dy += lineH;
       };
 
       auto drawPerfLine = [&](const wchar_t* label, double ms) {
         if (dy + lineH > detailPanel.bottom - 180) return;
-        DrawTextLine(dc, detailPanel.left + 18, dy, labelW, label, ColorRole::Dim, smallFont_);
+        DrawTextLine(dc, detailPanel.left + 18, dy, labelW, label, ColorRole::Dim, smallFont_.get());
         std::wstring val = (ms > 0.0) ? (std::to_wstring(ms).substr(0, 6) + L" ms") : L"N/A";
-        DrawTextLine(dc, detailPanel.left + 18 + labelW, dy, detailPanel.right - detailPanel.left - 36 - labelW, val, ColorRole::White, smallFont_);
+        DrawTextLine(dc, detailPanel.left + 18 + labelW, dy, detailPanel.right - detailPanel.left - 36 - labelW, val, ColorRole::White, smallFont_.get());
         dy += lineH;
       };
 
@@ -10172,7 +10163,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
       drawDetailLine(L"Cache:", detail.lastCacheStatus.empty() ? L"N/A" : Utf8ToWide(detail.lastCacheStatus));
 
       dy += 6;
-      DrawTextLine(dc, detailPanel.left + 18, dy, detailPanel.right - detailPanel.left - 36, L"PERFORMANCE", ColorRole::Security, smallFont_);
+      DrawTextLine(dc, detailPanel.left + 18, dy, detailPanel.right - detailPanel.left - 36, L"PERFORMANCE", ColorRole::Security, smallFont_.get());
       dy += lineH;
       drawPerfLine(L"Compile:", detail.compileDurationMs);
       drawPerfLine(L"Validation:", detail.validationDurationMs);
@@ -10183,34 +10174,34 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
       RECT reloadBtn { detailPanel.left + 130, detailPanel.bottom - 52, detailPanel.left + 240, detailPanel.bottom - 22 };
       FillSolid(dc, loadBtn, RGB(22, 86, 38));
       DrawRectOutline(dc, loadBtn, ResolveColor(ColorRole::Primary));
-      DrawTextRect(dc, loadBtn, L"LOAD", ColorRole::White, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+      DrawTextRect(dc, loadBtn, L"LOAD", ColorRole::White, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
       FillSolid(dc, reloadBtn, RGB(22, 86, 38));
       DrawRectOutline(dc, reloadBtn, ResolveColor(ColorRole::Primary));
-      DrawTextRect(dc, reloadBtn, L"RELOAD", ColorRole::White, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+      DrawTextRect(dc, reloadBtn, L"RELOAD", ColorRole::White, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
       if (!detail.firstError.empty()) {
         RECT errPanel { detailPanel.left, detailPanel.bottom - 280, detailPanel.right, detailPanel.bottom - 180 };
-        DrawPanel(dc, errPanel, L"ERROR", ColorRole::Error, smallFont_);
+        DrawPanel(dc, errPanel, L"ERROR", ColorRole::Error, smallFont_.get());
         int ey = errPanel.top + 56;
         const int errPad = 18;
-        DrawTextLine(dc, errPanel.left + errPad, ey, errPanel.right - errPanel.left - errPad * 2, Utf8ToWide(detail.firstError), ColorRole::Error, smallFont_);
+        DrawTextLine(dc, errPanel.left + errPad, ey, errPanel.right - errPanel.left - errPad * 2, Utf8ToWide(detail.firstError), ColorRole::Error, smallFont_.get());
       }
     } else {
-      DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 56, detailPanel.right - detailPanel.left - 36, L"Select a shader to view details.", ColorRole::Dim, smallFont_);
+      DrawTextLine(dc, detailPanel.left + 18, detailPanel.top + 56, detailPanel.right - detailPanel.left - 36, L"Select a shader to view details.", ColorRole::Dim, smallFont_.get());
 
       RECT loadBtn { detailPanel.left + 18, detailPanel.bottom - 52, detailPanel.left + 120, detailPanel.bottom - 22 };
       RECT reloadBtn { detailPanel.left + 130, detailPanel.bottom - 52, detailPanel.left + 240, detailPanel.bottom - 22 };
       FillSolid(dc, loadBtn, RGB(12, 20, 12));
       DrawRectOutline(dc, loadBtn, ResolveColor(ColorRole::Accent));
-      DrawTextRect(dc, loadBtn, L"LOAD", ColorRole::Dim, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+      DrawTextRect(dc, loadBtn, L"LOAD", ColorRole::Dim, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
       FillSolid(dc, reloadBtn, RGB(12, 20, 12));
       DrawRectOutline(dc, reloadBtn, ResolveColor(ColorRole::Accent));
-      DrawTextRect(dc, reloadBtn, L"RELOAD", ColorRole::Dim, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+      DrawTextRect(dc, reloadBtn, L"RELOAD", ColorRole::Dim, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
     }
 
     RECT cachePanel { detailPanel.left, detailPanel.bottom - 170, detailPanel.right, detailPanel.bottom - 58 };
     {
-      DrawPanel(dc, cachePanel, L"CACHE / DIAGNOSTICS", ColorRole::Engine, smallFont_);
+      DrawPanel(dc, cachePanel, L"CACHE / DIAGNOSTICS", ColorRole::Engine, smallFont_.get());
       int cy = cachePanel.top + 56;
       const int cLabelW = 110;
       const int cLineH = smallLineHeight_ + 2;
@@ -10219,8 +10210,8 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
         auto cs = shaderBrowserPanel_->cacheStats();
         auto drawCacheLine = [&](const wchar_t* label, const std::wstring& value) {
           if (cy + cLineH > cachePanel.bottom - 8) return;
-          DrawTextLine(dc, cachePanel.left + 18, cy, cLabelW, label, ColorRole::Dim, smallFont_);
-          DrawTextLine(dc, cachePanel.left + 18 + cLabelW, cy, cachePanel.right - cachePanel.left - 36 - cLabelW, value, ColorRole::White, smallFont_);
+          DrawTextLine(dc, cachePanel.left + 18, cy, cLabelW, label, ColorRole::Dim, smallFont_.get());
+          DrawTextLine(dc, cachePanel.left + 18 + cLabelW, cy, cachePanel.right - cachePanel.left - 36 - cLabelW, value, ColorRole::White, smallFont_.get());
           cy += cLineH;
         };
 
@@ -10249,13 +10240,13 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
       RECT hotRect { contentArea.left + 14, contentArea.bottom - 24, contentArea.left + 250, contentArea.bottom - 4 };
       const bool ok = hre.status == "Active" || hre.status == "Compiled";
       DrawTextLine(dc, hotRect.left, hotRect.top, hotRect.right - hotRect.left,
-        ok ? L"RELOADED" : L"RELOAD FAILED", ok ? ColorRole::Success : ColorRole::Error, smallFont_);
+        ok ? L"RELOADED" : L"RELOAD FAILED", ok ? ColorRole::Success : ColorRole::Error, smallFont_.get());
     }
 
     const auto& errHist = shaderBrowserPanel_ ? shaderBrowserPanel_->errorHistory() : std::deque<monix::renderer_vk::ErrorHistoryEntry>{};
     if (!errHist.empty()) {
       RECT histPanel { listPanel.left, listPanel.bottom - 180, listPanel.right, listPanel.bottom - 46 };
-      DrawPanel(dc, histPanel, L"ERROR HISTORY", ColorRole::Error, smallFont_);
+      DrawPanel(dc, histPanel, L"ERROR HISTORY", ColorRole::Error, smallFont_.get());
       int hy = histPanel.top + 56;
       const int hLineH = smallLineHeight_ + 2;
       int showCount = std::min(static_cast<int>(errHist.size()), 4);
@@ -10263,7 +10254,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
         if (hy + hLineH > histPanel.bottom - 8) break;
         const auto& e = errHist[i];
         std::wstring line = Utf8ToWide(e.shader) + L" [" + Utf8ToWide(e.stage) + L"] " + Utf8ToWide(e.error);
-        DrawTextLine(dc, histPanel.left + 18, hy, histPanel.right - histPanel.left - 36, line, ColorRole::Error, smallFont_);
+        DrawTextLine(dc, histPanel.left + 18, hy, histPanel.right - histPanel.left - 36, line, ColorRole::Error, smallFont_.get());
         hy += hLineH;
       }
     }
@@ -10277,9 +10268,9 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
     rightBottom.left = leftPanel.right + 14;
     rightBottom.top = rightTop.bottom + 14;
 
-    DrawPanel(dc, leftPanel, L"THEME & APPEARANCE", ColorRole::Primary, smallFont_);
-    DrawPanel(dc, rightTop, L"WINDOW & SYSTEM", ColorRole::Security, smallFont_);
-    DrawPanel(dc, rightBottom, L"HOTKEYS", ColorRole::Warning, smallFont_);
+    DrawPanel(dc, leftPanel, L"THEME & APPEARANCE", ColorRole::Primary, smallFont_.get());
+    DrawPanel(dc, rightTop, L"WINDOW & SYSTEM", ColorRole::Security, smallFont_.get());
+    DrawPanel(dc, rightBottom, L"HOTKEYS", ColorRole::Warning, smallFont_.get());
 
     const auto rows = BuildSettingActionRects(clientRect);
     state_.selectedSettingIndex = std::clamp(state_.selectedSettingIndex, 0, static_cast<int>(rows.size()) - 1);
@@ -10294,10 +10285,10 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
         FillSolid(dc, action.increase, selected ? RGB(18, 34, 18) : RGB(10, 16, 10));
         DrawRectOutline(dc, action.decrease, ResolveColor(accent));
         DrawRectOutline(dc, action.increase, ResolveColor(accent));
-        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextRect(dc, action.increase, L"+", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_);
-        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.increase, L"+", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_.get());
+        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_.get(), DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
       }
     };
 
@@ -10309,7 +10300,7 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
     RECT leftPanel = contentArea;
     leftPanel.right = contentArea.left + static_cast<int>((contentArea.right - contentArea.left) * 0.50);
 
-    DrawPanel(dc, leftPanel, L"PERFORMANCE", ColorRole::Thermal, smallFont_);
+    DrawPanel(dc, leftPanel, L"PERFORMANCE", ColorRole::Thermal, smallFont_.get());
 
     const auto rows = BuildSettingActionRects(clientRect);
     state_.selectedSettingIndex = std::clamp(state_.selectedSettingIndex, 0, static_cast<int>(rows.size()) - 1);
@@ -10324,10 +10315,10 @@ void MonixApp::DrawSettingsView(HDC dc, const RECT& clientRect) {
         FillSolid(dc, action.increase, selected ? RGB(18, 34, 18) : RGB(10, 16, 10));
         DrawRectOutline(dc, action.decrease, ResolveColor(accent));
         DrawRectOutline(dc, action.increase, ResolveColor(accent));
-        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextRect(dc, action.increase, L"+", accent, smallFont_, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_);
-        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_, DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.decrease, L"-", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextRect(dc, action.increase, L"+", accent, smallFont_.get(), DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+        DrawTextLine(dc, action.row.left + 10, action.row.top + 2, action.row.right - action.row.left - 270, SettingLabel(action.id), selected ? ColorRole::White : ColorRole::Dim, smallFont_.get());
+        DrawTextRect(dc, action.value, SettingValueText(action.id), valueColor, smallFont_.get(), DT_RIGHT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
       }
     };
 
@@ -10366,7 +10357,7 @@ void MonixApp::DrawTaskContextMenu(HDC dc) const {
       FillSolid(dc, itemRect, RGB(24, 52, 28));
     }
     DrawRectOutline(dc, itemRect, ResolveColor(ColorRole::Accent));
-    DrawTextRect(dc, RECT { itemRect.left + 12, itemRect.top + 2, itemRect.right - 12, itemRect.bottom }, items[i], i == state_.taskMenu.hoverIndex ? ColorRole::White : ColorRole::Primary, smallFont_, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextRect(dc, RECT { itemRect.left + 12, itemRect.top + 2, itemRect.right - 12, itemRect.bottom }, items[i], i == state_.taskMenu.hoverIndex ? ColorRole::White : ColorRole::Primary, smallFont_.get(), DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   }
 }
 
