@@ -150,57 +150,64 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
 
     mark_finalizing(operation_id);
 
-    std::error_code ec;
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(staging_files, ec)) {
-        if (entry.is_regular_file()) {
-            std::string relative = FileUtils::sanitize_relative_path(
-                std::filesystem::relative(entry.path(), staging_files).string());
-            std::string dest_path = dest_dir + "/" + relative;
-            std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
+    try {
+        std::error_code ec;
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(staging_files, ec)) {
+            if (entry.is_regular_file()) {
+                std::string relative = FileUtils::sanitize_relative_path(
+                    std::filesystem::relative(entry.path(), staging_files).string());
+                std::string dest_path = dest_dir + "/" + relative;
+                std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
 
-            if (std::filesystem::exists(dest_path)) {
-                switch (policy) {
-                    case CollisionPolicy::Reject:
-                        throw std::runtime_error("File collision: " + relative);
-                    case CollisionPolicy::SkipIfIdentical: {
-                        std::string dest_checksum = compute_file_checksum(dest_path);
-                        std::string src_checksum = compute_file_checksum(entry.path().string());
-                        if (dest_checksum == src_checksum) {
-                            continue;
+                if (std::filesystem::exists(dest_path)) {
+                    switch (policy) {
+                        case CollisionPolicy::Reject:
+                            throw std::runtime_error("File collision: " + relative);
+                        case CollisionPolicy::SkipIfIdentical: {
+                            std::string dest_checksum = compute_file_checksum(dest_path);
+                            std::string src_checksum = compute_file_checksum(entry.path().string());
+                            if (dest_checksum == src_checksum) {
+                                continue;
+                            }
+                            throw std::runtime_error(
+                                "SkipIfIdentical: destination differs from staged file: " + relative);
                         }
-                        throw std::runtime_error(
-                            "SkipIfIdentical: destination differs from staged file: " + relative);
-                    }
-                    case CollisionPolicy::BackupAndReplace: {
-                        std::string backup_path = get_backup_path(operation_id, relative);
-                        backup_file_strict(dest_path, backup_path);
+                        case CollisionPolicy::BackupAndReplace: {
+                            std::string backup_path = get_backup_path(operation_id, relative);
+                            backup_file_strict(dest_path, backup_path);
 
-                        BackupEntry bk;
-                        bk.destination = dest_path;
-                        bk.backup_path = backup_path;
-                        bk.state = "created";
-                        append_backup_entry(operation_id, bk);
+                            BackupEntry bk;
+                            bk.destination = dest_path;
+                            bk.backup_path = backup_path;
+                            bk.state = "created";
+                            append_backup_entry(operation_id, bk);
 
-                        std::filesystem::copy_file(entry.path().string(), dest_path,
-                            std::filesystem::copy_options::overwrite_existing, ec);
-                        if (ec) {
-                            throw std::runtime_error("Failed to copy to destination: " + relative
-                                + " (" + ec.message() + ")");
+                            std::filesystem::copy_file(entry.path().string(), dest_path,
+                                std::filesystem::copy_options::overwrite_existing, ec);
+                            if (ec) {
+                                throw std::runtime_error("Failed to copy to destination: " + relative
+                                    + " (" + ec.message() + ")");
+                            }
+                            break;
                         }
-                        break;
                     }
-                }
-            } else {
-                std::filesystem::copy_file(entry.path(), dest_path, ec);
-                if (ec) {
-                    throw std::runtime_error("Failed to copy new file: " + relative
-                        + " (" + ec.message() + ")");
+                } else {
+                    std::filesystem::copy_file(entry.path(), dest_path, ec);
+                    if (ec) {
+                        throw std::runtime_error("Failed to copy new file: " + relative
+                            + " (" + ec.message() + ")");
+                    }
                 }
             }
         }
-    }
 
-    verify_finalized(operation_id, dest_dir);
+        verify_finalized(operation_id, dest_dir);
+    } catch (...) {
+        restore_backups(operation_id);
+        mark_rolling_back(operation_id);
+        mark_rolled_back(operation_id);
+        throw;
+    }
     cleanup_backups(operation_id);
     mark_committed(operation_id);
 }
@@ -299,6 +306,21 @@ void StagingManager::cleanup_abandoned() {
     for (const auto& op : operations) {
         if (op.state == state_to_string(StagingState::RolledBack)) {
             cleanup_staging(op.operation_id);
+        }
+    }
+}
+
+void StagingManager::cleanup_committed() {
+    if (!std::filesystem::exists(staging_base_)) return;
+
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(staging_base_, ec)) {
+        if (entry.is_directory()) {
+            std::string op_id = entry.path().filename().string();
+            StagingOperation op = read_metadata(op_id);
+            if (op.state == state_to_string(StagingState::Committed)) {
+                cleanup_staging(op_id);
+            }
         }
     }
 }

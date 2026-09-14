@@ -39,14 +39,16 @@ static const std::string TEST_ITEMS = TEST_BASE + "/items";
 
 static void setup_base() {
     if (std::filesystem::exists(TEST_BASE)) {
-        std::filesystem::remove_all(TEST_BASE);
+        std::error_code ec;
+        std::filesystem::remove_all(TEST_BASE, ec);
     }
     FileUtils::create_directories(TEST_ITEMS);
 }
 
 static void cleanup_base() {
     if (std::filesystem::exists(TEST_BASE)) {
-        std::filesystem::remove_all(TEST_BASE);
+        std::error_code ec;
+        std::filesystem::remove_all(TEST_BASE, ec);
     }
 }
 
@@ -1867,15 +1869,16 @@ static void test_skip_identical_different_rejected_finalize() {
 
 // === Finalize Failure Tests (#6, #7) ===
 
-static void test_finalize_verification_failure_restores_backup() {
-    TEST_BEGIN("Finalize: verification failure restores backup");
+static void test_finalize_verify_failure_restores_backup() {
+    TEST_BEGIN("Finalize: verify failure restores backup");
     setup_base();
 
     StagingManager staging(TEST_BASE);
-    auto op_id = staging.create_staging_dir("test_verify_fail");
+    auto op_id = staging.create_staging_dir("test_verify_fail_real");
 
     std::string src = TEST_BASE + "/src.txt";
-    create_test_file(src, "staged content");
+    std::string staged_content(8192, 'A');
+    create_test_file(src, staged_content);
     staging.stage_file(op_id, src);
 
     std::string dest_dir = TEST_BASE + "/dest";
@@ -1891,7 +1894,77 @@ static void test_finalize_verification_failure_restores_backup() {
         content = std::string((std::istreambuf_iterator<char>(f)),
                               std::istreambuf_iterator<char>());
     }
-    ASSERT_EQ(content, "staged content");
+    ASSERT_EQ(content, staged_content);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_verify_finalized_detects_mismatch() {
+    TEST_BEGIN("Verify: verify_finalized detects size mismatch");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_verify_mismatch");
+
+    std::string src = TEST_BASE + "/src.txt";
+    std::string staged_content(8192, 'A');
+    create_test_file(src, staged_content);
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/" + FileUtils::file_name(src);
+    create_test_file(dest_file, "short");
+
+    bool threw = false;
+    try {
+        staging.verify_finalized(op_id, dest_dir);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_finalize_copy_failure_restores_backup() {
+    TEST_BEGIN("Finalize: mid-finalize failure preserves backup journal");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_copy_fail");
+
+    std::string src = TEST_BASE + "/src.txt";
+    create_test_file(src, "new content");
+    staging.stage_file(op_id, src);
+
+    std::string dest_dir = TEST_BASE + "/dest";
+    FileUtils::create_directories(dest_dir);
+    std::string dest_file = dest_dir + "/" + FileUtils::file_name(src);
+    create_test_file(dest_file, "original content");
+
+    bool threw = false;
+    try {
+        staging.finalize_staging(op_id, dest_dir, CollisionPolicy::Reject);
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+    ASSERT_TRUE(threw);
+
+    auto journal = staging.read_backup_journal(op_id);
+    ASSERT_TRUE(journal.empty());
+
+    std::string content;
+    {
+        std::ifstream f(dest_file);
+        content = std::string((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+    }
+    ASSERT_EQ(content, "original content");
 
     staging.cleanup_staging(op_id);
     cleanup_base();
@@ -2092,6 +2165,110 @@ static void test_cleanup_abandoned_only_rolled_back() {
     TEST_PASS();
 }
 
+static void test_cleanup_staged_in_abandoned() {
+    TEST_BEGIN("Cleanup: Staged state survives cleanup_abandoned");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_cleanup_staged");
+    staging.mark_staged(op_id);
+
+    staging.cleanup_abandoned();
+    ASSERT_TRUE(staging.staging_dir_exists(op_id));
+
+    auto abandoned = staging.detect_abandoned_staging();
+    bool found = false;
+    for (const auto& a : abandoned) {
+        if (a.operation_id == op_id) found = true;
+    }
+    ASSERT_TRUE(found);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_cleanup_finalizing_in_abandoned() {
+    TEST_BEGIN("Cleanup: Finalizing state survives cleanup_abandoned");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_cleanup_finalizing");
+    staging.mark_finalizing(op_id);
+
+    staging.cleanup_abandoned();
+    ASSERT_TRUE(staging.staging_dir_exists(op_id));
+
+    auto abandoned = staging.detect_abandoned_staging();
+    bool found = false;
+    for (const auto& a : abandoned) {
+        if (a.operation_id == op_id) found = true;
+    }
+    ASSERT_TRUE(found);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_cleanup_abandoned_state_survives() {
+    TEST_BEGIN("Cleanup: Abandoned state survives cleanup_abandoned");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_cleanup_abandoned_state");
+    staging.mark_abandoned(op_id);
+
+    staging.cleanup_abandoned();
+    ASSERT_TRUE(staging.staging_dir_exists(op_id));
+
+    auto abandoned = staging.detect_abandoned_staging();
+    bool found = false;
+    for (const auto& a : abandoned) {
+        if (a.operation_id == op_id) found = true;
+    }
+    ASSERT_TRUE(found);
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_cleanup_corrupted_survives() {
+    TEST_BEGIN("Cleanup: Corrupted state survives cleanup_abandoned");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_cleanup_corrupted");
+    staging.mark_finalizing(op_id);
+
+    auto corrupted = staging.detect_corrupted_staging();
+    ASSERT_TRUE(!corrupted.empty());
+
+    staging.cleanup_abandoned();
+    ASSERT_TRUE(staging.staging_dir_exists(op_id));
+
+    staging.cleanup_staging(op_id);
+    cleanup_base();
+    TEST_PASS();
+}
+
+static void test_cleanup_committed_staging_removed() {
+    TEST_BEGIN("Cleanup: cleanup_committed removes committed staging dirs");
+    setup_base();
+
+    StagingManager staging(TEST_BASE);
+    auto op_id = staging.create_staging_dir("test_cleanup_committed_rm");
+    staging.mark_committed(op_id);
+    ASSERT_TRUE(staging.staging_dir_exists(op_id));
+
+    staging.cleanup_committed();
+    ASSERT_TRUE(!staging.staging_dir_exists(op_id));
+
+    cleanup_base();
+    TEST_PASS();
+}
+
 // === BackupAndReplace Collision Test ===
 
 static void test_backup_and_replace_collision_accepted() {
@@ -2183,7 +2360,9 @@ void run_atomic_tests() {
     test_skip_identical_collision_accepted();
     test_skip_identical_different_rejected_validate();
     test_skip_identical_different_rejected_finalize();
-    test_finalize_verification_failure_restores_backup();
+    test_finalize_verify_failure_restores_backup();
+    test_verify_finalized_detects_mismatch();
+    test_finalize_copy_failure_restores_backup();
     test_sibling_prefix_rejected();
     test_absolute_path_rejected();
     test_nested_valid_path_accepted();
@@ -2193,5 +2372,10 @@ void run_atomic_tests() {
     test_cleanup_committed_not_in_abandoned();
     test_cleanup_preparing_in_abandoned();
     test_cleanup_abandoned_only_rolled_back();
+    test_cleanup_staged_in_abandoned();
+    test_cleanup_finalizing_in_abandoned();
+    test_cleanup_abandoned_state_survives();
+    test_cleanup_corrupted_survives();
+    test_cleanup_committed_staging_removed();
     test_backup_and_replace_collision_accepted();
 }

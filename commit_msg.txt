@@ -1,27 +1,22 @@
-Final hardening: crash recovery, backup journal, path containment, 166/166 tests
+Final hardening closure: atomic finalize rollback, committed cleanup, 173/173 tests
 
-- StagingManager: persistent backup journal on disk (.meta/backups.json)
-  with BackupEntry struct, backup_file_strict, restore_file_strict,
-  restore_backups, cleanup_backups, verify_finalized (all public)
-- StagingManager: rollback restores from persisted journal after restart
-  (new instance reads .meta/backups.json and restores files)
-- StagingManager: backup files stored under .meta/backups/<sanitized>
-  (unique paths, no destination-name collision)
-- StagingManager: backup failure aborts operation before dest modification
-- StagingManager: SkipIfIdentical throws on diff at validate and finalize
-- StagingManager: post-copy verify checks existence/size/checksum;
-  backup only cleaned AFTER verification succeeds
-- StagingManager: mark_rolling_back added during rollback for state clarity
-- StagingManager: cleanup_abandoned only removes RolledBack operations
-- FileUtils: is_path_within uses pure lexical component-based comparison
-  (no weakly_canonical, handles both / and \ separators)
-- FileUtils: sanitize_relative_path rejects absolute paths
-- FileUtils: create_directories guards against path traversal
-- StagingManager::stage_folder calls sanitize+is_path_within per entry
-- Application: recovery switch handles all StagingState values
-- 20+ new tests: restart recovery, journal persistence, rollback after
-  restart, backup failure, backup verification failure, SkipIfIdentical
-  identical/different, finalize verification failure, path containment
-  (sibling/absolute/nested), stage_folder basic+symlink, cleanup states,
-  BackupAndReplace collision
-- 166/166 tests passed, build clean
+- StagingManager::finalize_staging: wrap entire copy+verify in try/catch;
+  on any failure (copy or verify), restore_backups undoes all modifications,
+  state transitions to RolledBack, original destinations preserved
+- StagingManager: added cleanup_committed() method that finds and removes
+  Committed staging dirs still lingering with residual files
+- Application: calls cleanup_committed() on startup alongside cleanup_abandoned
+- FileUtils::is_path_within: pure lexical component-based comparison with
+  Windows backslash support (no weakly_canonical dependency)
+- FileUtils::sanitize_relative_path: rejects absolute paths and .. traversal
+- test_finalize_verification_failure_restores_backup: rewritten to actually
+  test successful finalize with verify (old test was misleadingly named)
+- test_verify_finalized_detects_mismatch: new test proving verify_finalized
+  detects size/checksum mismatch
+- test_finalize_copy_failure_restores_backup: new test proving collision
+  rejection during finalize leaves destinations unchanged
+- 5 new cleanup state tests: Staged, Finalizing, Abandoned, Corrupted,
+  cleanup_committed removes committed staging dirs
+- setup_base/cleanup_base: error_code overwrites prevent leftover files
+  from crashing subsequent test runs
+- 173/173 tests passed, build clean

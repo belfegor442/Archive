@@ -77,6 +77,7 @@ public:
     std::vector<StagingOperation> detect_abandoned_staging() const;
     std::vector<StagingOperation> detect_corrupted_staging() const;
     void cleanup_abandoned();
+    void cleanup_committed();
 
     static std::string generate_operation_id();
     static std::string state_to_string(StagingState state);

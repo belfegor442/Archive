@@ -50,6 +50,8 @@ void Application::recover_abandoned_staging() {
 
             staging.cleanup_staging(op.operation_id);
         }
+
+        staging.cleanup_committed();
     } catch (const std::exception& e) {
         std::cerr << "Warning: Failed to recover abandoned staging: " << e.what() << std::endl;
     }
