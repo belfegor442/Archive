@@ -1,16 +1,9 @@
-Fix backup journal: proper JSON escape, string-aware parser, atomic write, 187/187 tests
+fix(storage): Windows long path support (MAX_PATH 260+ chars)
 
-- write_backup_journal: json_escape() escapes ", \, \b, \f, \n, \r, \t
-  and control chars < 0x20 as \uXXXX; atomic write via .tmp + rename;
-  flush + error check before rename; cleanup .tmp on failure
-- read_backup_journal: single-pass string-aware parser that respects
-  escaped quotes/backslashes when finding object boundaries; json_unescape()
-  handles all JSON escape sequences including \uXXXX; validates array
-  structure, object boundaries, required fields; throws on truncated JSON,
-  missing destination, non-JSON content
-- append_backup_entry: reads journal, pushes entry, writes atomically
-- 12 new tests: quotes+backslashes, braces in strings, Windows paths,
-  newline+tab, 5→6 entries append, truncated JSON, missing field,
-  non-JSON content, empty array, missing file, no .tmp after write,
-  full escape roundtrip
-- 187/187 tests passed, build clean
+- FileUtils::long_path() adds \\?\ prefix for paths >=240 chars
+- Applied to create_directories, copy_file, move_file, remove_file,
+  remove_directory in FileUtils
+- StorageManager::store_folder and store_file_in_dir use FileUtils wrappers
+- StagingManager stage/finalize use long_path for deep nested imports
+- VersionService::restore uses FileUtils wrappers
+- Prevents 'cannot create directories' error on deep folder imports

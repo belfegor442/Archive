@@ -183,7 +183,7 @@ std::string StagingManager::stage_file_in_dir(const std::string& operation_id,
     if (!FileUtils::is_path_within(dest_path, files_dir)) {
         throw std::runtime_error("Path traversal rejected in staging: " + relative_path);
     }
-    std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
+    std::filesystem::create_directories(FileUtils::long_path(std::filesystem::path(dest_path).parent_path().string()));
     FileUtils::copy_file(source_path, dest_path);
     return dest_path;
 }
@@ -209,7 +209,7 @@ std::string StagingManager::stage_folder(const std::string& operation_id, const 
             if (!FileUtils::is_path_within(dest_path, files_dir)) {
                 throw std::runtime_error("Path traversal rejected in stage_folder: " + relative);
             }
-            std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
+            std::filesystem::create_directories(FileUtils::long_path(std::filesystem::path(dest_path).parent_path().string()));
             FileUtils::copy_file(entry.path().string(), dest_path);
         }
     }
@@ -278,7 +278,7 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
                 std::string relative = FileUtils::sanitize_relative_path(
                     std::filesystem::relative(entry.path(), staging_files).string());
                 std::string dest_path = dest_dir + "/" + relative;
-                std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
+                std::filesystem::create_directories(FileUtils::long_path(std::filesystem::path(dest_path).parent_path().string()));
 
                 if (std::filesystem::exists(dest_path)) {
                     switch (policy) {
@@ -303,7 +303,7 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
                             bk.state = "created";
                             append_backup_entry(operation_id, bk);
 
-                            std::filesystem::copy_file(entry.path().string(), dest_path,
+                            std::filesystem::copy_file(FileUtils::long_path(entry.path().string()), FileUtils::long_path(dest_path),
                                 std::filesystem::copy_options::overwrite_existing, ec);
                             if (ec) {
                                 throw std::runtime_error("Failed to copy to destination: " + relative

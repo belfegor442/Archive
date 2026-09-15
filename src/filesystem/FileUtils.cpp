@@ -37,7 +37,7 @@ std::string FileUtils::stem(const std::string& path) {
 
 void FileUtils::create_directories(const std::string& path) {
     std::error_code ec;
-    std::filesystem::create_directories(path, ec);
+    std::filesystem::create_directories(long_path(path), ec);
     if (ec) {
         throw std::runtime_error("Failed to create directories: " + path + " (" + ec.message() + ")");
     }
@@ -45,7 +45,7 @@ void FileUtils::create_directories(const std::string& path) {
 
 void FileUtils::copy_file(const std::string& source, const std::string& dest) {
     std::error_code ec;
-    std::filesystem::copy_file(source, dest, std::filesystem::copy_options::none, ec);
+    std::filesystem::copy_file(long_path(source), long_path(dest), std::filesystem::copy_options::none, ec);
     if (ec) {
         if (ec == std::errc::file_exists) {
             throw std::runtime_error("Destination already exists: " + dest);
@@ -63,7 +63,7 @@ std::string FileUtils::copy_file_safe(const std::string& source, const std::stri
 
 void FileUtils::move_file(const std::string& source, const std::string& dest) {
     std::error_code ec;
-    std::filesystem::rename(source, dest, ec);
+    std::filesystem::rename(long_path(source), long_path(dest), ec);
     if (ec) {
         throw std::runtime_error("Failed to move file: " + source + " -> " + dest + " (" + ec.message() + ")");
     }
@@ -71,7 +71,7 @@ void FileUtils::move_file(const std::string& source, const std::string& dest) {
 
 void FileUtils::remove_file(const std::string& path) {
     std::error_code ec;
-    std::filesystem::remove(path, ec);
+    std::filesystem::remove(long_path(path), ec);
     if (ec && ec != std::errc::no_such_file_or_directory) {
         throw std::runtime_error("Failed to remove file: " + path + " (" + ec.message() + ")");
     }
@@ -79,7 +79,7 @@ void FileUtils::remove_file(const std::string& path) {
 
 void FileUtils::remove_directory(const std::string& path) {
     std::error_code ec;
-    std::filesystem::remove_all(path, ec);
+    std::filesystem::remove_all(long_path(path), ec);
     if (ec) {
         throw std::runtime_error("Failed to remove directory: " + path + " (" + ec.message() + ")");
     }
@@ -194,6 +194,28 @@ bool FileUtils::is_path_within(const std::string& path, const std::string& base)
     }
 
     return true;
+}
+
+std::string FileUtils::long_path(const std::string& path) {
+#ifdef _WIN32
+    if (path.size() >= 240) {
+        std::string p = path;
+        for (auto& c : p) { if (c == '/') c = '\\'; }
+        if (p.size() >= 2 && p[1] == ':') {
+            return "\\\\?\\" + p;
+        }
+        if (p.size() >= 2 && p[0] == '\\' && p[1] == '\\') {
+            return p;
+        }
+        std::error_code ec;
+        auto abs = std::filesystem::absolute(p, ec).string();
+        if (!ec) {
+            for (auto& c : abs) { if (c == '/') c = '\\'; }
+            return "\\\\?\\" + abs;
+        }
+    }
+#endif
+    return path;
 }
 
 } // namespace archive::filesystem

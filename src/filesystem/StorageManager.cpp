@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <stdexcept>
 
+using archive::filesystem::FileUtils;
+
 namespace archive::filesystem {
 
 StorageManager::StorageManager(const std::string& base_dir, const std::string& items_dir)
@@ -34,7 +36,7 @@ std::string StorageManager::store_file_in_dir(const std::string& item_id,
     if (!FileUtils::is_path_within(dest_path, dest_dir)) {
         throw std::runtime_error("Path traversal rejected: " + relative_path);
     }
-    std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
+    FileUtils::create_directories(std::filesystem::path(dest_path).parent_path().string());
     FileUtils::copy_file(source_path, dest_path);
     return dest_path;
 }
@@ -66,7 +68,7 @@ std::string StorageManager::store_folder(const std::string& item_id, const std::
         if (entry.is_regular_file()) {
             std::string relative = std::filesystem::relative(entry.path(), source_dir).string();
             std::string dest_path = dest_base + "/" + relative;
-            std::filesystem::create_directories(std::filesystem::path(dest_path).parent_path());
+            FileUtils::create_directories(std::filesystem::path(dest_path).parent_path().string());
             FileUtils::copy_file(entry.path().string(), dest_path);
         }
     }
