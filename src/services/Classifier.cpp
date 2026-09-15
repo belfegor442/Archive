@@ -22,7 +22,8 @@ Classifier::Classifier(storage::DatabaseManager& db,
     , scan_items_(scan_items)
 {}
 
-std::vector<core::Classification> Classifier::classify_scan(const std::string& scan_id, int intensity) {
+std::vector<core::Classification> Classifier::classify_scan(const std::string& scan_id, int intensity,
+                                                             const ClassifyProgressFn& progress) {
     auto items = scan_items_.find_by_scan(scan_id);
     std::vector<core::Classification> results;
     results.reserve(items.size());
@@ -37,9 +38,17 @@ std::vector<core::Classification> Classifier::classify_scan(const std::string& s
               });
     rules_sorted_ = true;
 
+    int total = static_cast<int>(items.size());
+    int counted = 0;
+
     for (const auto& item : items) {
         core::Classification cls = classify_item(item, intensity);
         results.push_back(cls);
+        counted++;
+
+        if (progress && (counted % 256 == 0 || counted == total)) {
+            progress(counted, total);
+        }
     }
 
     rules_sorted_ = false;

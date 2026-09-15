@@ -24,7 +24,8 @@ Scanner::Scanner(storage::DatabaseManager& db,
     , scan_items_(scan_items)
 {}
 
-core::Scan Scanner::scan_directory(const std::string& root_path) {
+core::Scan Scanner::scan_directory(const std::string& root_path, bool compute_hash,
+                                    const ScanProgressFn& progress) {
     core::Scan scan;
     scan.id = core::utils::generate_id();
     scan.root_path = root_path;
@@ -34,6 +35,7 @@ core::Scan Scanner::scan_directory(const std::string& root_path) {
 
     int file_count = 0;
     int folder_count = 0;
+    int64_t total_bytes = 0;
 
     std::error_code ec;
     std::filesystem::recursive_directory_iterator it(
@@ -75,7 +77,8 @@ core::Scan Scanner::scan_directory(const std::string& root_path) {
         if (is_ignored(filename)) continue;
 
         try {
-            core::ScanItem item = analyze_file(entry.path().string(), scan.id);
+            core::ScanItem item = analyze_file(entry.path().string(), scan.id, compute_hash);
+            total_bytes += item.size;
             batch.push_back(std::move(item));
             file_count++;
 
@@ -84,6 +87,10 @@ core::Scan Scanner::scan_directory(const std::string& root_path) {
                 scan_items_.insert_batch(batch);
                 tx.commit();
                 batch.clear();
+
+                if (progress) {
+                    progress(file_count, folder_count, total_bytes);
+                }
             }
         } catch (const std::exception& e) {
             LOG_WARN("Failed to analyze file: " + entry.path().string() + " - " + e.what());
@@ -94,6 +101,10 @@ core::Scan Scanner::scan_directory(const std::string& root_path) {
         storage::Transaction tx(db_);
         scan_items_.insert_batch(batch);
         tx.commit();
+    }
+
+    if (progress) {
+        progress(file_count, folder_count, total_bytes);
     }
 
     scan.file_count = file_count;
@@ -139,7 +150,8 @@ std::vector<core::ScanItem> Scanner::get_items(const std::string& scan_id) const
     return scan_items_.find_by_scan(scan_id);
 }
 
-core::ScanItem Scanner::analyze_file(const std::string& filepath, const std::string& scan_id) {
+core::ScanItem Scanner::analyze_file(const std::string& filepath, const std::string& scan_id,
+                                      bool compute_hash) {
     core::ScanItem item;
     item.id = core::utils::generate_id();
     item.scan_id = scan_id;
@@ -159,10 +171,12 @@ core::ScanItem Scanner::analyze_file(const std::string& filepath, const std::str
 
     item.detected_project = detect_project_context(filepath);
 
-    try {
-        item.checksum = hashing::FileHasher::hash_file(filepath);
-    } catch (...) {
-        item.checksum = "";
+    if (compute_hash) {
+        try {
+            item.checksum = hashing::FileHasher::hash_file(filepath);
+        } catch (...) {
+            item.checksum = "";
+        }
     }
 
     return item;
@@ -296,6 +310,12 @@ std::string Scanner::detect_project_context(const std::string& filepath) {
 
     fs::path file_path(filepath);
     fs::path dir = file_path.parent_path();
+    std::string dir_str = dir.string();
+
+    auto cached = project_cache_.find(dir_str);
+    if (cached != project_cache_.end()) {
+        return cached->second;
+    }
 
     static const std::vector<std::pair<std::string, std::string>> project_indicators = {
         {"CMakeLists.txt", "C++"},
@@ -312,8 +332,6 @@ std::string Scanner::detect_project_context(const std::string& filepath) {
         {"pom.xml", "Java"},
         {"build.gradle", "Java"},
         {"build.gradle.kts", "Java/Kotlin"},
-        {"*.csproj", "C#"},
-        {"*.sln", "C#"},
         {"Package.swift", "Swift"},
         {"pubspec.yaml", "Dart/Flutter"},
         {"Dockerfile", "Docker"},
@@ -326,23 +344,34 @@ std::string Scanner::detect_project_context(const std::string& filepath) {
     int max_depth = 10;
 
     while (current != current.root_path() && max_depth > 0) {
+        std::string cur_str = current.string();
+        auto cached_parent = project_cache_.find(cur_str);
+        if (cached_parent != project_cache_.end()) {
+            std::string result = cached_parent->second;
+            project_cache_[dir_str] = result;
+            return result;
+        }
+
         for (const auto& [indicator, project_type] : project_indicators) {
             if (indicator.find('*') != std::string::npos) {
                 std::string stem_part = indicator.substr(0, indicator.find('*'));
                 std::string ext_part = indicator.substr(indicator.find('*') + 1);
 
-                for (const auto& entry : fs::directory_iterator(current)) {
+                std::error_code ec;
+                for (const auto& entry : fs::directory_iterator(current, ec)) {
                     if (entry.is_regular_file()) {
                         std::string name = entry.path().filename().string();
                         if (name.size() >= stem_part.size() + ext_part.size() &&
                             name.substr(0, stem_part.size()) == stem_part &&
                             name.substr(name.size() - ext_part.size()) == ext_part) {
+                            project_cache_[dir_str] = project_type;
                             return project_type;
                         }
                     }
                 }
             } else {
                 if (fs::exists(current / indicator)) {
+                    project_cache_[dir_str] = project_type;
                     return project_type;
                 }
             }
@@ -352,6 +381,7 @@ std::string Scanner::detect_project_context(const std::string& filepath) {
         max_depth--;
     }
 
+    project_cache_[dir_str] = "";
     return "";
 }
 

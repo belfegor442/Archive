@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <functional>
 #include "../core/models/ScanItem.h"
 #include "../core/models/Classification.h"
 #include "../core/models/ClassificationRule.h"
@@ -14,6 +15,8 @@
 
 namespace archive::services {
 
+using ClassifyProgressFn = std::function<void(int items_classified, int total)>;
+
 class Classifier {
 public:
     Classifier(storage::DatabaseManager& db,
@@ -21,7 +24,8 @@ public:
                storage::ClassificationRuleRepository& rules,
                storage::ScanItemRepository& scan_items);
 
-    std::vector<core::Classification> classify_scan(const std::string& scan_id, int intensity = 50);
+    std::vector<core::Classification> classify_scan(const std::string& scan_id, int intensity = 50,
+                                                     const ClassifyProgressFn& progress = nullptr);
     core::Classification classify_item(const core::ScanItem& item, int intensity = 50);
     void set_rules(const std::vector<core::ClassificationRule>& rules);
     std::vector<std::pair<std::string, int>> get_taxonomy_summary(const std::string& scan_id) const;

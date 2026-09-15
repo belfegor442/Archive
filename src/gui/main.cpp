@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <thread>
+#include <atomic>
 
 #include "app/AppConfig.h"
 #include "storage/DatabaseManager.h"
@@ -59,7 +61,16 @@ enum MenuCmd {
     CMD_ORG_PLAN     = 1021,
     CMD_ORG_EXECUTE  = 1022,
     CMD_ORG_UNDO     = 1023,
-    CMD_ORG_APPROVE  = 1024,
+};
+
+static const UINT WM_THREAD_DONE    = WM_USER + 100;
+static const UINT WM_THREAD_PROGRESS = WM_USER + 101;
+
+struct ThreadResult {
+    int op;
+    bool ok;
+    std::wstring message;
+    std::vector<std::wstring> rows;
 };
 
 static HINSTANCE g_hInst = nullptr;
@@ -70,6 +81,7 @@ static HWND g_hStatus = nullptr;
 static HWND g_hTab = nullptr;
 static app::AppConfig g_config;
 static std::vector<core::ArchiveItem> g_items;
+static std::atomic<bool> g_busy{false};
 
 static std::wstring ToW(const std::string& s) {
     if (s.empty()) return L"";
@@ -89,6 +101,17 @@ static std::string FromW(const std::wstring& ws) {
 
 static void Status(const wchar_t* txt) {
     SendMessageW(g_hStatus, SB_SETTEXTW, 0, (LPARAM)txt);
+}
+
+static void SetBusy(bool busy) {
+    g_busy = busy;
+    EnableMenuItem(GetMenu(g_hWnd), CMD_IMPORT, busy ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(GetMenu(g_hWnd), CMD_IMPORT_DIR, busy ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(GetMenu(g_hWnd), CMD_ORG_SCAN, busy ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(GetMenu(g_hWnd), CMD_ORG_PLAN, busy ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(GetMenu(g_hWnd), CMD_ORG_EXECUTE, busy ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(GetMenu(g_hWnd), CMD_ORG_UNDO, busy ? MF_GRAYED : MF_ENABLED);
+    EnableMenuItem(GetMenu(g_hWnd), CMD_VERIFY, busy ? MF_GRAYED : MF_ENABLED);
 }
 
 struct Svc {
@@ -115,20 +138,17 @@ struct Svc {
             storage(g_config.data_dir, g_config.items_dir) { db.initialize(); }
 };
 
+static Svc* g_svc = nullptr;
+
 static int ActiveTab() {
-    TCITEMW tc = {};
-    tc.mask = TCIF_TEXT;
     int sel = TabCtrl_GetCurSel(g_hTab);
-    if (sel < 0) return 0;
-    TabCtrl_GetItem(g_hTab, sel, &tc);
-    return sel;
+    return sel < 0 ? 0 : sel;
 }
 
 static void RefreshArchiveList() {
     ListView_DeleteAllItems(g_hList);
     try {
-        Svc s;
-        g_items = s.items.find_all();
+        g_items = g_svc->items.find_all();
     } catch (...) { Status(L"Error loading items"); return; }
 
     for (int i = 0; i < (int)g_items.size(); i++) {
@@ -141,7 +161,7 @@ static void RefreshArchiveList() {
         int idx = ListView_InsertItem(g_hList, &li);
 
         const wchar_t* types[] = { L"File", L"Folder", L"Project", L"Document" };
-        std::wstring tp = types[(int)it.type];
+        std::wstring tp = (int)it.type < 4 ? types[(int)it.type] : L"Unknown";
         std::wstring st = ToW(core::to_string(it.status));
         std::wstring vr = L"v" + std::to_wstring(it.current_version);
         std::wstring sz = std::to_wstring(it.size) + L" B";
@@ -160,11 +180,10 @@ static void RefreshArchiveList() {
 static void RefreshOrgList(const std::vector<std::wstring>& rows) {
     ListView_DeleteAllItems(g_hOrgList);
     for (int i = 0; i < (int)rows.size(); i++) {
-        std::wstring nm = rows[i];
         LVITEMW li = {};
         li.mask = LVIF_TEXT;
         li.iItem = i;
-        li.pszText = (LPWSTR)nm.c_str();
+        li.pszText = (LPWSTR)rows[i].c_str();
         ListView_InsertItem(g_hOrgList, &li);
     }
 }
@@ -195,27 +214,6 @@ static std::wstring PickFile(HWND h) {
 
 static int SelIdx() { return ListView_GetNextItem(g_hList, -1, LVNI_SELECTED); }
 
-static void DoImport(HWND h, bool dir) {
-    std::wstring path = dir ? PickFolder(h) : PickFile(h);
-    if (path.empty()) return;
-    Status(L"Importing...");
-    UpdateWindow(h);
-    try {
-        Svc s;
-        services::ImportService imp(s.db, s.items, s.categories, s.tags,
-                                    s.activities, s.versions, s.stored, s.storage, s.detector);
-        core::ImportRequest req;
-        req.paths.push_back(FromW(path));
-        auto res = imp.import(req);
-        if (res.has_errors()) {
-            MessageBoxW(h, (L"Error: " + ToW(res.errors[0].error)).c_str(), L"Import Error", MB_ICONERROR);
-        }
-        RefreshArchiveList();
-    } catch (const std::exception& e) {
-        MessageBoxW(h, (L"Failed: " + ToW(e.what())).c_str(), L"Error", MB_ICONERROR);
-    }
-}
-
 static void DoDetails(HWND h) {
     int i = SelIdx();
     if (i < 0 || i >= (int)g_items.size()) { MessageBoxW(h, L"Select an item", L"Info", MB_ICONINFORMATION); return; }
@@ -234,8 +232,7 @@ static void DoDetails(HWND h) {
     info += L"Created:   " + ToW(it.created_at) + L"\n";
     info += L"Archived:  " + ToW(it.archived_at) + L"\n";
     try {
-        Svc s;
-        auto vers = s.versions.find_by_item(it.id);
+        auto vers = g_svc->versions.find_by_item(it.id);
         if (!vers.empty()) {
             info += L"\nVersions (" + std::to_wstring(vers.size()) + L"):\n";
             for (const auto& v : vers)
@@ -245,12 +242,183 @@ static void DoDetails(HWND h) {
     MessageBoxW(h, info.c_str(), L"Details", MB_ICONINFORMATION);
 }
 
+static std::wstring g_last_scanned_path;
+static std::string g_last_scan_id;
+static std::string g_last_plan_id;
+static std::string g_last_undo_id;
+
+// ============================================================
+// Background thread: Scan + Classify
+// ============================================================
+static void ThreadScanAndClassify(HWND h, std::wstring path) {
+    auto* result = new ThreadResult{};
+    result->op = CMD_ORG_SCAN;
+    result->ok = false;
+
+    try {
+        app::AppConfig cfg = app::AppConfig::default_config();
+        cfg.ensure_directories();
+        storage::DatabaseManager db(cfg.db_path);
+        db.initialize();
+        storage::ScanRepository scans(db);
+        storage::ScanItemRepository scan_items(db);
+        storage::ClassificationRepository classifications(db);
+        storage::ClassificationRuleRepository rules(db);
+
+        services::Scanner scanner(db, scans, scan_items);
+        auto scan = scanner.scan_directory(FromW(path), false,
+            [h](int files, int folders, int64_t bytes) {
+                double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
+                std::wstring msg = L"Scanning... " + std::to_wstring(files) + L" files, "
+                    + std::to_wstring(folders) + L" folders";
+                PostMessageW(h, WM_THREAD_PROGRESS, 0, (LPARAM)_wcsdup(msg.c_str()));
+            });
+
+        services::Classifier classifier(db, classifications, rules, scan_items);
+        classifier.classify_scan(scan.id, 50);
+
+        result->ok = true;
+        result->message = ToW(scan.id);
+    } catch (const std::exception& e) {
+        result->message = ToW(e.what());
+    }
+
+    PostMessageW(h, WM_THREAD_DONE, 0, (LPARAM)result);
+}
+
+// ============================================================
+// Background thread: Plan
+// ============================================================
+static void ThreadPlan(HWND h, std::string scan_id, std::string root_path) {
+    auto* result = new ThreadResult{};
+    result->op = CMD_ORG_PLAN;
+    result->ok = false;
+
+    try {
+        app::AppConfig cfg = app::AppConfig::default_config();
+        cfg.ensure_directories();
+        storage::DatabaseManager db(cfg.db_path);
+        db.initialize();
+        storage::ScanRepository scans(db);
+        storage::ScanItemRepository scan_items(db);
+        storage::ClassificationRepository classifications(db);
+        storage::OrgPlanRepository plans(db);
+        storage::OrgMoveRepository moves(db);
+
+        services::OrganizationPlanner planner(db, scans, scan_items, classifications, plans, moves);
+        auto plan = planner.create_plan(scan_id, root_path, 50);
+        planner.approve_plan(plan.id);
+
+        auto details = planner.get_moves(plan.id);
+        for (const auto& d : details) {
+            std::wstring row = ToW(d.source);
+            row += L"  -->  " + ToW(d.destination);
+            row += L"  (" + std::to_wstring((int)(d.confidence * 100)) + L"%)";
+            result->rows.push_back(row);
+        }
+        if (result->rows.empty()) {
+            result->rows.push_back(L"No moves planned (files already organized)");
+        }
+
+        result->ok = true;
+        std::wstring summary = L"Plan: " + std::to_wstring(plan.moves_planned) + L" moves, "
+            + std::to_wstring(plan.total_files) + L" files, avg "
+            + std::to_wstring((int)(plan.avg_confidence * 100)) + L"%";
+        result->message = summary;
+    } catch (const std::exception& e) {
+        result->message = ToW(e.what());
+    }
+
+    PostMessageW(h, WM_THREAD_DONE, 0, (LPARAM)result);
+}
+
+// ============================================================
+// Background thread: Execute
+// ============================================================
+static void ThreadExecute(HWND h, std::string plan_id) {
+    auto* result = new ThreadResult{};
+    result->op = CMD_ORG_EXECUTE;
+    result->ok = false;
+
+    try {
+        app::AppConfig cfg = app::AppConfig::default_config();
+        cfg.ensure_directories();
+        storage::DatabaseManager db(cfg.db_path);
+        db.initialize();
+        storage::OrgPlanRepository plans(db);
+        storage::OrgMoveRepository moves(db);
+        storage::UndoRepository undo(db);
+
+        services::OrganizationExecutor executor(db, plans, moves, undo);
+        auto undo_rec = executor.execute(plan_id);
+
+        result->ok = true;
+        result->message = L"Executed! " + std::to_wstring(undo_rec.moves_count)
+            + L" files moved.\nUndo ID: " + ToW(undo_rec.id);
+    } catch (const std::exception& e) {
+        result->message = ToW(e.what());
+    }
+
+    PostMessageW(h, WM_THREAD_DONE, 0, (LPARAM)result);
+}
+
+// ============================================================
+// Background thread: Undo
+// ============================================================
+static void ThreadUndo(HWND h, std::string undo_id) {
+    auto* result = new ThreadResult{};
+    result->op = CMD_ORG_UNDO;
+    result->ok = false;
+
+    try {
+        app::AppConfig cfg = app::AppConfig::default_config();
+        cfg.ensure_directories();
+        storage::DatabaseManager db(cfg.db_path);
+        db.initialize();
+        storage::OrgPlanRepository plans(db);
+        storage::OrgMoveRepository moves(db);
+        storage::UndoRepository undo_repo(db);
+
+        services::OrganizationExecutor executor(db, plans, moves, undo_repo);
+        executor.undo(undo_id);
+
+        result->ok = true;
+        result->message = L"Files restored to original locations.";
+    } catch (const std::exception& e) {
+        result->message = ToW(e.what());
+    }
+
+    PostMessageW(h, WM_THREAD_DONE, 0, (LPARAM)result);
+}
+
+// ============================================================
+// UI actions (synchronous for quick ops, threaded for heavy)
+// ============================================================
+static void DoImport(HWND h, bool dir) {
+    std::wstring path = dir ? PickFolder(h) : PickFile(h);
+    if (path.empty()) return;
+    Status(L"Importing...");
+    UpdateWindow(h);
+    try {
+        services::ImportService imp(g_svc->db, g_svc->items, g_svc->categories, g_svc->tags,
+                                    g_svc->activities, g_svc->versions, g_svc->stored, g_svc->storage, g_svc->detector);
+        core::ImportRequest req;
+        req.paths.push_back(FromW(path));
+        auto res = imp.import(req);
+        if (res.has_errors()) {
+            MessageBoxW(h, (L"Error: " + ToW(res.errors[0].error)).c_str(), L"Import Error", MB_ICONERROR);
+        }
+        RefreshArchiveList();
+    } catch (const std::exception& e) {
+        MessageBoxW(h, (L"Failed: " + ToW(e.what())).c_str(), L"Error", MB_ICONERROR);
+    }
+}
+
 static void DoVerify(HWND h) {
     Status(L"Verifying...");
     UpdateWindow(h);
     try {
-        Svc s;
-        services::IntegrityService integ(s.items, s.versions, s.stored, s.activities, s.storage);
+        services::IntegrityService integ(g_svc->items, g_svc->versions, g_svc->stored, g_svc->activities, g_svc->storage);
         auto r = integ.verify_all();
         std::wstring m = L"Valid: " + std::to_wstring(r.valid_count);
         if (r.modified_count) m += L", Modified: " + std::to_wstring(r.modified_count);
@@ -270,9 +438,8 @@ static void DoRestore(HWND h) {
     Status(L"Restoring...");
     UpdateWindow(h);
     try {
-        Svc s;
-        services::VersionService vs(s.db, s.versions, s.items, s.activities, s.stored, s.storage);
-        auto lv = s.versions.find_latest(it.id);
+        services::VersionService vs(g_svc->db, g_svc->versions, g_svc->items, g_svc->activities, g_svc->stored, g_svc->storage);
+        auto lv = g_svc->versions.find_latest(it.id);
         if (!lv) { MessageBoxW(h, L"No versions", L"Error", MB_ICONERROR); return; }
         vs.restore(it.id, lv->id);
         MessageBoxW(h, (L"Restored v" + std::to_wstring(lv->version_number)).c_str(), L"Done", MB_ICONINFORMATION);
@@ -287,7 +454,7 @@ static void DoTrash(HWND h) {
     if (i < 0 || i >= (int)g_items.size()) return;
     const auto& it = g_items[i];
     if (MessageBoxW(h, (L"Trash \"" + ToW(it.name) + L"\"?").c_str(), L"Trash", MB_YESNO | MB_ICONQUESTION) != IDYES) return;
-    try { Svc s; services::UpdateService u(s.items, s.activities, s.storage); u.move_to_trash(it.id); RefreshArchiveList(); }
+    try { services::UpdateService u(g_svc->items, g_svc->activities, g_svc->storage); u.move_to_trash(it.id); RefreshArchiveList(); }
     catch (const std::exception& e) { MessageBoxW(h, ToW(e.what()).c_str(), L"Error", MB_ICONERROR); }
 }
 
@@ -295,7 +462,7 @@ static void DoUntrash(HWND h) {
     int i = SelIdx();
     if (i < 0 || i >= (int)g_items.size()) return;
     const auto& it = g_items[i];
-    try { Svc s; services::UpdateService u(s.items, s.activities, s.storage); u.restore_from_trash(it.id); RefreshArchiveList(); }
+    try { services::UpdateService u(g_svc->items, g_svc->activities, g_svc->storage); u.restore_from_trash(it.id); RefreshArchiveList(); }
     catch (const std::exception& e) { MessageBoxW(h, ToW(e.what()).c_str(), L"Error", MB_ICONERROR); }
 }
 
@@ -304,120 +471,44 @@ static void DoDelete(HWND h) {
     if (i < 0 || i >= (int)g_items.size()) return;
     const auto& it = g_items[i];
     if (MessageBoxW(h, (L"PERMANENTLY delete \"" + ToW(it.name) + L"\"?").c_str(), L"Delete", MB_YESNO | MB_ICONWARNING) != IDYES) return;
-    try { Svc s; services::UpdateService u(s.items, s.activities, s.storage); u.permanent_delete(it.id); RefreshArchiveList(); }
+    try { services::UpdateService u(g_svc->items, g_svc->activities, g_svc->storage); u.permanent_delete(it.id); RefreshArchiveList(); }
     catch (const std::exception& e) { MessageBoxW(h, ToW(e.what()).c_str(), L"Error", MB_ICONERROR); }
 }
 
-static std::wstring g_last_scanned_path;
-static std::string g_last_scan_id;
-static std::string g_last_plan_id;
-static std::string g_last_undo_id;
-
 static void DoOrgScan(HWND h) {
+    if (g_busy) return;
     std::wstring path = PickFolder(h);
     if (path.empty()) return;
     g_last_scanned_path = path;
+    SetBusy(true);
     Status(L"Scanning folder...");
-    UpdateWindow(h);
-    try {
-        Svc s;
-        services::Scanner scanner(s.db, s.scans, s.scan_items);
-        auto scan = scanner.scan_directory(FromW(path));
-        g_last_scan_id = scan.id;
-
-        Status(L"Classifying files...");
-        UpdateWindow(h);
-        services::Classifier classifier(s.db, s.classifications, s.rules, s.scan_items);
-        auto classes = classifier.classify_scan(scan.id, 50);
-
-        std::vector<std::wstring> rows;
-        auto items = s.scan_items.find_by_scan(scan.id);
-        for (const auto& item : items) {
-            auto best = s.classifications.find_best(item.id);
-            std::wstring row = ToW(item.filename);
-            row += L"  |  " + ToW(best ? best->taxonomy_path : "Unknown");
-            row += L"  |  " + ToW(item.extension);
-            row += L"  |  " + std::to_wstring(item.size) + L" B";
-            rows.push_back(row);
-        }
-        RefreshOrgList(rows);
-
-        std::wstring msg = L"Scanned " + std::to_wstring(scan.file_count) + L" files, " +
-                           std::to_wstring(scan.folder_count) + L" folders, " +
-                           std::to_wstring(classes.size()) + L" classified";
-        Status(msg.c_str());
-    } catch (const std::exception& e) {
-        MessageBoxW(h, (L"Failed: " + ToW(e.what())).c_str(), L"Error", MB_ICONERROR);
-    }
+    std::thread(ThreadScanAndClassify, h, path).detach();
 }
 
 static void DoOrgPlan(HWND h) {
+    if (g_busy) return;
     if (g_last_scan_id.empty()) { MessageBoxW(h, L"Scan a folder first", L"Info", MB_ICONINFORMATION); return; }
+    SetBusy(true);
     Status(L"Generating plan...");
-    UpdateWindow(h);
-    try {
-        Svc s;
-        services::OrganizationPlanner planner(s.db, s.scans, s.scan_items, s.classifications, s.plans, s.moves);
-        auto plan = planner.create_plan(g_last_scan_id, FromW(g_last_scanned_path), 50);
-        g_last_plan_id = plan.id;
-        planner.approve_plan(plan.id);
-
-        auto details = planner.get_moves(plan.id);
-        std::vector<std::wstring> rows;
-        for (const auto& d : details) {
-            std::wstring row = ToW(d.source);
-            row += L"  -->  " + ToW(d.destination);
-            row += L"  (" + std::to_wstring((int)(d.confidence * 100)) + L"%)";
-            rows.push_back(row);
-        }
-        if (rows.empty()) {
-            rows.push_back(L"No moves planned (files already organized)");
-        }
-        RefreshOrgList(rows);
-
-        std::wstring msg = L"Plan: " + std::to_wstring(plan.moves_planned) + L" moves, " +
-                           std::to_wstring(plan.total_files) + L" files, avg confidence " +
-                           std::to_wstring((int)(plan.avg_confidence * 100)) + L"%";
-        Status(msg.c_str());
-    } catch (const std::exception& e) {
-        MessageBoxW(h, (L"Failed: " + ToW(e.what())).c_str(), L"Error", MB_ICONERROR);
-    }
+    std::thread(ThreadPlan, h, g_last_scan_id, FromW(g_last_scanned_path)).detach();
 }
 
 static void DoOrgExecute(HWND h) {
+    if (g_busy) return;
     if (g_last_plan_id.empty()) { MessageBoxW(h, L"Generate a plan first", L"Info", MB_ICONINFORMATION); return; }
     if (MessageBoxW(h, L"Execute this plan? Files will be moved.", L"Confirm", MB_YESNO | MB_ICONQUESTION) != IDYES) return;
+    SetBusy(true);
     Status(L"Executing plan...");
-    UpdateWindow(h);
-    try {
-        Svc s;
-        services::OrganizationExecutor executor(s.db, s.plans, s.moves, s.undos);
-        auto undo = executor.execute(g_last_plan_id);
-        g_last_undo_id = undo.id;
-
-        std::wstring msg = L"Executed! " + std::to_wstring(undo.moves_count) + L" files moved. Undo ID: " + ToW(undo.id);
-        Status(msg.c_str());
-        MessageBoxW(h, msg.c_str(), L"Organize Complete", MB_ICONINFORMATION);
-    } catch (const std::exception& e) {
-        MessageBoxW(h, (L"Failed: " + ToW(e.what())).c_str(), L"Error", MB_ICONERROR);
-    }
+    std::thread(ThreadExecute, h, g_last_plan_id).detach();
 }
 
 static void DoOrgUndo(HWND h) {
+    if (g_busy) return;
     if (g_last_undo_id.empty()) { MessageBoxW(h, L"No undo available. Execute a plan first.", L"Info", MB_ICONINFORMATION); return; }
     if (MessageBoxW(h, L"Undo last organize operation?", L"Confirm", MB_YESNO | MB_ICONQUESTION) != IDYES) return;
+    SetBusy(true);
     Status(L"Undoing...");
-    UpdateWindow(h);
-    try {
-        Svc s;
-        services::OrganizationExecutor executor(s.db, s.plans, s.moves, s.undos);
-        executor.undo(g_last_undo_id);
-        g_last_undo_id.clear();
-        Status(L"Undo complete. Files restored to original locations.");
-        MessageBoxW(h, L"Files restored to original locations.", L"Undo Complete", MB_ICONINFORMATION);
-    } catch (const std::exception& e) {
-        MessageBoxW(h, (L"Failed: " + ToW(e.what())).c_str(), L"Error", MB_ICONERROR);
-    }
+    std::thread(ThreadUndo, h, g_last_undo_id).detach();
 }
 
 static void LayoutChildren(HWND h) {
@@ -431,7 +522,6 @@ static void LayoutChildren(HWND h) {
     SendMessageW(g_hStatus, WM_SIZE, 0, 0);
     MoveWindow(g_hTab, 0, 0, w, hh - sbh, TRUE);
 
-    int tab_margin = 4;
     RECT tr; GetWindowRect(g_hTab, &tr);
     TabCtrl_AdjustRect(g_hTab, FALSE, &tr);
     int tx = tr.left; int ty = tr.top; int tw = tr.right - tr.left; int th = tr.bottom - tr.top;
@@ -505,6 +595,63 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         if (nm->hwndFrom == g_hList && nm->code == NM_DBLCLK) DoDetails(h);
         break;
     }
+    case WM_THREAD_PROGRESS: {
+        if (l) {
+            Status((const wchar_t*)l);
+            free((void*)l);
+        }
+        break;
+    }
+    case WM_THREAD_DONE: {
+        auto* result = (ThreadResult*)l;
+        if (!result) break;
+
+        switch (result->op) {
+        case CMD_ORG_SCAN:
+            if (result->ok) {
+                g_last_scan_id = FromW(result->message);
+                Status(L"Scan complete. Ready to plan.");
+            } else {
+                MessageBoxW(h, (L"Scan failed: " + result->message).c_str(), L"Error", MB_ICONERROR);
+                Status(L"Scan failed.");
+            }
+            break;
+        case CMD_ORG_PLAN:
+            if (result->ok) {
+                g_last_plan_id = FromW(result->message);
+                RefreshOrgList(result->rows);
+                Status(result->message.c_str());
+            } else {
+                MessageBoxW(h, (L"Plan failed: " + result->message).c_str(), L"Error", MB_ICONERROR);
+                Status(L"Plan failed.");
+            }
+            break;
+        case CMD_ORG_EXECUTE:
+            if (result->ok) {
+                g_last_undo_id = FromW(result->message.substr(result->message.find(L"Undo ID:") + 9));
+                Status(L"Execute complete.");
+                MessageBoxW(h, result->message.c_str(), L"Organize Complete", MB_ICONINFORMATION);
+            } else {
+                MessageBoxW(h, (L"Execute failed: " + result->message).c_str(), L"Error", MB_ICONERROR);
+                Status(L"Execute failed.");
+            }
+            break;
+        case CMD_ORG_UNDO:
+            if (result->ok) {
+                g_last_undo_id.clear();
+                Status(L"Undo complete.");
+                MessageBoxW(h, result->message.c_str(), L"Undo Complete", MB_ICONINFORMATION);
+            } else {
+                MessageBoxW(h, (L"Undo failed: " + result->message).c_str(), L"Error", MB_ICONERROR);
+                Status(L"Undo failed.");
+            }
+            break;
+        }
+
+        SetBusy(false);
+        delete result;
+        break;
+    }
     case WM_COMMAND:
         switch (LOWORD(w)) {
             case CMD_IMPORT:       DoImport(h, false); break;
@@ -520,7 +667,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             case CMD_ORG_PLAN:     DoOrgPlan(h); break;
             case CMD_ORG_EXECUTE:  DoOrgExecute(h); break;
             case CMD_ORG_UNDO:     DoOrgUndo(h); break;
-            case CMD_ABOUT:        MessageBoxW(h, L"Archive v0.1.0\n\nFile Archiving & Intelligent Organizer\nSHA-256 integrity. Atomic rollback.\n\nScan  >  Classify  >  Plan  >  Execute  >  Undo\n\nMIT License", L"About", MB_ICONINFORMATION); break;
+            case CMD_ABOUT:        MessageBoxW(h, L"Archive v0.2.0\n\nFile Archiving & Intelligent Organizer\nSHA-256 integrity. Atomic rollback.\nScan  >  Classify  >  Plan  >  Execute  >  Undo\n\nHandles 1GB+ folders with streaming batch processing.\n\nMIT License", L"About", MB_ICONINFORMATION); break;
             case CMD_EXIT:         DestroyWindow(h); break;
         }
         break;
@@ -534,6 +681,8 @@ int WINAPI wWinMain(HINSTANCE hI, HINSTANCE, LPWSTR, int nS) {
     g_hInst = hI;
     g_config = app::AppConfig::default_config();
     g_config.ensure_directories();
+
+    g_svc = new Svc();
 
     INITCOMMONCONTROLSEX ic = { sizeof(ic), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES | ICC_TAB_CLASSES };
     InitCommonControlsEx(&ic);
@@ -582,7 +731,7 @@ int WINAPI wWinMain(HINSTANCE hI, HINSTANCE, LPWSTR, int nS) {
     AppendMenuW(hHelp, MF_STRING, CMD_ABOUT, L"&About");
     AppendMenuW(hBar, MF_POPUP, (UINT_PTR)hHelp, L"&Help");
 
-    g_hWnd = CreateWindowExW(0, L"ArchiveWnd", L"Archive v0.1.0 — Organizer",
+    g_hWnd = CreateWindowExW(0, L"ArchiveWnd", L"Archive v0.2.0 — Organizer",
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1020, 620,
         nullptr, hBar, hI, nullptr);
 

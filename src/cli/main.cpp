@@ -32,6 +32,7 @@
 #include <algorithm>
 #include <map>
 #include <functional>
+#include <chrono>
 
 using namespace archive;
 
@@ -42,6 +43,7 @@ struct CliContext {
     int intensity = 50;
     bool dry_run = false;
     bool yes = false;
+    bool skip_hash = false;
 };
 
 static void print_usage() {
@@ -66,6 +68,7 @@ static void print_usage() {
         "Options:\n"
         "  --data-dir <path>   Override data directory (default: ~/.archive-data)\n"
         "  --intensity <N>     Classification intensity 0-100 (default: 50)\n"
+        "  --skip-hash         Skip SHA-256 hashing (much faster for large folders)\n"
         "  --dry-run           Show what would happen without executing\n"
         "  --yes               Skip confirmation prompts\n"
         "\n"
@@ -107,6 +110,8 @@ static bool parse_args(int argc, char* argv[], CliContext& ctx) {
             }
         } else if (arg == "--dry-run") {
             ctx.dry_run = true;
+        } else if (arg == "--skip-hash") {
+            ctx.skip_hash = true;
         } else if (arg == "--yes" || arg == "-y") {
             ctx.yes = true;
         } else {
@@ -239,7 +244,7 @@ static void print_moves(const std::vector<core::MoveDetail>& moves) {
 static int cmd_analyze(CliContext& ctx) {
     if (ctx.args.empty()) {
         std::cerr << "Error: analyze requires a path\n";
-        std::cerr << "Usage: archive analyze <path>\n";
+        std::cerr << "Usage: archive analyze <path> [--skip-hash]\n";
         return 2;
     }
 
@@ -252,14 +257,31 @@ static int cmd_analyze(CliContext& ctx) {
 
     services::Scanner scanner(db, scans, scan_items);
 
+    auto start = std::chrono::steady_clock::now();
+
     try {
-        auto scan = scanner.scan_directory(ctx.args[0]);
+        auto scan = scanner.scan_directory(ctx.args[0], !ctx.skip_hash,
+            [](int files, int folders, int64_t bytes) {
+                double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
+                std::cout << "\r  Scanning... " << files << " files, "
+                          << folders << " folders, "
+                          << std::fixed << std::setprecision(1) << mb << " MB"
+                          << std::flush;
+            });
+        std::cout << "\n";
+
         auto result = scanner.analyze(scan.id);
+        auto elapsed = std::chrono::steady_clock::now() - start;
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+
         print_analysis(result);
         std::cout << "Scan ID: " << scan.id << "\n";
+        std::cout << "Time:    " << ms << "ms";
+        if (ctx.skip_hash) std::cout << " (SHA-256 skipped)";
+        std::cout << "\n";
         return 0;
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << "\n";
+        std::cerr << "\nError: " << e.what() << "\n";
         return 6;
     }
 }
@@ -287,20 +309,42 @@ static int cmd_plan(CliContext& ctx) {
     services::OrganizationPlanner planner(db, scans, scan_items, classifications, plans, moves);
 
     try {
-        auto scan = scanner.scan_directory(ctx.args[0]);
-        classifier.classify_scan(scan.id, ctx.intensity);
+        auto start = std::chrono::steady_clock::now();
+
+        auto scan = scanner.scan_directory(ctx.args[0], !ctx.skip_hash,
+            [](int files, int folders, int64_t bytes) {
+                double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
+                std::cout << "\r  Scanning... " << files << " files, "
+                          << folders << " folders, "
+                          << std::fixed << std::setprecision(1) << mb << " MB"
+                          << std::flush;
+            });
+        std::cout << "\n";
+
+        classifier.classify_scan(scan.id, ctx.intensity,
+            [](int done, int total) {
+                std::cout << "\r  Classifying... " << done << "/" << total
+                          << " items" << std::flush;
+            });
+        std::cout << "\n";
 
         auto plan = planner.create_plan(scan.id, ctx.args[0], ctx.intensity);
         auto summary = planner.get_summary(plan.id);
-
         planner.approve_plan(plan.id);
+
+        auto elapsed = std::chrono::steady_clock::now() - start;
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+
         print_plan_summary(summary);
 
         std::cout << "Plan ID: " << plan.id << "\n";
+        std::cout << "Time:    " << ms << "ms";
+        if (ctx.skip_hash) std::cout << " (SHA-256 skipped)";
+        std::cout << "\n";
         std::cout << "Use 'archive preview " << plan.id << "' to see detailed moves.\n";
         return 0;
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << "\n";
+        std::cerr << "\nError: " << e.what() << "\n";
         return 1;
     }
 }
