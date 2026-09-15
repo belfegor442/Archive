@@ -102,7 +102,7 @@ target_include_directories(archive-cli PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_options(archive-cli PRIVATE -static -static-libgcc -static-libstdc++)
 
 # Win32 native GUI (no Qt dependency)
-add_executable(archive-gui WIN32 src/gui/main.cpp)
+add_executable(archive-gui WIN32 src/gui/main.cpp src/gui/archive-gui.rc)
 target_link_libraries(archive-gui PRIVATE archive_lib comctl32 shell32)
 target_include_directories(archive-gui PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_compile_definitions(archive-gui PRIVATE UNICODE _UNICODE)
