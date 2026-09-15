@@ -111,6 +111,57 @@ bool VulkanRenderer::initialize(HWND hwnd, uint32_t width, uint32_t height) {
     hwnd_ = hwnd;
     VkCtx ctx{*this};
 
+    // Pre-check: detect broken implicit layers BEFORE loading Vulkan.
+    // VK_LAYER_AMD_switchable_graphics (DriverStore) and VK_LAYER_MEDIASDK_HOOK
+    // (registry) wrap VkDevice handles incorrectly, causing
+    // __fastfail(STATUS_STACK_BUFFER_OVERRUN) on any device-level call.
+    {
+        bool brokenLayerDetected = false;
+
+        // Check HKLM registry for MEDIASDK_HOOK and switchable_graphics
+        HKEY hKey;
+        if (RegOpenKeyExA(HKEY_LOCAL_MACHINE,
+                "SOFTWARE\\Khronos\\Vulkan\\ImplicitLayers",
+                0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+            DWORD idx = 0;
+            char valueName[512];
+            DWORD valueNameSize;
+            while (true) {
+                valueNameSize = sizeof(valueName);
+                LONG res = RegEnumValueA(hKey, idx++, valueName, &valueNameSize,
+                    nullptr, nullptr, nullptr, nullptr);
+                if (res != ERROR_SUCCESS) break;
+                if (strstr(valueName, "switchable") || strstr(valueName, "MediaSDK") ||
+                    strstr(valueName, "MEDIASDK")) {
+                    OutputDebugStringA("[VK] Broken implicit layer found in registry\n");
+                    brokenLayerDetected = true;
+                    break;
+                }
+            }
+            RegCloseKey(hKey);
+        }
+
+        // Check for AMD switchable graphics DriverStore manifest
+        if (!brokenLayerDetected) {
+            const char* amdDriverDirs[] = {
+                "C:\\Windows\\System32\\DriverStore\\FileRepository\\u0401134.inf_amd64_35bda0dee1499017\\B399690\\amd-vulkan64.json",
+                "C:\\Windows\\System32\\DriverStore\\FileRepository\\amdwin-u0401134.inf_amd64_a9f23e8d30e00e27\\amd-vulkan64.json",
+            };
+            for (auto path : amdDriverDirs) {
+                if (GetFileAttributesA(path) != INVALID_FILE_ATTRIBUTES) {
+                    OutputDebugStringA("[VK] Broken AMD switchable graphics layer found in DriverStore\n");
+                    brokenLayerDetected = true;
+                    break;
+                }
+            }
+        }
+
+        if (brokenLayerDetected) {
+            OutputDebugStringA("[VK] Broken implicit layers prevent safe Vulkan init. GDI fallback.\n");
+            return false;
+        }
+    }
+
     // Load Vulkan DLL
     g_vkModule = LoadLibraryA("vulkan-1.dll");
     if (!g_vkModule) {

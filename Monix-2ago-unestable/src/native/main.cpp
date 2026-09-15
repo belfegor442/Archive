@@ -772,7 +772,7 @@ public:
   void TelemetryLoop();
 private:
   Snapshot PollSnapshot();
-  Snapshot PollNativeSnapshot();
+  Snapshot PollSnapshotWithState(std::unique_ptr<Snapshot> prevSnap, int sampleCount);
   std::vector<ProcessInfo> BuildFallbackProcesses(const Snapshot& snapshot);
   std::string RunProcessCapture(const std::wstring& commandLine) const;
   void ConsumeSnapshot(Snapshot snapshot);
@@ -2027,10 +2027,12 @@ static std::string GetCrashLogPath() {
 }
 
 static LONG CALLBACK CrashVehHandler(EXCEPTION_POINTERS* ep) {
-  if (ep && ep->ExceptionRecord && ep->ExceptionRecord->ExceptionCode == 0xC0000005) {
+  if (ep && ep->ExceptionRecord &&
+      (ep->ExceptionRecord->ExceptionCode == 0xC0000005 ||
+       ep->ExceptionRecord->ExceptionCode == 0xC0000409)) {
     HANDLE h = CreateFileA(GetCrashLogPath().c_str(),
       GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, nullptr);
     if (h != INVALID_HANDLE_VALUE) {
       SetFilePointer(h, 0, nullptr, FILE_END);
       char buf[512];
@@ -2040,9 +2042,19 @@ static LONG CALLBACK CrashVehHandler(EXCEPTION_POINTERS* ep) {
       const char* phase = g_phase.load();
       DWORD crashTid = GetCurrentThreadId();
       DWORD telTid = g_telTid.load();
-      int len = snprintf(buf, sizeof(buf), "CRASH OFFSET=0x%llx Phase=%s FaultAddr=0x%llx CrashTID=%lu TelTID=%lu\n",
-        (unsigned long long)offset, phase ? phase : "?",
-        (unsigned long long)ep->ExceptionRecord->ExceptionInformation[1],
+      const char* codeName = ep->ExceptionRecord->ExceptionCode == 0xC0000005 ? "ACCESS_VIOLATION" : "STACK_BUFFER_OVERRUN";
+
+      HMODULE faultModule = nullptr;
+      GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+        reinterpret_cast<LPCSTR>(addr), &faultModule);
+      char modName[MAX_PATH] = {};
+      if (faultModule) GetModuleFileNameA(faultModule, modName, MAX_PATH);
+
+      int len = snprintf(buf, sizeof(buf), "CRASH code=%s(0x%lX) OFFSET=0x%llx Module=%s Phase=%s FaultAddr=0x%llx CrashTID=%lu TelTID=%lu\n",
+        codeName, (unsigned long)ep->ExceptionRecord->ExceptionCode,
+        (unsigned long long)offset, modName, phase ? phase : "?",
+        (unsigned long long)(ep->ExceptionRecord->ExceptionCode == 0xC0000005
+          ? ep->ExceptionRecord->ExceptionInformation[1] : addr),
         (unsigned long)crashTid, (unsigned long)telTid);
       DWORD written = 0;
       WriteFile(h, buf, len, &written, nullptr);
@@ -2158,6 +2170,25 @@ static monix::renderer_vk::GlPresetConfig parseGlslpPreset(
   return config;
 }
 
+// Standalone SEH wrapper — MSVC forbids __try/__except in functions with C++
+// destructors, so we isolate the Vulkan init call here to catch access violations
+// from broken/incompatible Vulkan drivers without killing the process.
+static bool TryInitVulkanSafe(VulkanRenderer& vk, HWND hwnd, uint32_t w, uint32_t h) {
+  BOOL crashed = FALSE;
+  __try {
+    if (!vk.initialize(hwnd, w, h)) {
+      return false;
+    }
+  } __except(EXCEPTION_EXECUTE_HANDLER) {
+    crashed = TRUE;
+  }
+  if (crashed) {
+    vk.shutdown();
+    return false;
+  }
+  return true;
+}
+
 bool MonixApp::InitializeOpenGlBootstrap() {
   if (openGl_.available || openGl_.vkAvailable) {
     return true;
@@ -2175,13 +2206,15 @@ bool MonixApp::InitializeOpenGlBootstrap() {
     Gdiplus::GdiplusStartup(&gdiplusToken_, &gdiplusStartupInput, nullptr);
   }
 
-  // Initialize Vulkan renderer
+  // Initialize Vulkan renderer — wrap in standalone SEH function to catch
+  // access violations from broken Vulkan drivers (MSVC disallows __try in
+  // functions with C++ destructors).
   RECT rc;
   GetClientRect(hwnd_, &rc);
   uint32_t width = static_cast<uint32_t>(rc.right - rc.left);
   uint32_t height = static_cast<uint32_t>(rc.bottom - rc.top);
 
-  if (!openGl_.vk.initialize(hwnd_, width, height)) {
+  if (!TryInitVulkanSafe(openGl_.vk, hwnd_, width, height)) {
     openGl_.status = L"Vulkan initialization failed — running in GDI-only mode";
     openGl_.vkFailed = true;
     return false;
@@ -2567,7 +2600,16 @@ void MonixApp::TelemetryLoop() {
     }
   }
   while (running_) {
-    Snapshot snapshot = PollSnapshot();
+    std::unique_ptr<Snapshot> prevSnap;
+    int sc = 0;
+    {
+      std::lock_guard<std::mutex> lock(stateMutex_);
+      sc = state_.sampleCount;
+      if (state_.hasPreviousSnapshot && state_.previousSnapshot) {
+        prevSnap = std::make_unique<Snapshot>(*state_.previousSnapshot);
+      }
+    }
+    Snapshot snapshot = PollSnapshotWithState(std::move(prevSnap), sc);
     if (!snapshot.processes.empty() || snapshot.ramTotalBytes != 0) {
       {
         std::lock_guard<std::mutex> lock(stateMutex_);
@@ -2652,7 +2694,7 @@ std::string MonixApp::RunProcessCapture(const std::wstring& commandLine) const {
 
 
 Snapshot MonixApp::PollSnapshot() {
-  return PollNativeSnapshot();
+  return PollSnapshotWithState(nullptr, 0);
 }
 
 static bool HeapOk(const char* tag) {
@@ -2673,14 +2715,14 @@ static bool HeapOk(const char* tag) {
   return ok != FALSE;
 }
 
-Snapshot MonixApp::PollNativeSnapshot() {
+Snapshot MonixApp::PollSnapshotWithState(std::unique_ptr<Snapshot> prevSnap, int sampleCount) {
   g_phase = "POLL:ENTER";
   HeapOk("ENTER");
-  const int sc = state_.sampleCount;
+  const int sc = sampleCount;
   auto snapshotPtr = std::make_unique<Snapshot>();
   Snapshot& snapshot = *snapshotPtr;
-  if (state_.hasPreviousSnapshot) {
-    const auto& prev = *state_.previousSnapshot;
+  if (prevSnap) {
+    const auto& prev = *prevSnap;
     if (sc % 4 != 0) {
       snapshot.systemTime100ns = prev.systemTime100ns;
       snapshot.uptimeMs = prev.uptimeMs;
