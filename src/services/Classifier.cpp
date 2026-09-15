@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <unordered_map>
 
 #include "../core/utils/Uuid.h"
 #include "../core/utils/Logger.h"
@@ -26,10 +27,22 @@ std::vector<core::Classification> Classifier::classify_scan(const std::string& s
     std::vector<core::Classification> results;
     results.reserve(items.size());
 
+    if (rules_.empty()) {
+        rules_ = rules_repo_.find_enabled();
+    }
+    sorted_rules_ = rules_;
+    std::sort(sorted_rules_.begin(), sorted_rules_.end(),
+              [](const core::ClassificationRule& a, const core::ClassificationRule& b) {
+                  return a.priority > b.priority;
+              });
+    rules_sorted_ = true;
+
     for (const auto& item : items) {
         core::Classification cls = classify_item(item, intensity);
         results.push_back(cls);
     }
+
+    rules_sorted_ = false;
 
     detect_relationships(results, items);
 
@@ -120,6 +133,16 @@ std::vector<std::pair<std::string, int>> Classifier::get_taxonomy_summary(const 
 }
 
 std::string Classifier::try_user_rules(const core::ScanItem& item) {
+    if (rules_sorted_) {
+        for (const auto& rule : sorted_rules_) {
+            if (!rule.enabled) continue;
+            if (matches_pattern(item.filename, rule.pattern)) {
+                return rule.target_path;
+            }
+        }
+        return "";
+    }
+
     std::vector<core::ClassificationRule> active_rules;
     if (!rules_.empty()) {
         active_rules = rules_;
@@ -149,118 +172,116 @@ std::string Classifier::classify_by_extension(const core::ScanItem& item, int in
     if (ext.empty()) return "";
 
     struct ExtMapping {
-        const char* extension;
         const char* category;
         const char* subcategory;
         const char* detail;
     };
 
-    static const ExtMapping mappings[] = {
-        {".cpp", "Development", "C++", "Source"},
-        {".cc", "Development", "C++", "Source"},
-        {".cxx", "Development", "C++", "Source"},
-        {".c", "Development", "C", "Source"},
-        {".h", "Development", "C++", "Header"},
-        {".hpp", "Development", "C++", "Header"},
+    static const std::unordered_map<std::string, ExtMapping> mappings = {
+        {".cpp", {"Development", "C++", "Source"}},
+        {".cc", {"Development", "C++", "Source"}},
+        {".cxx", {"Development", "C++", "Source"}},
+        {".c", {"Development", "C", "Source"}},
+        {".h", {"Development", "C++", "Header"}},
+        {".hpp", {"Development", "C++", "Header"}},
 
-        {".py", "Development", "Python", "Source"},
-        {".js", "Development", "JavaScript", "Source"},
-        {".ts", "Development", "TypeScript", "Source"},
-        {".jsx", "Development", "React", "Component"},
-        {".tsx", "Development", "React", "Component"},
+        {".py", {"Development", "Python", "Source"}},
+        {".js", {"Development", "JavaScript", "Source"}},
+        {".ts", {"Development", "TypeScript", "Source"}},
+        {".jsx", {"Development", "React", "Component"}},
+        {".tsx", {"Development", "React", "Component"}},
 
-        {".rs", "Development", "Rust", "Source"},
-        {".go", "Development", "Go", "Source"},
-        {".java", "Development", "Java", "Source"},
-        {".cs", "Development", "CSharp", "Source"},
-        {".swift", "Development", "Swift", "Source"},
-        {".rb", "Development", "Ruby", "Source"},
-        {".php", "Development", "PHP", "Source"},
+        {".rs", {"Development", "Rust", "Source"}},
+        {".go", {"Development", "Go", "Source"}},
+        {".java", {"Development", "Java", "Source"}},
+        {".cs", {"Development", "CSharp", "Source"}},
+        {".swift", {"Development", "Swift", "Source"}},
+        {".rb", {"Development", "Ruby", "Source"}},
+        {".php", {"Development", "PHP", "Source"}},
 
-        {".html", "Development", "Web", "HTML"},
-        {".htm", "Development", "Web", "HTML"},
-        {".css", "Development", "Web", "CSS"},
-        {".scss", "Development", "Web", "CSS"},
-        {".less", "Development", "Web", "CSS"},
+        {".html", {"Development", "Web", "HTML"}},
+        {".htm", {"Development", "Web", "HTML"}},
+        {".css", {"Development", "Web", "CSS"}},
+        {".scss", {"Development", "Web", "CSS"}},
+        {".less", {"Development", "Web", "CSS"}},
 
-        {".sql", "Data", "SQL", "Query"},
+        {".sql", {"Data", "SQL", "Query"}},
 
-        {".json", "Configuration", "Data", "JSON"},
-        {".yaml", "Configuration", "Data", "YAML"},
-        {".yml", "Configuration", "Data", "YAML"},
-        {".toml", "Configuration", "Data", "TOML"},
-        {".xml", "Configuration", "Data", "XML"},
-        {".ini", "Configuration", "Data", "INI"},
-        {".cfg", "Configuration", "Data", "Config"},
-        {".conf", "Configuration", "Data", "Config"},
+        {".json", {"Configuration", "Data", "JSON"}},
+        {".yaml", {"Configuration", "Data", "YAML"}},
+        {".yml", {"Configuration", "Data", "YAML"}},
+        {".toml", {"Configuration", "Data", "TOML"}},
+        {".xml", {"Configuration", "Data", "XML"}},
+        {".ini", {"Configuration", "Data", "INI"}},
+        {".cfg", {"Configuration", "Data", "Config"}},
+        {".conf", {"Configuration", "Data", "Config"}},
 
-        {".txt", "Documents", "Text", "Plain"},
-        {".md", "Documents", "Text", "Markdown"},
-        {".rst", "Documents", "Text", "reStructuredText"},
-        {".doc", "Documents", "Word", "Legacy"},
-        {".docx", "Documents", "Word", "Modern"},
-        {".pdf", "Documents", "PDF", "Document"},
-        {".tex", "Documents", "LaTeX", "Document"},
-        {".bib", "Documents", "LaTeX", "Bibliography"},
+        {".txt", {"Documents", "Text", "Plain"}},
+        {".md", {"Documents", "Text", "Markdown"}},
+        {".rst", {"Documents", "Text", "reStructuredText"}},
+        {".doc", {"Documents", "Word", "Legacy"}},
+        {".docx", {"Documents", "Word", "Modern"}},
+        {".pdf", {"Documents", "PDF", "Document"}},
+        {".tex", {"Documents", "LaTeX", "Document"}},
+        {".bib", {"Documents", "LaTeX", "Bibliography"}},
 
-        {".jpg", "Images", "Photos", "JPEG"},
-        {".jpeg", "Images", "Photos", "JPEG"},
-        {".png", "Images", "Photos", "PNG"},
-        {".gif", "Images", "Photos", "GIF"},
-        {".bmp", "Images", "Photos", "BMP"},
-        {".webp", "Images", "Photos", "WebP"},
-        {".svg", "Images", "Vector", "SVG"},
-        {".tiff", "Images", "Photos", "TIFF"},
-        {".tif", "Images", "Photos", "TIFF"},
-        {".ico", "Images", "Icon", "ICO"},
+        {".jpg", {"Images", "Photos", "JPEG"}},
+        {".jpeg", {"Images", "Photos", "JPEG"}},
+        {".png", {"Images", "Photos", "PNG"}},
+        {".gif", {"Images", "Photos", "GIF"}},
+        {".bmp", {"Images", "Photos", "BMP"}},
+        {".webp", {"Images", "Photos", "WebP"}},
+        {".svg", {"Images", "Vector", "SVG"}},
+        {".tiff", {"Images", "Photos", "TIFF"}},
+        {".tif", {"Images", "Photos", "TIFF"}},
+        {".ico", {"Images", "Icon", "ICO"}},
 
-        {".mp4", "Video", "Container", "MP4"},
-        {".avi", "Video", "Container", "AVI"},
-        {".mkv", "Video", "Container", "MKV"},
-        {".mov", "Video", "Container", "MOV"},
-        {".wmv", "Video", "Container", "WMV"},
-        {".flv", "Video", "Container", "FLV"},
-        {".webm", "Video", "Container", "WebM"},
+        {".mp4", {"Video", "Container", "MP4"}},
+        {".avi", {"Video", "Container", "AVI"}},
+        {".mkv", {"Video", "Container", "MKV"}},
+        {".mov", {"Video", "Container", "MOV"}},
+        {".wmv", {"Video", "Container", "WMV"}},
+        {".flv", {"Video", "Container", "FLV"}},
+        {".webm", {"Video", "Container", "WebM"}},
 
-        {".mp3", "Audio", "Music", "MP3"},
-        {".wav", "Audio", "Music", "WAV"},
-        {".flac", "Audio", "Music", "FLAC"},
-        {".ogg", "Audio", "Music", "OGG"},
-        {".aac", "Audio", "Music", "AAC"},
-        {".wma", "Audio", "Music", "WMA"},
+        {".mp3", {"Audio", "Music", "MP3"}},
+        {".wav", {"Audio", "Music", "WAV"}},
+        {".flac", {"Audio", "Music", "FLAC"}},
+        {".ogg", {"Audio", "Music", "OGG"}},
+        {".aac", {"Audio", "Music", "AAC"}},
+        {".wma", {"Audio", "Music", "WMA"}},
 
-        {".zip", "Archives", "Compressed", "ZIP"},
-        {".tar", "Archives", "Compressed", "TAR"},
-        {".gz", "Archives", "Compressed", "GZIP"},
-        {".bz2", "Archives", "Compressed", "BZIP2"},
-        {".7z", "Archives", "Compressed", "7Z"},
-        {".rar", "Archives", "Compressed", "RAR"},
-        {".xz", "Archives", "Compressed", "XZ"},
+        {".zip", {"Archives", "Compressed", "ZIP"}},
+        {".tar", {"Archives", "Compressed", "TAR"}},
+        {".gz", {"Archives", "Compressed", "GZIP"}},
+        {".bz2", {"Archives", "Compressed", "BZIP2"}},
+        {".7z", {"Archives", "Compressed", "7Z"}},
+        {".rar", {"Archives", "Compressed", "RAR"}},
+        {".xz", {"Archives", "Compressed", "XZ"}},
 
-        {".exe", "Software", "Binary", "Windows"},
-        {".msi", "Software", "Binary", "Windows"},
-        {".dmg", "Software", "Binary", "macOS"},
-        {".deb", "Software", "Binary", "Debian"},
-        {".rpm", "Software", "Binary", "RPM"},
-        {".app", "Software", "Binary", "macOS"},
+        {".exe", {"Software", "Binary", "Windows"}},
+        {".msi", {"Software", "Binary", "Windows"}},
+        {".dmg", {"Software", "Binary", "macOS"}},
+        {".deb", {"Software", "Binary", "Debian"}},
+        {".rpm", {"Software", "Binary", "RPM"}},
+        {".app", {"Software", "Binary", "macOS"}},
 
-        {".ttf", "Fonts", "TrueType", "TTF"},
-        {".otf", "Fonts", "OpenType", "OTF"},
-        {".woff", "Fonts", "WebFont", "WOFF"},
-        {".woff2", "Fonts", "WebFont", "WOFF2"},
+        {".ttf", {"Fonts", "TrueType", "TTF"}},
+        {".otf", {"Fonts", "OpenType", "OTF"}},
+        {".woff", {"Fonts", "WebFont", "WOFF"}},
+        {".woff2", {"Fonts", "WebFont", "WOFF2"}},
 
-        {".csv", "Data", "Spreadsheet", "CSV"},
-        {".xls", "Data", "Spreadsheet", "Legacy"},
-        {".xlsx", "Data", "Spreadsheet", "Modern"},
+        {".csv", {"Data", "Spreadsheet", "CSV"}},
+        {".xls", {"Data", "Spreadsheet", "Legacy"}},
+        {".xlsx", {"Data", "Spreadsheet", "Modern"}},
 
-        {".log", "Documents", "Logs", "Text"},
-        {".env", "Configuration", "Environment", "Variables"},
+        {".log", {"Documents", "Logs", "Text"}},
+        {".env", {"Configuration", "Environment", "Variables"}},
     };
 
-    for (const auto& m : mappings) {
-        if (ext == m.extension) {
-            return build_taxonomy_path(m.category, m.subcategory, m.detail, intensity);
-        }
+    auto it = mappings.find(ext);
+    if (it != mappings.end()) {
+        return build_taxonomy_path(it->second.category, it->second.subcategory, it->second.detail, intensity);
     }
 
     return "";

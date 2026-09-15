@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <unordered_set>
 #include "../core/models/OrgPlan.h"
 #include "../core/models/OrgMove.h"
 #include "../core/models/UndoRecord.h"
@@ -29,9 +30,9 @@ private:
     storage::OrgMoveRepository& moves_;
     storage::UndoRepository& undo_;
 
-    bool execute_move(const core::OrgMove& move);
+    bool execute_move(const core::OrgMove& move, std::unordered_set<std::string>& created_dirs);
     bool undo_move(const core::UndoEntry& entry);
-    void ensure_dest_dir(const std::string& dest_path);
+    void ensure_dest_dir(const std::string& dest_path, std::unordered_set<std::string>& created_dirs);
 };
 
 } // namespace archive::services

@@ -27,8 +27,10 @@ endif()
 
 # Release optimizations
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    add_compile_options($<$<CONFIG:Release>:-O2>)
+    add_compile_options($<$<CONFIG:Release>:-O3>)
     add_compile_options($<$<CONFIG:Release>:-DNDEBUG>)
+    add_compile_options($<$<CONFIG:Release>:-flto>)
+    add_link_options($<$<CONFIG:Release>:-flto>)
     add_link_options($<$<CONFIG:Release>:-s>)
 endif()
 

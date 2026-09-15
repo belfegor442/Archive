@@ -32,6 +32,8 @@ private:
     storage::ClassificationRuleRepository& rules_repo_;
     storage::ScanItemRepository& scan_items_;
     std::vector<core::ClassificationRule> rules_;
+    std::vector<core::ClassificationRule> sorted_rules_;
+    bool rules_sorted_ = false;
 
     std::string try_user_rules(const core::ScanItem& item);
     std::string classify_by_extension(const core::ScanItem& item, int intensity);

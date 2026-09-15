@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <algorithm>
+#include <unordered_set>
 
 #include "../core/utils/Uuid.h"
 #include "../core/utils/Logger.h"
@@ -47,14 +48,18 @@ core::UndoRecord OrganizationExecutor::execute(const std::string& plan_id) {
     undo_record.created_at = core::utils::now_iso();
 
     std::vector<core::UndoEntry> undo_entries;
+    undo_entries.reserve(plan_moves.size());
     int success_count = 0;
     int fail_count = 0;
+
+    std::unordered_set<std::string> created_dirs;
+    created_dirs.reserve(plan_moves.size());
 
     for (auto& move : plan_moves) {
         move.status = core::MoveStatus::Executing;
         moves_.update_status(move.id, core::MoveStatus::Executing);
 
-        if (execute_move(move)) {
+        if (execute_move(move, created_dirs)) {
             core::UndoEntry entry;
             entry.undo_id = undo_record.id;
             entry.source_path = move.dest_path;
@@ -150,7 +155,7 @@ bool OrganizationExecutor::can_write_to(const std::string& path) {
     return (perms & fs::perms::owner_write) != fs::perms::none;
 }
 
-bool OrganizationExecutor::execute_move(const core::OrgMove& move) {
+bool OrganizationExecutor::execute_move(const core::OrgMove& move, std::unordered_set<std::string>& created_dirs) {
     try {
         namespace fs = std::filesystem;
 
@@ -159,7 +164,7 @@ bool OrganizationExecutor::execute_move(const core::OrgMove& move) {
             return false;
         }
 
-        ensure_dest_dir(move.dest_path);
+        ensure_dest_dir(move.dest_path, created_dirs);
 
         if (fs::exists(move.dest_path)) {
             std::string ext = filesystem::FileUtils::extension(move.dest_path);
@@ -196,7 +201,8 @@ bool OrganizationExecutor::undo_move(const core::UndoEntry& entry) {
             return false;
         }
 
-        ensure_dest_dir(entry.dest_path);
+        std::unordered_set<std::string> dummy;
+        ensure_dest_dir(entry.dest_path, dummy);
 
         fs::rename(entry.source_path, entry.dest_path);
         return true;
@@ -207,11 +213,14 @@ bool OrganizationExecutor::undo_move(const core::UndoEntry& entry) {
     }
 }
 
-void OrganizationExecutor::ensure_dest_dir(const std::string& dest_path) {
+void OrganizationExecutor::ensure_dest_dir(const std::string& dest_path, std::unordered_set<std::string>& created_dirs) {
     namespace fs = std::filesystem;
 
     fs::path dest(dest_path);
     fs::path parent = dest.parent_path();
+    std::string parent_str = parent.string();
+
+    if (created_dirs.count(parent_str)) return;
 
     if (!fs::exists(parent)) {
         std::error_code ec;
@@ -221,6 +230,8 @@ void OrganizationExecutor::ensure_dest_dir(const std::string& dest_path) {
                                      + " - " + ec.message());
         }
     }
+
+    created_dirs.insert(parent_str);
 }
 
 } // namespace archive::services

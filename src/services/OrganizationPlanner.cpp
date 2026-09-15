@@ -1,7 +1,8 @@
 #include "OrganizationPlanner.h"
 
 #include <algorithm>
-#include <set>
+#include <unordered_set>
+#include <unordered_map>
 
 #include "../core/utils/Uuid.h"
 #include "../core/utils/Logger.h"
@@ -181,8 +182,10 @@ std::vector<core::OrgMove> OrganizationPlanner::generate_moves(const std::vector
                                                                 const std::string& root_path,
                                                                 int intensity) {
     std::vector<core::OrgMove> moves;
+    moves.reserve(items.size());
 
-    std::map<std::string, const core::Classification*> class_map;
+    std::unordered_map<std::string, const core::Classification*> class_map;
+    class_map.reserve(classifications.size());
     for (const auto& cls : classifications) {
         class_map[cls.scan_item_id] = &cls;
     }
@@ -219,33 +222,19 @@ std::vector<core::OrgMove> OrganizationPlanner::generate_moves(const std::vector
 }
 
 void OrganizationPlanner::resolve_conflicts(std::vector<core::OrgMove>& moves) {
-    std::map<std::string, size_t> dest_count;
-    std::set<size_t> to_remove;
+    std::unordered_map<std::string, size_t> dest_best;
+    std::unordered_set<size_t> to_remove;
 
     for (size_t i = 0; i < moves.size(); ++i) {
-        std::string dest = moves[i].dest_path;
-        dest_count[dest]++;
-
-        if (dest_count[dest] > 1) {
-            size_t best_idx = i;
-            for (size_t j = 0; j < i; ++j) {
-                if (moves[j].dest_path == dest && to_remove.find(j) == to_remove.end()) {
-                    if (moves[j].confidence < moves[i].confidence) {
-                        best_idx = j;
-                    } else {
-                        best_idx = i;
-                        break;
-                    }
-                }
-            }
-
-            for (size_t j = 0; j < i; ++j) {
-                if (j != best_idx && moves[j].dest_path == dest && to_remove.find(j) == to_remove.end()) {
-                    to_remove.insert(j);
-                }
-            }
-
-            if (best_idx != i) {
+        const std::string& dest = moves[i].dest_path;
+        auto it = dest_best.find(dest);
+        if (it == dest_best.end()) {
+            dest_best[dest] = i;
+        } else {
+            if (moves[i].confidence > moves[it->second].confidence) {
+                to_remove.insert(it->second);
+                it->second = i;
+            } else {
                 to_remove.insert(i);
             }
         }
@@ -254,33 +243,27 @@ void OrganizationPlanner::resolve_conflicts(std::vector<core::OrgMove>& moves) {
     std::vector<core::OrgMove> resolved;
     resolved.reserve(moves.size() - to_remove.size());
 
+    std::unordered_set<std::string> existing_dests;
+    existing_dests.reserve(moves.size());
+
     for (size_t i = 0; i < moves.size(); ++i) {
-        if (to_remove.find(i) == to_remove.end()) {
-            int counter = 1;
-            std::string final_dest = moves[i].dest_path;
+        if (to_remove.count(i)) continue;
 
-            std::set<std::string> existing_dests;
-            for (const auto& m : resolved) {
-                existing_dests.insert(m.dest_path);
-            }
-            for (size_t j = 0; j < i; ++j) {
-                if (to_remove.find(j) == to_remove.end()) {
-                    existing_dests.insert(moves[j].dest_path);
-                }
-            }
+        int counter = 1;
+        std::string final_dest = moves[i].dest_path;
 
-            while (existing_dests.find(final_dest) != existing_dests.end()) {
-                std::string stem = filesystem::FileUtils::stem(final_dest);
-                std::string ext = filesystem::FileUtils::extension(final_dest);
-                std::string dir = filesystem::FileUtils::parent_dir(final_dest);
-                std::string new_name = stem + "_" + std::to_string(counter) + ext;
-                final_dest = dir + "/" + new_name;
-                counter++;
-            }
-
-            moves[i].dest_path = final_dest;
-            resolved.push_back(std::move(moves[i]));
+        while (existing_dests.count(final_dest)) {
+            std::string stem = filesystem::FileUtils::stem(final_dest);
+            std::string ext = filesystem::FileUtils::extension(final_dest);
+            std::string dir = filesystem::FileUtils::parent_dir(final_dest);
+            std::string new_name = stem + "_" + std::to_string(counter) + ext;
+            final_dest = dir + "/" + new_name;
+            counter++;
         }
+
+        existing_dests.insert(final_dest);
+        moves[i].dest_path = final_dest;
+        resolved.push_back(std::move(moves[i]));
     }
 
     moves = std::move(resolved);

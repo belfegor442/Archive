@@ -3,12 +3,14 @@
 #include <filesystem>
 #include <fstream>
 #include <algorithm>
-#include <map>
+#include <array>
+#include <unordered_set>
 
 #include "../core/utils/Uuid.h"
 #include "../core/utils/Logger.h"
 #include "../hashing/FileHasher.h"
 #include "../filesystem/FileUtils.h"
+#include "../storage/Transaction.h"
 
 namespace archive::services {
 
@@ -49,6 +51,9 @@ core::Scan Scanner::scan_directory(const std::string& root_path) {
 
     auto end = std::filesystem::recursive_directory_iterator();
 
+    std::vector<core::ScanItem> batch;
+    batch.reserve(512);
+
     for (; it != end; ++it) {
         const auto& entry = *it;
 
@@ -71,11 +76,24 @@ core::Scan Scanner::scan_directory(const std::string& root_path) {
 
         try {
             core::ScanItem item = analyze_file(entry.path().string(), scan.id);
-            scan_items_.insert(item);
+            batch.push_back(std::move(item));
             file_count++;
+
+            if (batch.size() >= 256) {
+                storage::Transaction tx(db_);
+                scan_items_.insert_batch(batch);
+                tx.commit();
+                batch.clear();
+            }
         } catch (const std::exception& e) {
             LOG_WARN("Failed to analyze file: " + entry.path().string() + " - " + e.what());
         }
+    }
+
+    if (!batch.empty()) {
+        storage::Transaction tx(db_);
+        scan_items_.insert_batch(batch);
+        tx.commit();
     }
 
     scan.file_count = file_count;
@@ -96,19 +114,19 @@ core::AnalysisResult Scanner::analyze(const std::string& scan_id) const {
     result.root_path = items.empty() ? "" : filesystem::FileUtils::parent_dir(items[0].path);
 
     for (const auto& item : items) {
-        result.total_size += static_cast<int>(item.size);
+        result.total_size += item.size;
 
-        std::string ext = item.extension;
+        const std::string& ext = item.extension;
         if (!ext.empty()) {
             result.by_extension[ext]++;
         }
 
-        std::string mime = item.mime_type;
+        const std::string& mime = item.mime_type;
         if (!mime.empty()) {
             result.by_mime[mime]++;
         }
 
-        std::string proj = item.detected_project;
+        const std::string& proj = item.detected_project;
         if (!proj.empty()) {
             result.by_project[proj]++;
         }
@@ -129,8 +147,9 @@ core::ScanItem Scanner::analyze_file(const std::string& filepath, const std::str
     item.filename = filesystem::FileUtils::file_name(filepath);
     item.extension = filesystem::FileUtils::extension(filepath);
     item.size = static_cast<int64_t>(filesystem::FileUtils::file_size(filepath));
-    item.created_at = core::utils::now_iso();
-    item.modified_at = core::utils::now_iso();
+    std::string now = core::utils::now_iso();
+    item.created_at = now;
+    item.modified_at = now;
 
     item.mime_type = detect_mime(item.extension);
 
@@ -249,8 +268,9 @@ std::string Scanner::read_content_preview(const std::string& path, int max_bytes
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open()) return "";
 
-    std::vector<char> buffer(max_bytes, 0);
-    file.read(buffer.data(), max_bytes);
+    std::array<char, 512> buffer{};
+    int to_read = std::min(max_bytes, 512);
+    file.read(buffer.data(), to_read);
     auto bytes_read = file.gcount();
 
     std::string preview(buffer.data(), static_cast<size_t>(bytes_read));
@@ -336,7 +356,7 @@ std::string Scanner::detect_project_context(const std::string& filepath) {
 }
 
 bool Scanner::is_text_extension(const std::string& ext) {
-    static const std::vector<std::string> text_exts = {
+    static const std::unordered_set<std::string> text_exts = {
         ".txt", ".md", ".rst", ".csv", ".log",
         ".html", ".htm", ".css", ".js", ".ts", ".jsx", ".tsx",
         ".json", ".yaml", ".yml", ".toml", ".xml", ".sql",
@@ -351,11 +371,11 @@ bool Scanner::is_text_extension(const std::string& ext) {
     std::string lower = ext;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
 
-    return std::find(text_exts.begin(), text_exts.end(), lower) != text_exts.end();
+    return text_exts.count(lower) > 0;
 }
 
 bool Scanner::is_ignored(const std::string& filename) {
-    static const std::vector<std::string> ignored = {
+    static const std::unordered_set<std::string> ignored = {
         ".git", ".svn", ".hg",
         "__pycache__", ".pytest_cache", ".mypy_cache",
         "node_modules", ".npm", ".yarn",
@@ -368,7 +388,7 @@ bool Scanner::is_ignored(const std::string& filename) {
     std::string lower = filename;
     std::transform(lower.begin(), lower.end(), lower.begin(), ::tolower);
 
-    return std::find(ignored.begin(), ignored.end(), lower) != ignored.end();
+    return ignored.count(lower) > 0;
 }
 
 } // namespace archive::services

@@ -35,6 +35,9 @@ void DatabaseManager::close() {
             sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
             txn_depth_ = 0;
         }
+        if (db_path_ != ":memory:") {
+            sqlite3_exec(db_, "PRAGMA optimize", nullptr, nullptr, nullptr);
+        }
         sqlite3_close(db_);
         db_ = nullptr;
     }
@@ -82,9 +85,14 @@ void DatabaseManager::rollback() {
 void DatabaseManager::enable_wal() {
     if (db_path_ != ":memory:") {
         execute("PRAGMA journal_mode=WAL");
+        execute("PRAGMA synchronous=NORMAL");
     }
     execute("PRAGMA foreign_keys=ON");
     execute("PRAGMA busy_timeout=5000");
+    execute("PRAGMA cache_size=-64000");
+    execute("PRAGMA temp_store=MEMORY");
+    execute("PRAGMA mmap_size=268435456");
+    execute("PRAGMA page_size=4096");
 }
 
 void DatabaseManager::create_schema() {
@@ -324,13 +332,18 @@ void DatabaseManager::create_schema() {
     )");
 
     execute("CREATE INDEX IF NOT EXISTS idx_scan_items_scan ON scan_items(scan_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_scan_items_scan_path ON scan_items(scan_id, path)");
     execute("CREATE INDEX IF NOT EXISTS idx_scan_items_ext ON scan_items(extension)");
     execute("CREATE INDEX IF NOT EXISTS idx_classifications_item ON classifications(scan_item_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_classifications_scan ON classifications(scan_item_id)");
     execute("CREATE INDEX IF NOT EXISTS idx_taxonomy_parent ON taxonomy_nodes(parent_id)");
     execute("CREATE INDEX IF NOT EXISTS idx_org_plans_scan ON org_plans(scan_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_org_plans_status ON org_plans(status)");
     execute("CREATE INDEX IF NOT EXISTS idx_org_moves_plan ON org_moves(plan_id)");
     execute("CREATE INDEX IF NOT EXISTS idx_org_moves_status ON org_moves(status)");
     execute("CREATE INDEX IF NOT EXISTS idx_undo_entries_undo ON undo_entries(undo_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_undo_records_status ON undo_records(status)");
+    execute("CREATE INDEX IF NOT EXISTS idx_classification_rules_enabled ON classification_rules(enabled, priority)");
 }
 
 DatabaseManager::Statement::Statement(sqlite3* db, const std::string& sql) {
