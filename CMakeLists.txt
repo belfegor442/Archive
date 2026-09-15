@@ -54,6 +54,14 @@ set(ARCHIVE_LIB_SOURCES
     src/storage/NoteRepository.cpp
     src/storage/ActivityRepository.cpp
     src/storage/StoredObjectRepository.cpp
+    src/storage/ScanRepository.cpp
+    src/storage/ScanItemRepository.cpp
+    src/storage/ClassificationRepository.cpp
+    src/storage/TaxonomyRepository.cpp
+    src/storage/ClassificationRuleRepository.cpp
+    src/storage/OrgPlanRepository.cpp
+    src/storage/OrgMoveRepository.cpp
+    src/storage/UndoRepository.cpp
     src/hashing/FileHasher.cpp
     src/filesystem/FileUtils.cpp
     src/filesystem/StorageManager.cpp
@@ -70,6 +78,10 @@ set(ARCHIVE_LIB_SOURCES
     src/services/CategoryService.cpp
     src/services/TagService.cpp
     src/services/UpdateService.cpp
+    src/services/Scanner.cpp
+    src/services/Classifier.cpp
+    src/services/OrganizationPlanner.cpp
+    src/services/OrganizationExecutor.cpp
     src/core/utils/Logger.cpp
     src/app/AppConfig.cpp
 )

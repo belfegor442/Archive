@@ -10,6 +10,14 @@ add_executable(archive_tests
     services/test_services.cpp
     integration/test_import_flow.cpp
     integration/test_atomic_ops.cpp
+    test_new_enums.cpp
+    test_new_models.cpp
+    test_new_storage.cpp
+    test_classifier.cpp
+    test_scanner.cpp
+    test_planner.cpp
+    test_executor.cpp
+    integration/test_organize_flow.cpp
 )
 
 target_link_libraries(archive_tests PRIVATE archive_lib)

@@ -193,6 +193,144 @@ void DatabaseManager::create_schema() {
     execute("CREATE INDEX IF NOT EXISTS idx_activity_item ON activity_log(item_id)");
     execute("CREATE INDEX IF NOT EXISTS idx_stored_objects_item ON stored_objects(item_id)");
     execute("CREATE INDEX IF NOT EXISTS idx_stored_objects_version ON stored_objects(version_id)");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS scans (
+            id TEXT PRIMARY KEY,
+            root_path TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            file_count INTEGER DEFAULT 0,
+            folder_count INTEGER DEFAULT 0,
+            started_at TEXT DEFAULT '',
+            completed_at TEXT DEFAULT ''
+        )
+    )");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS scan_items (
+            id TEXT PRIMARY KEY,
+            scan_id TEXT NOT NULL,
+            path TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            extension TEXT DEFAULT '',
+            mime_type TEXT DEFAULT '',
+            size INTEGER DEFAULT 0,
+            role TEXT DEFAULT 'unknown',
+            detected_project TEXT DEFAULT '',
+            content_preview TEXT DEFAULT '',
+            checksum TEXT DEFAULT '',
+            created_at TEXT DEFAULT '',
+            modified_at TEXT DEFAULT '',
+            FOREIGN KEY (scan_id) REFERENCES scans(id) ON DELETE CASCADE
+        )
+    )");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS classifications (
+            id TEXT PRIMARY KEY,
+            scan_item_id TEXT NOT NULL,
+            taxonomy_path TEXT NOT NULL DEFAULT '',
+            confidence REAL DEFAULT 0.0,
+            reason TEXT DEFAULT '',
+            FOREIGN KEY (scan_item_id) REFERENCES scan_items(id) ON DELETE CASCADE
+        )
+    )");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS classification_groups (
+            id TEXT PRIMARY KEY,
+            classification_id TEXT NOT NULL,
+            group_member_id TEXT NOT NULL,
+            FOREIGN KEY (classification_id) REFERENCES classifications(id) ON DELETE CASCADE,
+            FOREIGN KEY (group_member_id) REFERENCES scan_items(id) ON DELETE CASCADE
+        )
+    )");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS taxonomy_nodes (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            parent_id TEXT DEFAULT '',
+            level INTEGER DEFAULT 0,
+            file_count INTEGER DEFAULT 0,
+            icon TEXT DEFAULT ''
+        )
+    )");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS classification_rules (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL DEFAULT '',
+            pattern TEXT NOT NULL,
+            target_path TEXT NOT NULL,
+            priority INTEGER DEFAULT 0,
+            enabled INTEGER DEFAULT 1,
+            created_at TEXT DEFAULT ''
+        )
+    )");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS org_plans (
+            id TEXT PRIMARY KEY,
+            scan_id TEXT NOT NULL,
+            root_path TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'draft',
+            total_files INTEGER DEFAULT 0,
+            moves_planned INTEGER DEFAULT 0,
+            unchanged INTEGER DEFAULT 0,
+            avg_confidence REAL DEFAULT 0.0,
+            intensity INTEGER DEFAULT 50,
+            created_at TEXT DEFAULT '',
+            executed_at TEXT DEFAULT '',
+            FOREIGN KEY (scan_id) REFERENCES scans(id)
+        )
+    )");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS org_moves (
+            id TEXT PRIMARY KEY,
+            plan_id TEXT NOT NULL,
+            scan_item_id TEXT NOT NULL DEFAULT '',
+            source_path TEXT NOT NULL,
+            dest_path TEXT NOT NULL,
+            confidence REAL DEFAULT 0.0,
+            reason TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'planned',
+            FOREIGN KEY (plan_id) REFERENCES org_plans(id) ON DELETE CASCADE,
+            FOREIGN KEY (scan_item_id) REFERENCES scan_items(id) ON DELETE CASCADE
+        )
+    )");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS undo_records (
+            id TEXT PRIMARY KEY,
+            operation_id TEXT NOT NULL,
+            moves_count INTEGER DEFAULT 0,
+            root_path TEXT DEFAULT '',
+            status TEXT DEFAULT 'available',
+            created_at TEXT DEFAULT ''
+        )
+    )");
+
+    execute(R"(
+        CREATE TABLE IF NOT EXISTS undo_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            undo_id TEXT NOT NULL,
+            source_path TEXT NOT NULL,
+            dest_path TEXT NOT NULL,
+            move_index INTEGER DEFAULT 0,
+            FOREIGN KEY (undo_id) REFERENCES undo_records(id) ON DELETE CASCADE
+        )
+    )");
+
+    execute("CREATE INDEX IF NOT EXISTS idx_scan_items_scan ON scan_items(scan_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_scan_items_ext ON scan_items(extension)");
+    execute("CREATE INDEX IF NOT EXISTS idx_classifications_item ON classifications(scan_item_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_taxonomy_parent ON taxonomy_nodes(parent_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_org_plans_scan ON org_plans(scan_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_org_moves_plan ON org_moves(plan_id)");
+    execute("CREATE INDEX IF NOT EXISTS idx_org_moves_status ON org_moves(status)");
+    execute("CREATE INDEX IF NOT EXISTS idx_undo_entries_undo ON undo_entries(undo_id)");
 }
 
 DatabaseManager::Statement::Statement(sqlite3* db, const std::string& sql) {
