@@ -56,17 +56,7 @@ std::vector<core::Tag> TagService::get_tags_for_item(const std::string& item_id)
 }
 
 int TagService::get_item_count(const std::string& tag_id) {
-    auto all_items = items_.find_all();
-    int count = 0;
-    for (const auto& item : all_items) {
-        for (const auto& tag : item.tags) {
-            if (tag.id == tag_id) {
-                count++;
-                break;
-            }
-        }
-    }
-    return count;
+    return items_.count_by_tag(tag_id);
 }
 
 } // namespace archive::services

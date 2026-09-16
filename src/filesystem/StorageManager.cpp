@@ -46,7 +46,7 @@ std::string StorageManager::store_version(const std::string& item_id, int versio
     std::string versions_dir = get_item_versions_dir(item_id);
     std::string ext = FileUtils::extension(source_path);
     std::string name = "v" + std::to_string(version);
-    std::string dest = versions_dir + "/" + name + ext;
+    std::string dest = FileUtils::unique_path(versions_dir, name, ext);
     FileUtils::copy_file(source_path, dest);
     return dest;
 }

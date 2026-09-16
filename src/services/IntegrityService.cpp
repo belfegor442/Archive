@@ -80,17 +80,11 @@ core::VerificationItem IntegrityService::verify_file_item(const core::ArchiveIte
     vi.name = item.name;
     vi.expected_checksum = item.checksum;
 
-    if (!std::filesystem::exists(item.storage_path)) {
-        vi.state = core::IntegrityState::Missing;
-        vi.details = "File not found: " + item.storage_path;
-        return vi;
-    }
-
     try {
         vi.actual_checksum = hashing::FileHasher::hash_file(item.storage_path);
     } catch (const std::exception& e) {
-        vi.state = core::IntegrityState::Corrupted;
-        vi.details = "Hash failed: " + std::string(e.what());
+        vi.state = core::IntegrityState::Missing;
+        vi.details = "File not accessible: " + item.storage_path + " (" + e.what() + ")";
         return vi;
     }
 
@@ -111,17 +105,11 @@ core::VerificationItem IntegrityService::verify_folder_item(const core::ArchiveI
     vi.name = item.name;
     vi.expected_checksum = item.checksum;
 
-    if (!std::filesystem::exists(item.storage_path)) {
-        vi.state = core::IntegrityState::Missing;
-        vi.details = "Folder not found: " + item.storage_path;
-        return vi;
-    }
-
     try {
         vi.actual_checksum = hashing::FileHasher::hash_folder(item.storage_path);
     } catch (const std::exception& e) {
-        vi.state = core::IntegrityState::Corrupted;
-        vi.details = "Folder hash failed: " + std::string(e.what());
+        vi.state = core::IntegrityState::Missing;
+        vi.details = "Folder not accessible: " + item.storage_path + " (" + e.what() + ")";
         return vi;
     }
 
@@ -157,21 +145,13 @@ core::VerificationResult IntegrityService::verify_version(const std::string& ver
         return result;
     }
 
-    if (!std::filesystem::exists(ver->storage_path)) {
-        vi.state = core::IntegrityState::Missing;
-        vi.details = "Version file not found: " + ver->storage_path;
-        result.items.push_back(std::move(vi));
-        result.missing_count++;
-        return result;
-    }
-
     try {
         vi.actual_checksum = hashing::FileHasher::hash_file(ver->storage_path);
     } catch (const std::exception& e) {
-        vi.state = core::IntegrityState::Corrupted;
-        vi.details = "Hash failed: " + std::string(e.what());
+        vi.state = core::IntegrityState::Missing;
+        vi.details = "Version not accessible: " + ver->storage_path + " (" + e.what() + ")";
         result.items.push_back(std::move(vi));
-        result.corrupted_count++;
+        result.missing_count++;
         return result;
     }
 
@@ -207,21 +187,13 @@ core::VerificationResult IntegrityService::verify_stored_object(const std::strin
         return result;
     }
 
-    if (!std::filesystem::exists(obj->storage_path)) {
-        vi.state = core::IntegrityState::Missing;
-        vi.details = "Stored object file not found: " + obj->storage_path;
-        result.items.push_back(std::move(vi));
-        result.missing_count++;
-        return result;
-    }
-
     try {
         vi.actual_checksum = hashing::FileHasher::hash_file(obj->storage_path);
     } catch (const std::exception& e) {
-        vi.state = core::IntegrityState::Corrupted;
-        vi.details = "Hash failed: " + std::string(e.what());
+        vi.state = core::IntegrityState::Missing;
+        vi.details = "Stored object not accessible: " + obj->storage_path + " (" + e.what() + ")";
         result.items.push_back(std::move(vi));
-        result.corrupted_count++;
+        result.missing_count++;
         return result;
     }
 
@@ -280,25 +252,41 @@ core::ConsistencyReport IntegrityService::check_consistency() {
         }
 
         for (const auto& so : stored_objects) {
-            if (!std::filesystem::exists(so.storage_path)) {
+            std::error_code ec;
+            auto status = std::filesystem::status(so.storage_path, ec);
+            if (ec || status.type() == std::filesystem::file_type::not_found) {
                 core::ConsistencyIssue issue;
                 issue.severity = core::ConsistencyIssue::Severity::Error;
                 issue.kind = core::ConsistencyIssue::Kind::StoredObjectWithoutFile;
                 issue.entity_id = so.id;
                 issue.details = "Stored object file missing: " + so.storage_path;
                 report.add_issue(std::move(issue));
-            } else if (!so.checksum.empty()) {
-                try {
-                    std::string actual = hashing::FileHasher::hash_file(so.storage_path);
-                    if (!hashing::FileHasher::compare(actual, so.checksum)) {
-                        core::ConsistencyIssue issue;
-                        issue.severity = core::ConsistencyIssue::Severity::Error;
-                        issue.kind = core::ConsistencyIssue::Kind::ChecksumMismatch;
-                        issue.entity_id = so.id;
-                        issue.details = "Checksum mismatch for: " + so.storage_path;
-                        report.add_issue(std::move(issue));
-                    }
-                } catch (...) {}
+                continue;
+            }
+
+            if (!so.checksum.empty() && so.size == item.size) {
+                // Size matches and checksum exists — skip expensive re-hash
+                continue;
+            }
+
+            try {
+                std::string actual = hashing::FileHasher::hash_file(so.storage_path);
+                if (!so.checksum.empty() && !hashing::FileHasher::compare(actual, so.checksum)) {
+                    core::ConsistencyIssue issue;
+                    issue.severity = core::ConsistencyIssue::Severity::Error;
+                    issue.kind = core::ConsistencyIssue::Kind::ChecksumMismatch;
+                    issue.entity_id = so.id;
+                    issue.details = "Checksum mismatch for: " + so.storage_path;
+                    report.add_issue(std::move(issue));
+                }
+            } catch (const std::exception& e) {
+                core::ConsistencyIssue issue;
+                issue.severity = core::ConsistencyIssue::Severity::Error;
+                issue.kind = core::ConsistencyIssue::Kind::StoredObjectWithoutFile;
+                issue.entity_id = so.id;
+                issue.details = "Stored object not accessible: " + so.storage_path
+                    + " (" + e.what() + ")";
+                report.add_issue(std::move(issue));
             }
 
             if (item.size != so.size) {

@@ -57,11 +57,7 @@ std::vector<core::ArchiveItem> SearchService::find_favorites() {
 }
 
 std::vector<core::ArchiveItem> SearchService::find_recent(int limit) {
-    auto all = items_.find_all();
-    if (static_cast<int>(all.size()) > limit) {
-        all.resize(static_cast<size_t>(limit));
-    }
-    return all;
+    return items_.find_recent(limit);
 }
 
 std::vector<core::ArchiveItem> SearchService::find_by_category(const std::string& category_id) {

@@ -56,14 +56,6 @@ core::ImportResult ImportService::import_single(const std::string& path,
                                                  const std::optional<std::string>& category_id) {
     core::ImportResult result;
 
-    if (!std::filesystem::exists(path)) {
-        core::ImportError err;
-        err.path = path;
-        err.error = "Path does not exist";
-        result.errors.push_back(std::move(err));
-        return result;
-    }
-
     if (std::filesystem::is_directory(path)) {
         return import_folder(path, category_id);
     }

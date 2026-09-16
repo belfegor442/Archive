@@ -34,7 +34,10 @@ void DatabaseManager::close() {
         if (txn_depth_ > 0) {
             char* err = nullptr;
             int rc = sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, &err);
-            if (rc != SQLITE_OK && err) sqlite3_free(err);
+            if (rc != SQLITE_OK) {
+                sqlite3_exec(db_, "ABORT", nullptr, nullptr, nullptr);
+            }
+            if (err) sqlite3_free(err);
             txn_depth_ = 0;
         }
         sqlite3_close(db_);

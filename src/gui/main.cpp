@@ -239,7 +239,7 @@ static void DoTrash(HWND h) {
     if (i < 0 || i >= (int)g_items.size()) return;
     const auto& it = g_items[i];
     if (MessageBoxW(h, (L"Trash \"" + ToW(it.name) + L"\"?").c_str(), L"Trash", MB_YESNO | MB_ICONQUESTION) != IDYES) return;
-    try { services::UpdateService u(g_svc->items, g_svc->activities, g_svc->storage); u.move_to_trash(it.id); RefreshList(); }
+    try { services::UpdateService u(g_svc->db, g_svc->items, g_svc->activities, g_svc->storage); u.move_to_trash(it.id); RefreshList(); }
     catch (const std::exception& e) { MessageBoxW(h, ToW(e.what()).c_str(), L"Error", MB_ICONERROR); }
 }
 
@@ -247,7 +247,7 @@ static void DoUntrash(HWND h) {
     int i = SelIdx();
     if (i < 0 || i >= (int)g_items.size()) return;
     const auto& it = g_items[i];
-    try { services::UpdateService u(g_svc->items, g_svc->activities, g_svc->storage); u.restore_from_trash(it.id); RefreshList(); }
+    try { services::UpdateService u(g_svc->db, g_svc->items, g_svc->activities, g_svc->storage); u.restore_from_trash(it.id); RefreshList(); }
     catch (const std::exception& e) { MessageBoxW(h, ToW(e.what()).c_str(), L"Error", MB_ICONERROR); }
 }
 
@@ -256,7 +256,7 @@ static void DoDelete(HWND h) {
     if (i < 0 || i >= (int)g_items.size()) return;
     const auto& it = g_items[i];
     if (MessageBoxW(h, (L"PERMANENTLY delete \"" + ToW(it.name) + L"\"?").c_str(), L"Delete", MB_YESNO | MB_ICONWARNING) != IDYES) return;
-    try { services::UpdateService u(g_svc->items, g_svc->activities, g_svc->storage); u.permanent_delete(it.id); RefreshList(); }
+    try { services::UpdateService u(g_svc->db, g_svc->items, g_svc->activities, g_svc->storage); u.permanent_delete(it.id); RefreshList(); }
     catch (const std::exception& e) { MessageBoxW(h, ToW(e.what()).c_str(), L"Error", MB_ICONERROR); }
 }
 

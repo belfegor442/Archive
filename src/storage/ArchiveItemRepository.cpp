@@ -179,6 +179,28 @@ int ArchiveItemRepository::count_by_status(core::ItemStatus status) {
     return 0;
 }
 
+int ArchiveItemRepository::count_by_category(const std::string& category_id) {
+    auto stmt = db_.prepare(
+        "SELECT COUNT(*) FROM archive_items WHERE category_id=?");
+    stmt.bind_text(1, category_id);
+    if (stmt.step()) return stmt.column_int(0);
+    return 0;
+}
+
+std::vector<core::ArchiveItem> ArchiveItemRepository::find_recent(int limit) {
+    std::vector<core::ArchiveItem> items;
+    auto stmt = db_.prepare(
+        "SELECT " + std::string(ARCHIVE_ITEM_COLUMNS)
+        + " FROM archive_items WHERE status='archived' ORDER BY archived_at DESC LIMIT ?");
+    stmt.bind_int(1, limit);
+    while (stmt.step()) {
+        auto item = read_item(stmt);
+        load_tags(item);
+        items.push_back(std::move(item));
+    }
+    return items;
+}
+
 void ArchiveItemRepository::update_status(const std::string& id, core::ItemStatus status) {
     auto stmt = db_.prepare("UPDATE archive_items SET status=? WHERE id=?");
     stmt.bind_text(1, core::to_string(status));
@@ -190,6 +212,12 @@ void ArchiveItemRepository::set_favorite(const std::string& id, bool favorite) {
     auto stmt = db_.prepare("UPDATE archive_items SET is_favorite=? WHERE id=?");
     stmt.bind_int(1, favorite ? 1 : 0);
     stmt.bind_text(2, id);
+    stmt.step_done();
+}
+
+void ArchiveItemRepository::toggle_favorite(const std::string& id) {
+    auto stmt = db_.prepare("UPDATE archive_items SET is_favorite = 1 - is_favorite WHERE id=?");
+    stmt.bind_text(1, id);
     stmt.step_done();
 }
 
@@ -237,6 +265,13 @@ void ArchiveItemRepository::remove_tag(const std::string& item_id, const std::st
     stmt.bind_text(1, item_id);
     stmt.bind_text(2, tag_id);
     stmt.step_done();
+}
+
+int ArchiveItemRepository::count_by_tag(const std::string& tag_id) {
+    auto stmt = db_.prepare("SELECT COUNT(*) FROM item_tags WHERE tag_id=?");
+    stmt.bind_text(1, tag_id);
+    if (stmt.step()) return stmt.column_int(0);
+    return 0;
 }
 
 core::DashboardStats ArchiveItemRepository::get_stats() {

@@ -397,7 +397,7 @@ static int cmd_trash(CliContext& ctx) {
     storage::ActivityRepository activities(db);
     filesystem::StorageManager storage(ctx.config.data_dir, ctx.config.items_dir);
 
-    services::UpdateService update(items, activities, storage);
+    services::UpdateService update(db, items, activities, storage);
 
     auto item = items.find_by_id(ctx.args[0]);
     if (!item) {
@@ -429,7 +429,7 @@ static int cmd_untrash(CliContext& ctx) {
     storage::ActivityRepository activities(db);
     filesystem::StorageManager storage(ctx.config.data_dir, ctx.config.items_dir);
 
-    services::UpdateService update(items, activities, storage);
+    services::UpdateService update(db, items, activities, storage);
 
     auto item = items.find_by_id(ctx.args[0]);
     if (!item) {
@@ -461,7 +461,7 @@ static int cmd_delete(CliContext& ctx) {
     storage::ActivityRepository activities(db);
     filesystem::StorageManager storage(ctx.config.data_dir, ctx.config.items_dir);
 
-    services::UpdateService update(items, activities, storage);
+    services::UpdateService update(db, items, activities, storage);
 
     auto item = items.find_by_id(ctx.args[0]);
     if (!item) {

@@ -40,9 +40,9 @@ core::Note NoteService::add(const std::string& item_id, const std::string& conte
 }
 
 void NoteService::update(const std::string& note_id, const std::string& content) {
-    auto item_notes = notes_.find_by_note_id(note_id);
-    if (!item_notes) return;
-    auto note = *item_notes;
+    auto note_opt = notes_.find_by_note_id(note_id);
+    if (!note_opt) return;
+    auto& note = *note_opt;
     note.content = content;
     note.updated_at = core::utils::now_iso();
     notes_.update(note);
