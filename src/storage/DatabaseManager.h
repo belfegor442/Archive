@@ -14,12 +14,12 @@ public:
 
     DatabaseManager(const DatabaseManager&) = delete;
     DatabaseManager& operator=(const DatabaseManager&) = delete;
+    DatabaseManager(DatabaseManager&& other) noexcept;
+    DatabaseManager& operator=(DatabaseManager&& other) noexcept;
 
     void initialize();
     void close();
     bool is_open() const { return db_ != nullptr; }
-
-    sqlite3* handle() const { return db_; }
 
     void execute(const std::string& sql);
     void begin_transaction();
@@ -60,7 +60,7 @@ public:
         int last_rc_ = SQLITE_OK;
     };
 
-    Statement prepare(const std::string& sql);
+    [[nodiscard]] Statement prepare(const std::string& sql) const;
 
     static std::string rc_to_string(int rc);
 

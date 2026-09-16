@@ -336,7 +336,7 @@ static void test_update_move_to_trash() {
     ArchiveItemRepository item_repo(db);
     ActivityRepository act_repo(db);
     StorageManager storage(":", "test-items");
-    UpdateService svc(item_repo, act_repo, storage);
+    UpdateService svc(db, item_repo, act_repo, storage);
 
     ArchiveItem item;
     item.id = "upd-1"; item.name = "TrashMe"; item.type = ItemType::File;
@@ -359,7 +359,7 @@ static void test_update_restore() {
     ArchiveItemRepository item_repo(db);
     ActivityRepository act_repo(db);
     StorageManager storage(":", "test-items");
-    UpdateService svc(item_repo, act_repo, storage);
+    UpdateService svc(db, item_repo, act_repo, storage);
 
     ArchiveItem item;
     item.id = "upd-2"; item.name = "RestoreMe"; item.type = ItemType::File;
@@ -382,7 +382,7 @@ static void test_update_toggle_favorite() {
     ArchiveItemRepository item_repo(db);
     ActivityRepository act_repo(db);
     StorageManager storage(":", "test-items");
-    UpdateService svc(item_repo, act_repo, storage);
+    UpdateService svc(db, item_repo, act_repo, storage);
 
     ArchiveItem item;
     item.id = "upd-3"; item.name = "FavMe"; item.type = ItemType::File;
@@ -409,7 +409,7 @@ static void test_update_metadata() {
     ArchiveItemRepository item_repo(db);
     ActivityRepository act_repo(db);
     StorageManager storage(":", "test-items");
-    UpdateService svc(item_repo, act_repo, storage);
+    UpdateService svc(db, item_repo, act_repo, storage);
 
     ArchiveItem item;
     item.id = "upd-4"; item.name = "OldName"; item.type = ItemType::File;

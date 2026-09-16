@@ -15,6 +15,9 @@ public:
     FilesystemTracker(const FilesystemTracker&) = delete;
     FilesystemTracker& operator=(const FilesystemTracker&) = delete;
 
+    FilesystemTracker(FilesystemTracker&& other) noexcept = default;
+    FilesystemTracker& operator=(FilesystemTracker&& other) noexcept = default;
+
     void track_created_dir(const std::string& path);
     void track_created_file(const std::string& path);
     void track_copied_file(const std::string& dest_path);

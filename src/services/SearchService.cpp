@@ -16,11 +16,6 @@ core::SearchResult SearchService::search(const std::string& query, const SearchF
 
     if (has_query) {
         results = items_.search(query);
-    } else if (filters.is_favorite.has_value() && *filters.is_favorite) {
-        results = items_.find_favorites();
-    } else if (filters.type.has_value()) {
-        auto status = core::ItemStatus::Archived;
-        results = items_.find_by_status(status);
     } else {
         results = items_.find_all();
     }
@@ -44,6 +39,17 @@ core::SearchResult SearchService::search(const std::string& query, const SearchF
         results.erase(it, results.end());
     }
 
+    if (filters.tag.has_value()) {
+        auto it = std::remove_if(results.begin(), results.end(),
+            [&](const core::ArchiveItem& i) {
+                for (const auto& t : i.tags) {
+                    if (t.id == *filters.tag || t.name == *filters.tag) return false;
+                }
+                return true;
+            });
+        results.erase(it, results.end());
+    }
+
     int total = static_cast<int>(results.size());
     return core::SearchResult(std::move(results), total, query);
 }
@@ -57,11 +63,7 @@ std::vector<core::ArchiveItem> SearchService::find_favorites() {
 }
 
 std::vector<core::ArchiveItem> SearchService::find_recent(int limit) {
-    auto all = items_.find_all();
-    if (static_cast<int>(all.size()) > limit) {
-        all.resize(static_cast<size_t>(limit));
-    }
-    return all;
+    return items_.find_recent(limit);
 }
 
 std::vector<core::ArchiveItem> SearchService::find_by_category(const std::string& category_id) {

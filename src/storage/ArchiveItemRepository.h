@@ -22,17 +22,21 @@ public:
     std::vector<core::ArchiveItem> find_by_status(core::ItemStatus status);
     std::vector<core::ArchiveItem> find_by_category(const std::string& category_id);
     std::vector<core::ArchiveItem> find_favorites();
+    std::vector<core::ArchiveItem> find_recent(int limit);
     std::vector<core::ArchiveItem> search(const std::string& query);
     int count();
     int count_by_status(core::ItemStatus status);
+    int count_by_category(const std::string& category_id);
     void update_status(const std::string& id, core::ItemStatus status);
     void set_favorite(const std::string& id, bool favorite);
+    void toggle_favorite(const std::string& id);
     void update_category(const std::string& id, const std::string& category_id);
     void increment_version(const std::string& id);
 
     std::vector<core::Tag> get_tags(const std::string& item_id);
     void add_tag(const std::string& item_id, const std::string& tag_id);
     void remove_tag(const std::string& item_id, const std::string& tag_id);
+    int count_by_tag(const std::string& tag_id);
 
     core::DashboardStats get_stats();
 

@@ -435,7 +435,7 @@ static void test_import_trash_restore_integrity() {
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
     ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
-    UpdateService update_svc(item_repo, act_repo, storage);
+    UpdateService update_svc(db, item_repo, act_repo, storage);
     IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     std::string src = TEST_BASE + "/trash_restore.txt";

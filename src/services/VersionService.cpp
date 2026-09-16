@@ -39,8 +39,8 @@ core::Version VersionService::create_version(const std::string& item_id, const s
         std::string checksum;
         uint64_t size = 0;
         if (item->type == core::ItemType::File) {
-            checksum = hashing::FileHasher::hash_file(file_path);
-            size = filesystem::FileUtils::file_size(file_path);
+            checksum = hashing::FileHasher::hash_file(stored_path);
+            size = filesystem::FileUtils::file_size(stored_path);
         } else {
             checksum = hashing::FileHasher::hash_folder(file_path);
             size = filesystem::FileUtils::total_size(file_path);
@@ -120,8 +120,26 @@ void VersionService::restore(const std::string& item_id, const std::string& vers
         if (std::filesystem::is_directory(ver->storage_path)) {
             dest = item_dir + "/restored/" + original_name;
             FileUtils::create_directories(std::filesystem::path(dest).parent_path().string());
-            std::filesystem::copy(FileUtils::long_path(ver->storage_path), FileUtils::long_path(dest),
-                                  std::filesystem::copy_options::recursive);
+
+            std::error_code ec;
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(
+                    ver->storage_path, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                std::error_code status_ec;
+                auto status = entry.status(status_ec);
+                if (status_ec) continue;
+                if (status.type() == std::filesystem::file_type::symlink) continue;
+
+                std::string relative = std::filesystem::relative(entry.path(), ver->storage_path).string();
+                std::string entry_dest = dest + "/" + relative;
+                if (entry.is_regular_file()) {
+                    std::filesystem::create_directories(std::filesystem::path(entry_dest).parent_path());
+                    std::filesystem::copy_file(FileUtils::long_path(entry.path().string()),
+                        FileUtils::long_path(entry_dest), std::filesystem::copy_options::overwrite_existing, ec);
+                } else if (entry.is_directory()) {
+                    std::filesystem::create_directories(FileUtils::long_path(entry_dest));
+                }
+            }
+
             fs_tracker.track_created_dir(dest);
         } else {
             dest = item_file_dir + "/" + original_name;

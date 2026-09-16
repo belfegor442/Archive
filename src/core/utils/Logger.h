@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <mutex>
 
 namespace archive::core {
 
@@ -18,6 +19,7 @@ public:
 private:
     Logger() = default;
     LogLevel level_ = LogLevel::Info;
+    mutable std::mutex mutex_;
     static const char* level_name(LogLevel level);
 };
 

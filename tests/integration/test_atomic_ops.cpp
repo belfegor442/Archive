@@ -600,7 +600,7 @@ static void test_consistency_after_full_lifecycle() {
     ProjectDetector detector;
     ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
     VersionService version_svc(db, ver_repo, item_repo, act_repo, so_repo, storage);
-    UpdateService update_svc(item_repo, act_repo, storage);
+    UpdateService update_svc(db, item_repo, act_repo, storage);
     IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     std::string src1 = TEST_BASE + "/lifecycle.txt";
@@ -871,7 +871,7 @@ static void test_permanent_delete_consistency() {
     StorageManager storage(TEST_BASE, TEST_ITEMS);
     ProjectDetector detector;
     ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
-    UpdateService update_svc(item_repo, act_repo, storage);
+    UpdateService update_svc(db, item_repo, act_repo, storage);
 
     std::string src = TEST_BASE + "/delete_me.txt";
     create_test_file(src, "delete test");
@@ -1364,7 +1364,7 @@ static void test_consistency_full_lifecycle_with_staging() {
     ProjectDetector detector;
     ImportService import_svc(db, item_repo, cat_repo, tag_repo, act_repo, ver_repo, so_repo, storage, detector);
     VersionService version_svc(db, ver_repo, item_repo, act_repo, so_repo, storage);
-    UpdateService update_svc(item_repo, act_repo, storage);
+    UpdateService update_svc(db, item_repo, act_repo, storage);
     IntegrityService integrity(item_repo, ver_repo, so_repo, act_repo, storage);
 
     std::string src1 = TEST_BASE + "/full_staging.txt";

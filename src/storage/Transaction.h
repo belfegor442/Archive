@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DatabaseManager.h"
+#include "../core/utils/Logger.h"
 #include <stdexcept>
 
 namespace archive::storage {
@@ -19,7 +20,9 @@ public:
         if (active_ && !committed_) {
             try {
                 db_.rollback();
-            } catch (...) {}
+            } catch (const std::exception& e) {
+                LOG_FATAL(std::string("Transaction rollback failed in destructor: ") + e.what());
+            }
         }
     }
 

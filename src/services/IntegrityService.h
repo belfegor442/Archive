@@ -41,8 +41,7 @@ private:
     storage::ActivityRepository& activities_;
     filesystem::StorageManager& storage_;
 
-    core::VerificationItem verify_file_item(const core::ArchiveItem& item);
-    core::VerificationItem verify_folder_item(const core::ArchiveItem& item);
+    core::VerificationItem verify_item_checksum(const core::ArchiveItem& item);
 };
 
 } // namespace archive::services

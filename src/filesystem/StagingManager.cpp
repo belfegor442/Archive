@@ -111,21 +111,36 @@ std::string parse_json_string(const std::string& s, size_t& pos) {
 
 std::string find_json_value(const std::string& obj, const std::string& key) {
     std::string search = "\"" + key + "\"";
-    auto key_pos = obj.find(search);
-    if (key_pos == std::string::npos) {
-        return "";
+    size_t search_pos = 0;
+    while (search_pos < obj.size()) {
+        auto key_pos = obj.find(search, search_pos);
+        if (key_pos == std::string::npos) {
+            return "";
+        }
+
+        if (key_pos > 0) {
+            char before = obj[key_pos - 1];
+            if (before != ' ' && before != '\n' && before != '\r' && before != '\t' && before != ',' && before != '{') {
+                search_pos = key_pos + 1;
+                continue;
+            }
+        }
+
+        size_t pos = key_pos + search.size();
+        skip_whitespace(obj, pos);
+        if (pos >= obj.size() || obj[pos] != ':') {
+            search_pos = key_pos + 1;
+            continue;
+        }
+        pos++;
+        skip_whitespace(obj, pos);
+        if (pos >= obj.size() || obj[pos] != '"') {
+            search_pos = key_pos + 1;
+            continue;
+        }
+        return parse_json_string(obj, pos);
     }
-    size_t pos = key_pos + search.size();
-    skip_whitespace(obj, pos);
-    if (pos >= obj.size() || obj[pos] != ':') {
-        return "";
-    }
-    pos++;
-    skip_whitespace(obj, pos);
-    if (pos >= obj.size() || obj[pos] != '"') {
-        return "";
-    }
-    return parse_json_string(obj, pos);
+    return "";
 }
 
 } // anonymous namespace
@@ -146,7 +161,6 @@ std::string StagingManager::create_staging_dir(const std::string& operation_type
     FileUtils::create_directories(path);
     FileUtils::create_directories(path + "/files");
     FileUtils::create_directories(path + "/.meta");
-    FileUtils::create_directories(path + "/.meta/backups");
 
     StagingOperation meta;
     meta.operation_id = op_id;
@@ -324,8 +338,8 @@ void StagingManager::finalize_staging(const std::string& operation_id, const std
 
         verify_finalized(operation_id, dest_dir);
     } catch (...) {
-        restore_backups(operation_id);
         mark_rolling_back(operation_id);
+        restore_backups(operation_id);
         mark_rolled_back(operation_id);
         throw;
     }
@@ -561,6 +575,9 @@ void StagingManager::write_backup_journal(const std::string& operation_id,
     std::string journal = get_staging_path(operation_id) + "/.meta/backups.json";
     std::string tmp = journal + ".tmp";
 
+    std::error_code dir_ec;
+    std::filesystem::create_directories(std::filesystem::path(journal).parent_path(), dir_ec);
+
     std::ofstream f(tmp);
     if (!f.is_open()) {
         throw std::runtime_error("Failed to write backup journal: " + tmp);
@@ -604,11 +621,7 @@ void StagingManager::append_backup_entry(const std::string& operation_id,
 
 std::string StagingManager::get_backup_path(const std::string& operation_id,
                                              const std::string& relative) const {
-    std::string safe_name;
-    for (char c : relative) {
-        if (c == '/' || c == '\\') safe_name += '_';
-        else safe_name += c;
-    }
+    std::string safe_name = FileUtils::sanitize_filename(relative);
     return get_staging_path(operation_id) + "/.meta/backups/" + safe_name;
 }
 
@@ -684,17 +697,37 @@ void StagingManager::verify_finalized(const std::string& operation_id, const std
 
 void StagingManager::write_metadata(const std::string& operation_id, const StagingOperation& meta) {
     std::string meta_file = get_staging_path(operation_id) + "/.meta/operation.json";
-    std::ofstream f(meta_file);
-    if (f.is_open()) {
-        f << "{\n";
-        f << "  \"operation_id\": \"" << meta.operation_id << "\",\n";
-        f << "  \"operation_type\": \"" << meta.operation_type << "\",\n";
-        f << "  \"state\": \"" << meta.state << "\",\n";
-        f << "  \"created_at\": \"" << meta.created_at << "\",\n";
-        f << "  \"item_id\": \"" << meta.item_id << "\",\n";
-        f << "  \"version_id\": \"" << meta.version_id << "\",\n";
-        f << "  \"expected_checksum\": \"" << meta.expected_checksum << "\"\n";
-        f << "}\n";
+    std::string tmp = meta_file + ".tmp";
+    std::ofstream f(tmp);
+    if (!f.is_open()) {
+        throw std::runtime_error("Failed to write metadata: " + tmp);
+    }
+    f << "{\n";
+    f << "  \"operation_id\": \"" << json_escape(meta.operation_id) << "\",\n";
+    f << "  \"operation_type\": \"" << json_escape(meta.operation_type) << "\",\n";
+    f << "  \"state\": \"" << json_escape(meta.state) << "\",\n";
+    f << "  \"created_at\": \"" << json_escape(meta.created_at) << "\",\n";
+    f << "  \"item_id\": \"" << json_escape(meta.item_id) << "\",\n";
+    f << "  \"version_id\": \"" << json_escape(meta.version_id) << "\",\n";
+    f << "  \"expected_checksum\": \"" << json_escape(meta.expected_checksum) << "\"\n";
+    f << "}\n";
+    f.flush();
+    if (f.fail()) {
+        f.close();
+        std::error_code ec;
+        std::filesystem::remove(tmp, ec);
+        throw std::runtime_error("Failed to flush metadata: " + tmp);
+    }
+    f.close();
+
+    std::error_code ec;
+#ifdef _WIN32
+    std::filesystem::remove(meta_file, ec);
+#endif
+    std::filesystem::rename(tmp, meta_file, ec);
+    if (ec) {
+        std::filesystem::remove(tmp, ec);
+        throw std::runtime_error("Failed to write metadata: " + meta_file + " (" + ec.message() + ")");
     }
 }
 
@@ -722,32 +755,18 @@ StagingOperation StagingManager::read_metadata(const std::string& operation_id) 
     }
 
     std::ifstream f(meta_file);
-    if (f.is_open()) {
-        std::string line;
-        while (std::getline(f, line)) {
-            auto pos = line.find(':');
-            if (pos == std::string::npos) continue;
+    if (!f.is_open()) return op;
 
-            std::string key = line.substr(0, pos);
-            std::string value = line.substr(pos + 1);
+    std::string content((std::istreambuf_iterator<char>(f)),
+                        std::istreambuf_iterator<char>());
+    f.close();
 
-            auto trim = [](std::string s) {
-                while (!s.empty() && (s.front() == ' ' || s.front() == '"')) s.erase(s.begin());
-                while (!s.empty() && (s.back() == ' ' || s.back() == '"' || s.back() == ',' || s.back() == '}')) s.pop_back();
-                return s;
-            };
-
-            key = trim(key);
-            value = trim(value);
-
-            if (key == "operation_type") op.operation_type = value;
-            else if (key == "state") op.state = value;
-            else if (key == "created_at") op.created_at = value;
-            else if (key == "item_id") op.item_id = value;
-            else if (key == "version_id") op.version_id = value;
-            else if (key == "expected_checksum") op.expected_checksum = value;
-        }
-    }
+    op.operation_type = find_json_value(content, "operation_type");
+    op.state = find_json_value(content, "state");
+    op.created_at = find_json_value(content, "created_at");
+    op.item_id = find_json_value(content, "item_id");
+    op.version_id = find_json_value(content, "version_id");
+    op.expected_checksum = find_json_value(content, "expected_checksum");
 
     return op;
 }

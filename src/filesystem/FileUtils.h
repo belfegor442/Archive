@@ -29,6 +29,7 @@ public:
                                    const std::string& ext);
 
     static std::string sanitize_relative_path(const std::string& relative);
+    static std::string sanitize_filename(const std::string& name);
     static bool is_path_within(const std::string& path, const std::string& base);
     static std::string long_path(const std::string& path);
 };

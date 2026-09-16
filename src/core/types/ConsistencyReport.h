@@ -37,7 +37,7 @@ struct ConsistencyReport {
 
     ConsistencyReport() = default;
 
-    bool is_clean() const { return error_count == 0; }
+    [[nodiscard]] bool is_clean() const { return error_count == 0; }
 
     void add_issue(ConsistencyIssue issue) {
         issues.push_back(std::move(issue));
@@ -51,6 +51,7 @@ struct ConsistencyReport {
             case ConsistencyIssue::Kind::ChecksumMismatch: invalid_checksums++; break;
             case ConsistencyIssue::Kind::ItemWithoutVersion:
             case ConsistencyIssue::Kind::VersionWithoutStoredObject:
+            case ConsistencyIssue::Kind::OrphanStaging:
                 broken_relations++; break;
             default: break;
         }

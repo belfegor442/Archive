@@ -12,6 +12,27 @@ DatabaseManager::~DatabaseManager() {
     close();
 }
 
+DatabaseManager::DatabaseManager(DatabaseManager&& other) noexcept
+    : db_(other.db_)
+    , db_path_(std::move(other.db_path_))
+    , txn_depth_(other.txn_depth_)
+{
+    other.db_ = nullptr;
+    other.txn_depth_ = 0;
+}
+
+DatabaseManager& DatabaseManager::operator=(DatabaseManager&& other) noexcept {
+    if (this != &other) {
+        close();
+        db_ = other.db_;
+        db_path_ = std::move(other.db_path_);
+        txn_depth_ = other.txn_depth_;
+        other.db_ = nullptr;
+        other.txn_depth_ = 0;
+    }
+    return *this;
+}
+
 void DatabaseManager::initialize() {
     int rc = sqlite3_open(db_path_.c_str(), &db_);
     if (rc != SQLITE_OK) {
@@ -32,7 +53,12 @@ void DatabaseManager::initialize() {
 void DatabaseManager::close() {
     if (db_) {
         if (txn_depth_ > 0) {
-            sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+            char* err = nullptr;
+            int rc = sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, &err);
+            if (rc != SQLITE_OK) {
+                sqlite3_exec(db_, "ABORT", nullptr, nullptr, nullptr);
+            }
+            if (err) sqlite3_free(err);
             txn_depth_ = 0;
         }
         if (db_path_ != ":memory:") {
@@ -88,7 +114,6 @@ void DatabaseManager::enable_wal() {
         execute("PRAGMA synchronous=NORMAL");
     }
     execute("PRAGMA foreign_keys=ON");
-    execute("PRAGMA busy_timeout=5000");
     execute("PRAGMA cache_size=-64000");
     execute("PRAGMA temp_store=MEMORY");
     execute("PRAGMA mmap_size=268435456");
@@ -465,7 +490,7 @@ void DatabaseManager::Statement::reset() {
     sqlite3_clear_bindings(stmt_);
 }
 
-DatabaseManager::Statement DatabaseManager::prepare(const std::string& sql) {
+DatabaseManager::Statement DatabaseManager::prepare(const std::string& sql) const {
     return Statement(db_, sql);
 }
 

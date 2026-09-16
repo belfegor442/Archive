@@ -45,8 +45,7 @@ std::optional<core::Category> CategoryService::get_by_id(const std::string& id) 
 }
 
 int CategoryService::get_item_count(const std::string& category_id) {
-    auto items = items_.find_by_category(category_id);
-    return static_cast<int>(items.size());
+    return items_.count_by_category(category_id);
 }
 
 } // namespace archive::services

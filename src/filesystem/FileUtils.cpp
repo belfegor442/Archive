@@ -15,7 +15,10 @@ bool FileUtils::directory_exists(const std::string& path) {
 }
 
 uint64_t FileUtils::file_size(const std::string& path) {
-    return std::filesystem::file_size(path);
+    std::error_code ec;
+    auto size = std::filesystem::file_size(long_path(path), ec);
+    if (ec) return 0;
+    return size;
 }
 
 std::string FileUtils::file_name(const std::string& path) {
@@ -147,6 +150,20 @@ std::string FileUtils::sanitize_relative_path(const std::string& relative) {
         result += part;
     }
     return result;
+}
+
+std::string FileUtils::sanitize_filename(const std::string& name) {
+    std::string safe;
+    safe.reserve(name.size());
+    for (char c : name) {
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
+            c == '"' || c == '<' || c == '>' || c == '|') {
+            safe += '_';
+        } else {
+            safe += c;
+        }
+    }
+    return safe;
 }
 
 bool FileUtils::is_path_within(const std::string& path, const std::string& base) {
