@@ -273,9 +273,3 @@ void MonixApp::TransitionToLoggedIn() {
   state_.intro.active = config_.introEnabled;
   PushLog(L"SYSTEM", L"SUCCESS", L"Kernel initialized — terminal unlocked", ColorRole::Success);
 }
-
-void MonixApp::PlayAlertSound(LogLevel /*level*/) {
-}
-
-void MonixApp::PlayClickSound() {
-}

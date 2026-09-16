@@ -1425,8 +1425,10 @@ LRESULT MonixApp::WndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
             state_.devShell.history.push_back(L"Commands: help, status, version, processes, scram, clear, config, log, uptime, memory");
           } else if (cmd == L"status") {
             wchar_t buf[256];
+            double ramPct = (state_.snapshot.ramTotalBytes > 0) ?
+              (static_cast<double>(state_.snapshot.ramUsedBytes) / state_.snapshot.ramTotalBytes * 100.0) : 0.0;
             _snwprintf_s(buf, 256, L"CPU: %.0f%%  RAM: %.0f%%  Risk: %.0f  Procs: %d",
-              state_.snapshot.cpuPct, state_.snapshot.ramPctUsed, state_.scramState.smoothedRisk,
+              state_.snapshot.cpuPct, ramPct, state_.scramState.smoothedRisk,
               static_cast<int>(state_.snapshot.processes.size()));
             state_.devShell.history.push_back(buf);
           } else if (cmd == L"version") {
