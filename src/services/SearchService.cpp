@@ -16,11 +16,6 @@ core::SearchResult SearchService::search(const std::string& query, const SearchF
 
     if (has_query) {
         results = items_.search(query);
-    } else if (filters.is_favorite.has_value() && *filters.is_favorite) {
-        results = items_.find_favorites();
-    } else if (filters.type.has_value()) {
-        auto status = core::ItemStatus::Archived;
-        results = items_.find_by_status(status);
     } else {
         results = items_.find_all();
     }
@@ -41,6 +36,17 @@ core::SearchResult SearchService::search(const std::string& query, const SearchF
     if (filters.category_id.has_value()) {
         auto it = std::remove_if(results.begin(), results.end(),
             [&](const core::ArchiveItem& i) { return i.category_id != filters.category_id; });
+        results.erase(it, results.end());
+    }
+
+    if (filters.tag.has_value()) {
+        auto it = std::remove_if(results.begin(), results.end(),
+            [&](const core::ArchiveItem& i) {
+                for (const auto& t : i.tags) {
+                    if (t.id == *filters.tag || t.name == *filters.tag) return false;
+                }
+                return true;
+            });
         results.erase(it, results.end());
     }
 
