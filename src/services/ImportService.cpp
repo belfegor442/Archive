@@ -82,41 +82,8 @@ core::ImportResult ImportService::import_single(const std::string& path,
         item.storage_path = stored_path;
         item.checksum = copy_checksum;
 
-        {
-            storage::Transaction tx(db_);
-
-            items_.insert(item);
-
-            core::Version ver;
-            ver.id = core::utils::generate_id();
-            ver.item_id = item_id;
-            ver.version_number = 1;
-            ver.storage_path = stored_path;
-            ver.checksum = copy_checksum;
-            ver.size = item.size;
-            ver.created_at = core::utils::now_iso();
-            versions_.insert(ver);
-
-            core::StoredObject so;
-            so.id = core::utils::generate_id();
-            so.item_id = item_id;
-            so.version_id = ver.id;
-            so.storage_path = stored_path;
-            so.size = item.size;
-            so.checksum = copy_checksum;
-            so.created_at = core::utils::now_iso();
-            stored_objects_.insert(so);
-
-            core::Activity act;
-            act.id = core::utils::generate_id();
-            act.item_id = item_id;
-            act.action = core::ActivityAction::Imported;
-            act.details = "Archived file from " + path;
-            act.created_at = core::utils::now_iso();
-            activities_.insert(act);
-
-            tx.commit();
-        }
+        persist_import(item, stored_path, copy_checksum, item.size,
+                       "Archived file from " + path);
 
         result.items.push_back(std::move(item));
     } catch (const std::exception& e) {
@@ -159,44 +126,11 @@ core::ImportResult ImportService::import_folder(const std::string& path,
         item.size = filesystem::FileUtils::total_size(stored_path);
         item.checksum = hashing::FileHasher::hash_folder(stored_path);
 
-        {
-            storage::Transaction tx(db_);
-
-            items_.insert(item);
-
-            core::Version ver;
-            ver.id = core::utils::generate_id();
-            ver.item_id = item_id;
-            ver.version_number = 1;
-            ver.storage_path = stored_path;
-            ver.checksum = item.checksum;
-            ver.size = item.size;
-            ver.notes = "Initial folder import";
-            ver.created_at = core::utils::now_iso();
-            versions_.insert(ver);
-
-            core::StoredObject so;
-            so.id = core::utils::generate_id();
-            so.item_id = item_id;
-            so.version_id = ver.id;
-            so.storage_path = stored_path;
-            so.size = item.size;
-            so.checksum = item.checksum;
-            so.created_at = core::utils::now_iso();
-            stored_objects_.insert(so);
-
-            core::Activity act;
-            act.id = core::utils::generate_id();
-            act.item_id = item_id;
-            act.action = core::ActivityAction::Imported;
-            act.details = "Archived folder from " + path
-                + (detection.is_project ? " (" + detection.project_type + ")" : "")
-                + " - " + std::to_string(item.file_count) + " files";
-            act.created_at = core::utils::now_iso();
-            activities_.insert(act);
-
-            tx.commit();
-        }
+        persist_import(item, stored_path, item.checksum, item.size,
+                       "Archived folder from " + path
+                           + (detection.is_project ? " (" + detection.project_type + ")" : "")
+                           + " - " + std::to_string(item.file_count) + " files",
+                       "Initial folder import");
 
         result.items.push_back(std::move(item));
     } catch (const std::exception& e) {
@@ -237,11 +171,46 @@ core::ArchiveItem ImportService::create_item_from_path(const std::string& path,
     return item;
 }
 
-void ImportService::rollback_filesystem(const std::string& item_id) {
-    try {
-        storage_.remove_item_dir(item_id);
-    } catch (...) {
-    }
+void ImportService::persist_import(const core::ArchiveItem& item,
+                                    const std::string& storage_path,
+                                    const std::string& checksum,
+                                    uint64_t size,
+                                    const std::string& activity_details,
+                                    const std::string& version_notes) {
+    storage::Transaction tx(db_);
+
+    items_.insert(item);
+
+    core::Version ver;
+    ver.id = core::utils::generate_id();
+    ver.item_id = item.id;
+    ver.version_number = 1;
+    ver.storage_path = storage_path;
+    ver.checksum = checksum;
+    ver.size = size;
+    ver.notes = version_notes;
+    ver.created_at = core::utils::now_iso();
+    versions_.insert(ver);
+
+    core::StoredObject so;
+    so.id = core::utils::generate_id();
+    so.item_id = item.id;
+    so.version_id = ver.id;
+    so.storage_path = storage_path;
+    so.size = size;
+    so.checksum = checksum;
+    so.created_at = core::utils::now_iso();
+    stored_objects_.insert(so);
+
+    core::Activity act;
+    act.id = core::utils::generate_id();
+    act.item_id = item.id;
+    act.action = core::ActivityAction::Imported;
+    act.details = activity_details;
+    act.created_at = core::utils::now_iso();
+    activities_.insert(act);
+
+    tx.commit();
 }
 
 } // namespace archive::services

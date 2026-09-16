@@ -54,12 +54,10 @@ core::VerificationResult IntegrityService::verify_item(const std::string& item_i
         return result;
     }
 
-    if (item->type == core::ItemType::File) {
-        auto file_result = verify_file_item(*item);
-        result.items.push_back(std::move(file_result));
-    } else {
-        auto folder_result = verify_folder_item(*item);
-        result.items.push_back(std::move(folder_result));
+    if (item->type == core::ItemType::File || item->type == core::ItemType::Folder
+        || item->type == core::ItemType::Project || item->type == core::ItemType::Document) {
+        auto result_vi = verify_item_checksum(*item);
+        result.items.push_back(std::move(result_vi));
     }
 
     const auto& last = result.items.back();
@@ -74,17 +72,21 @@ core::VerificationResult IntegrityService::verify_item(const std::string& item_i
     return result;
 }
 
-core::VerificationItem IntegrityService::verify_file_item(const core::ArchiveItem& item) {
+core::VerificationItem IntegrityService::verify_item_checksum(const core::ArchiveItem& item) {
     core::VerificationItem vi;
     vi.id = item.id;
     vi.name = item.name;
     vi.expected_checksum = item.checksum;
 
     try {
-        vi.actual_checksum = hashing::FileHasher::hash_file(item.storage_path);
+        if (item.type == core::ItemType::File) {
+            vi.actual_checksum = hashing::FileHasher::hash_file(item.storage_path);
+        } else {
+            vi.actual_checksum = hashing::FileHasher::hash_folder(item.storage_path);
+        }
     } catch (const std::exception& e) {
         vi.state = core::IntegrityState::Missing;
-        vi.details = "File not accessible: " + item.storage_path + " (" + e.what() + ")";
+        vi.details = "Not accessible: " + item.storage_path + " (" + e.what() + ")";
         return vi;
     }
 
@@ -94,31 +96,6 @@ core::VerificationItem IntegrityService::verify_file_item(const core::ArchiveIte
     } else {
         vi.state = core::IntegrityState::Modified;
         vi.details = "Checksum mismatch";
-    }
-
-    return vi;
-}
-
-core::VerificationItem IntegrityService::verify_folder_item(const core::ArchiveItem& item) {
-    core::VerificationItem vi;
-    vi.id = item.id;
-    vi.name = item.name;
-    vi.expected_checksum = item.checksum;
-
-    try {
-        vi.actual_checksum = hashing::FileHasher::hash_folder(item.storage_path);
-    } catch (const std::exception& e) {
-        vi.state = core::IntegrityState::Missing;
-        vi.details = "Folder not accessible: " + item.storage_path + " (" + e.what() + ")";
-        return vi;
-    }
-
-    if (hashing::FileHasher::compare(vi.actual_checksum, vi.expected_checksum)) {
-        vi.state = core::IntegrityState::Valid;
-        vi.details = "Folder checksum matches";
-    } else {
-        vi.state = core::IntegrityState::Modified;
-        vi.details = "Folder checksum mismatch";
     }
 
     return vi;

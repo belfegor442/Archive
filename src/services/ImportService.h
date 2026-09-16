@@ -51,7 +51,12 @@ private:
     ProjectDetector& detector_;
 
     core::ArchiveItem create_item_from_path(const std::string& path, const std::optional<std::string>& category_id);
-    void rollback_filesystem(const std::string& item_id);
+    void persist_import(const core::ArchiveItem& item,
+                        const std::string& storage_path,
+                        const std::string& checksum,
+                        uint64_t size,
+                        const std::string& activity_details,
+                        const std::string& version_notes = "");
 };
 
 } // namespace archive::services

@@ -37,7 +37,7 @@ struct ConsistencyReport {
 
     ConsistencyReport() = default;
 
-    bool is_clean() const { return error_count == 0; }
+    [[nodiscard]] bool is_clean() const { return error_count == 0; }
 
     void add_issue(ConsistencyIssue issue) {
         issues.push_back(std::move(issue));

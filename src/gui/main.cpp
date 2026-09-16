@@ -108,8 +108,7 @@ static void RefreshList() {
         li.pszText = (LPWSTR)nm.c_str();
         int idx = ListView_InsertItem(g_hList, &li);
 
-        const wchar_t* types[] = { L"File", L"Folder", L"Project", L"Document" };
-        std::wstring tp = types[(int)it.type];
+        std::wstring tp = ToW(core::to_string(it.type));
         std::wstring st = ToW(core::to_string(it.status));
         std::wstring vr = L"v" + std::to_wstring(it.current_version);
         std::wstring sz = std::to_wstring(it.size) + L" B";
@@ -175,11 +174,10 @@ static void DoDetails(HWND h) {
     int i = SelIdx();
     if (i < 0 || i >= (int)g_items.size()) { MessageBoxW(h, L"Select an item", L"Info", MB_ICONINFORMATION); return; }
     const auto& it = g_items[i];
-    const char* types[] = {"File","Folder","Project","Document"};
     std::wstring info;
     info += L"Name:      " + ToW(it.name) + L"\n";
     info += L"ID:        " + ToW(it.id) + L"\n";
-    info += L"Type:      " + ToW(types[(int)it.type]) + L"\n";
+    info += L"Type:      " + ToW(core::to_string(it.type)) + L"\n";
     info += L"Status:    " + ToW(core::to_string(it.status)) + L"\n";
     info += L"Size:      " + std::to_wstring(it.size) + L" bytes\n";
     info += L"Version:   " + std::to_wstring(it.current_version) + L"\n";

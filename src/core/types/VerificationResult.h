@@ -27,7 +27,7 @@ struct VerificationResult {
 
     VerificationResult() = default;
 
-    bool all_valid() const {
+    [[nodiscard]] bool all_valid() const {
         return modified_count == 0 && missing_count == 0 && corrupted_count == 0;
     }
 };

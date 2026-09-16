@@ -12,6 +12,27 @@ DatabaseManager::~DatabaseManager() {
     close();
 }
 
+DatabaseManager::DatabaseManager(DatabaseManager&& other) noexcept
+    : db_(other.db_)
+    , db_path_(std::move(other.db_path_))
+    , txn_depth_(other.txn_depth_)
+{
+    other.db_ = nullptr;
+    other.txn_depth_ = 0;
+}
+
+DatabaseManager& DatabaseManager::operator=(DatabaseManager&& other) noexcept {
+    if (this != &other) {
+        close();
+        db_ = other.db_;
+        db_path_ = std::move(other.db_path_);
+        txn_depth_ = other.txn_depth_;
+        other.db_ = nullptr;
+        other.txn_depth_ = 0;
+    }
+    return *this;
+}
+
 void DatabaseManager::initialize() {
     int rc = sqlite3_open(db_path_.c_str(), &db_);
     if (rc != SQLITE_OK) {
