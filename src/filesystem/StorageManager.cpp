@@ -66,8 +66,12 @@ std::string StorageManager::store_folder(const std::string& item_id, const std::
         }
 
         if (entry.is_regular_file()) {
-            std::string relative = std::filesystem::relative(entry.path(), source_dir).string();
+            std::string relative = FileUtils::sanitize_relative_path(
+                std::filesystem::relative(entry.path(), source_dir).string());
             std::string dest_path = dest_base + "/" + relative;
+            if (!FileUtils::is_path_within(dest_path, dest_base)) {
+                continue;
+            }
             FileUtils::create_directories(std::filesystem::path(dest_path).parent_path().string());
             FileUtils::copy_file(entry.path().string(), dest_path);
         }

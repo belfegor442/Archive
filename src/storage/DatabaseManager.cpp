@@ -32,7 +32,9 @@ void DatabaseManager::initialize() {
 void DatabaseManager::close() {
     if (db_) {
         if (txn_depth_ > 0) {
-            sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, nullptr);
+            char* err = nullptr;
+            int rc = sqlite3_exec(db_, "ROLLBACK", nullptr, nullptr, &err);
+            if (rc != SQLITE_OK && err) sqlite3_free(err);
             txn_depth_ = 0;
         }
         sqlite3_close(db_);
@@ -84,7 +86,6 @@ void DatabaseManager::enable_wal() {
         execute("PRAGMA journal_mode=WAL");
     }
     execute("PRAGMA foreign_keys=ON");
-    execute("PRAGMA busy_timeout=5000");
 }
 
 void DatabaseManager::create_schema() {

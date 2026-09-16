@@ -43,6 +43,16 @@ void UpdateService::restore_from_trash(const std::string& item_id) {
 }
 
 void UpdateService::permanent_delete(const std::string& item_id) {
+    auto item = items_.find_by_id(item_id);
+    if (!item) return;
+
+    core::Activity act;
+    act.id = core::utils::generate_id();
+    act.item_id = item_id;
+    act.action = core::ActivityAction::Deleted;
+    act.created_at = core::utils::now_iso();
+    activities_.insert(act);
+
     storage_.remove_item_dir(item_id);
     items_.remove(item_id);
 }

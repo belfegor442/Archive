@@ -2,6 +2,10 @@
 
 #include <algorithm>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 namespace archive::filesystem {
 
 FilesystemTracker::FilesystemTracker(const std::string& backup_dir)
@@ -73,8 +77,16 @@ void FilesystemTracker::backup_original(const std::string& dest_path, const std:
     if (!std::filesystem::exists(original_path)) return;
 
     std::error_code ec;
-    auto backup_path = std::filesystem::path(backup_dir_)
-        / std::filesystem::path(dest_path).filename();
+    std::string safe_name;
+    for (char c : dest_path) {
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
+            c == '"' || c == '<' || c == '>' || c == '|') {
+            safe_name += '_';
+        } else {
+            safe_name += c;
+        }
+    }
+    auto backup_path = std::filesystem::path(backup_dir_) / safe_name;
 
     std::filesystem::create_directories(backup_dir_, ec);
     if (ec) return;
@@ -125,11 +137,9 @@ bool FilesystemTracker::is_symlink_or_junction(const std::string& path) {
     auto p = std::filesystem::path(path);
     if (std::filesystem::is_symlink(p, ec)) return true;
 #ifdef _WIN32
-    auto status = std::filesystem::status(p, ec);
-    if (!ec) {
-        auto perms = status.permissions();
-        if ((static_cast<int>(perms) & static_cast<int>(std::filesystem::perms::owner_all)) == 0) {
-        }
+    DWORD attrs = GetFileAttributesA(path.c_str());
+    if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_REPARSE_POINT)) {
+        return true;
     }
 #endif
     return false;

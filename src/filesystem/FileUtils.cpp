@@ -15,7 +15,10 @@ bool FileUtils::directory_exists(const std::string& path) {
 }
 
 uint64_t FileUtils::file_size(const std::string& path) {
-    return std::filesystem::file_size(path);
+    std::error_code ec;
+    auto size = std::filesystem::file_size(long_path(path), ec);
+    if (ec) return 0;
+    return size;
 }
 
 std::string FileUtils::file_name(const std::string& path) {

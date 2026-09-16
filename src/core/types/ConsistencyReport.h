@@ -51,6 +51,7 @@ struct ConsistencyReport {
             case ConsistencyIssue::Kind::ChecksumMismatch: invalid_checksums++; break;
             case ConsistencyIssue::Kind::ItemWithoutVersion:
             case ConsistencyIssue::Kind::VersionWithoutStoredObject:
+            case ConsistencyIssue::Kind::OrphanStaging:
                 broken_relations++; break;
             default: break;
         }

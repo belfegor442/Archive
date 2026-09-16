@@ -281,10 +281,10 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         break;
     }
     case WM_SIZE: {
-        int w = LOWORD(l), hh = HIWORD(l);
+        int ww = LOWORD(l), hh = HIWORD(l);
         SendMessageW(g_hStatus, WM_SIZE, 0, 0);
         RECT sr; GetWindowRect(g_hStatus, &sr);
-        MoveWindow(g_hList, 0, 0, w, hh - (sr.bottom - sr.top), TRUE);
+        MoveWindow(g_hList, 0, 0, ww, hh - (sr.bottom - sr.top), TRUE);
         break;
     }
     case WM_COMMAND:
