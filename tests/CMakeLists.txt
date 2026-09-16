@@ -17,6 +17,7 @@ add_executable(archive_tests
     test_scanner.cpp
     test_planner.cpp
     test_executor.cpp
+    test_file_analysis.cpp
     integration/test_organize_flow.cpp
 )
 

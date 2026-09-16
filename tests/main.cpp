@@ -15,6 +15,7 @@ void run_classifier_tests();
 void run_scanner_tests();
 void run_planner_tests();
 void run_executor_tests();
+void run_file_analysis_tests();
 void run_organize_flow_tests();
 
 int main() {
@@ -33,6 +34,7 @@ int main() {
     run_scanner_tests();
     run_planner_tests();
     run_executor_tests();
+    run_file_analysis_tests();
     run_organize_flow_tests();
 
     return ::test::test_summary();

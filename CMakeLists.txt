@@ -84,6 +84,8 @@ set(ARCHIVE_LIB_SOURCES
     src/services/Classifier.cpp
     src/services/OrganizationPlanner.cpp
     src/services/OrganizationExecutor.cpp
+    src/services/FileAnalysisEngine.cpp
+    src/services/RelationshipEngine.cpp
     src/core/utils/Logger.cpp
     src/app/AppConfig.cpp
 )

@@ -10,10 +10,17 @@
 #include "../storage/DatabaseManager.h"
 #include "../storage/ScanRepository.h"
 #include "../storage/ScanItemRepository.h"
+#include "FileAnalysisEngine.h"
 
 namespace archive::services {
 
 using ScanProgressFn = std::function<void(int files_scanned, int folders_scanned, int64_t bytes_scanned)>;
+
+struct ScanResult {
+    core::Scan scan;
+    std::vector<FileAnalysis> analyses;
+    std::vector<std::string> ignored_dirs;
+};
 
 class Scanner {
 public:
@@ -26,11 +33,15 @@ public:
     core::AnalysisResult analyze(const std::string& scan_id) const;
     std::vector<core::ScanItem> get_items(const std::string& scan_id) const;
 
+    ScanResult scan_with_analysis(const std::string& root_path, bool compute_hash = true,
+                                  const ScanProgressFn& progress = nullptr);
+
 private:
     storage::DatabaseManager& db_;
     storage::ScanRepository& scans_;
     storage::ScanItemRepository& scan_items_;
     std::unordered_map<std::string, std::string> project_cache_;
+    FileAnalysisEngine analysis_engine_;
 
     core::ScanItem analyze_file(const std::string& filepath, const std::string& scan_id,
                                 bool compute_hash);

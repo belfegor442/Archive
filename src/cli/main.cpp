@@ -796,7 +796,7 @@ static int cmd_plan(CliContext& ctx) {
 
     auto start = std::chrono::steady_clock::now();
     try {
-        auto scan = scanner.scan_directory(ctx.positional[0], !ctx.skip_hash,
+        auto scan = scanner.scan_with_analysis(ctx.positional[0], !ctx.skip_hash,
             [](int files, int folders, int64_t bytes) {
                 double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
                 std::cout << "\r  Scanning... " << files << " files, "
@@ -806,13 +806,13 @@ static int cmd_plan(CliContext& ctx) {
             });
         std::cout << "\n";
 
-        classifier.classify_scan(scan.id, ctx.intensity,
+        classifier.classify_with_analyses(scan.scan.id, scan.analyses, ctx.intensity,
             [](int done, int total) {
                 std::cout << "\r  Classifying... " << done << "/" << total << " items" << std::flush;
             });
         std::cout << "\n";
 
-        auto plan = planner.create_plan(scan.id, ctx.positional[0], ctx.intensity);
+        auto plan = planner.create_plan_with_analyses(scan.scan.id, ctx.positional[0], scan.analyses, ctx.intensity);
         planner.approve_plan(plan.id);
         auto summary = planner.get_summary(plan.id);
 

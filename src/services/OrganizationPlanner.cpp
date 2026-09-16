@@ -69,6 +69,108 @@ core::OrgPlan OrganizationPlanner::create_plan(const std::string& scan_id,
     return plan;
 }
 
+double OrganizationPlanner::confidence_threshold_for_intensity(int intensity) {
+    if (intensity <= 25) return 0.80;
+    if (intensity <= 50) return 0.50;
+    if (intensity <= 75) return 0.30;
+    return 0.10;
+}
+
+core::OrgPlan OrganizationPlanner::create_plan_with_analyses(
+    const std::string& scan_id, const std::string& root_path,
+    const std::vector<FileAnalysis>& analyses, int intensity) {
+
+    core::OrgPlan plan;
+    plan.id = core::utils::generate_id();
+    plan.scan_id = scan_id;
+    plan.root_path = root_path;
+    plan.status = core::PlanStatus::Draft;
+    plan.intensity = intensity;
+    plan.created_at = core::utils::now_iso();
+
+    auto items = scan_items_.find_by_scan(scan_id);
+    auto classes = classifications_.find_by_scan(scan_id);
+
+    plan.total_files = static_cast<int>(items.size());
+
+    auto org_moves = generate_moves_with_analyses(items, classes, analyses, root_path, intensity);
+
+    plan.moves_planned = static_cast<int>(org_moves.size());
+    plan.unchanged = plan.total_files - plan.moves_planned;
+
+    double total_conf = 0.0;
+    for (const auto& m : org_moves) {
+        total_conf += m.confidence;
+    }
+    plan.avg_confidence = org_moves.empty() ? 0.0 : total_conf / org_moves.size();
+
+    {
+        storage::Transaction tx(db_);
+        plans_.insert(plan);
+        for (auto& m : org_moves) {
+            m.plan_id = plan.id;
+        }
+        if (!org_moves.empty()) {
+            moves_.insert_batch(org_moves);
+        }
+        tx.commit();
+    }
+
+    return plan;
+}
+
+std::vector<core::OrgMove> OrganizationPlanner::generate_moves_with_analyses(
+    const std::vector<core::ScanItem>& items,
+    const std::vector<core::Classification>& classifications,
+    const std::vector<FileAnalysis>& analyses,
+    const std::string& root_path, int intensity) {
+
+    double threshold = confidence_threshold_for_intensity(intensity);
+
+    std::vector<core::OrgMove> moves;
+    moves.reserve(items.size());
+
+    std::unordered_map<std::string, const core::Classification*> class_map;
+    class_map.reserve(classifications.size());
+    for (const auto& cls : classifications) {
+        class_map[cls.scan_item_id] = &cls;
+    }
+
+    std::map<std::string, const FileAnalysis*> analysis_map;
+    for (const auto& a : analyses)
+        analysis_map[a.file_path] = &a;
+
+    for (const auto& item : items) {
+        auto it = class_map.find(item.id);
+        if (it == class_map.end()) continue;
+
+        const core::Classification& cls = *it->second;
+
+        if (cls.taxonomy_path == "Unknown") continue;
+        if (cls.confidence < threshold) continue;
+
+        std::string dest = build_dest_path(cls.taxonomy_path, item.filename, root_path);
+
+        if (dest == item.path) continue;
+
+        core::OrgMove move;
+        move.id = core::utils::generate_id();
+        move.plan_id = "";
+        move.scan_item_id = item.id;
+        move.source_path = item.path;
+        move.dest_path = dest;
+        move.confidence = cls.confidence;
+        move.reason = cls.reason;
+        move.status = core::MoveStatus::Planned;
+
+        moves.push_back(std::move(move));
+    }
+
+    resolve_conflicts(moves);
+
+    return moves;
+}
+
 core::OrgPlanSummary OrganizationPlanner::get_summary(const std::string& plan_id) const {
     core::OrgPlanSummary summary;
 
@@ -178,9 +280,10 @@ void OrganizationPlanner::cancel_plan(const std::string& plan_id) {
 }
 
 std::vector<core::OrgMove> OrganizationPlanner::generate_moves(const std::vector<core::ScanItem>& items,
-                                                                const std::vector<core::Classification>& classifications,
-                                                                const std::string& root_path,
-                                                                int intensity) {
+                                                                 const std::vector<core::Classification>& classifications,
+                                                                 const std::string& root_path,
+                                                                 int intensity) {
+    double threshold = confidence_threshold_for_intensity(intensity);
     std::vector<core::OrgMove> moves;
     moves.reserve(items.size());
 
@@ -197,7 +300,7 @@ std::vector<core::OrgMove> OrganizationPlanner::generate_moves(const std::vector
         const core::Classification& cls = *it->second;
 
         if (cls.taxonomy_path == "Unknown") continue;
-        if (cls.confidence < 0.1) continue;
+        if (cls.confidence < threshold) continue;
 
         std::string dest = build_dest_path(cls.taxonomy_path, item.filename, root_path);
 

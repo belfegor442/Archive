@@ -7,6 +7,7 @@
 #include "../core/utils/Uuid.h"
 #include "../core/utils/Logger.h"
 #include "../storage/Transaction.h"
+#include "FileAnalysisEngine.h"
 
 namespace archive::services {
 
@@ -54,6 +55,90 @@ std::vector<core::Classification> Classifier::classify_scan(const std::string& s
     rules_sorted_ = false;
 
     detect_relationships(results, items);
+
+    {
+        storage::Transaction tx(db_);
+        for (const auto& cls : results) {
+            classifications_.insert(cls);
+        }
+        tx.commit();
+    }
+
+    return results;
+}
+
+std::vector<core::Classification> Classifier::classify_with_analyses(
+    const std::string& scan_id,
+    const std::vector<FileAnalysis>& analyses,
+    int intensity,
+    const ClassifyProgressFn& progress) {
+
+    auto items = scan_items_.find_by_scan(scan_id);
+    std::vector<core::Classification> results;
+    results.reserve(items.size());
+
+    if (rules_.empty()) {
+        rules_ = rules_repo_.find_enabled();
+    }
+    sorted_rules_ = rules_;
+    std::sort(sorted_rules_.begin(), sorted_rules_.end(),
+              [](const core::ClassificationRule& a, const core::ClassificationRule& b) {
+                  return a.priority > b.priority;
+              });
+    rules_sorted_ = true;
+
+    std::map<std::string, const FileAnalysis*> analysis_map;
+    for (const auto& a : analyses)
+        analysis_map[a.file_path] = &a;
+
+    int total = static_cast<int>(items.size());
+    int counted = 0;
+
+    for (const auto& item : items) {
+        core::Classification cls = classify_item(item, intensity);
+
+        auto ait = analysis_map.find(item.path);
+        if (ait != analysis_map.end()) {
+            const FileAnalysis* fa = ait->second;
+            if (!fa->evidence.language.empty() && cls.reason.find("Extension") != std::string::npos) {
+                cls.reason += " (Language: " + fa->evidence.language + ")";
+            }
+            if (!fa->detected_project.empty() && cls.reason.find("project") == std::string::npos) {
+                cls.reason += " (Project: " + fa->detected_project + ")";
+            }
+            if (fa->evidence.in_src_dir) cls.reason += " [src]";
+            if (fa->evidence.in_test_dir) cls.reason += " [test]";
+            if (fa->evidence.in_docs_dir) cls.reason += " [docs]";
+        }
+
+        results.push_back(cls);
+        counted++;
+
+        if (progress && (counted % 256 == 0 || counted == total)) {
+            progress(counted, total);
+        }
+    }
+
+    rules_sorted_ = false;
+
+    std::vector<std::string> paths;
+    paths.reserve(items.size());
+    for (const auto& item : items)
+        paths.push_back(item.path);
+
+    auto families = relationship_engine_.group_into_families(paths);
+    std::map<std::string, std::string> file_to_family;
+    for (const auto& fam : families)
+        for (const auto& m : fam.members)
+            file_to_family[m] = fam.family_type;
+
+    for (size_t i = 0; i < results.size() && i < items.size(); i++) {
+        auto fit = file_to_family.find(items[i].path);
+        if (fit != file_to_family.end()) {
+            if (results[i].reason.find("Grouped") == std::string::npos)
+                results[i].reason += " (Family: " + fit->second + ")";
+        }
+    }
 
     {
         storage::Transaction tx(db_);

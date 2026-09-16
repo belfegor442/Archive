@@ -150,6 +150,21 @@ std::vector<core::ScanItem> Scanner::get_items(const std::string& scan_id) const
     return scan_items_.find_by_scan(scan_id);
 }
 
+ScanResult Scanner::scan_with_analysis(const std::string& root_path, bool compute_hash,
+                                        const ScanProgressFn& progress) {
+    ScanResult result;
+    result.scan = scan_directory(root_path, compute_hash, progress);
+    if (progress) {
+        result.analyses = analysis_engine_.analyze_directory(root_path,
+            [&progress](int done, int total) {
+                progress(done, 0, 0);
+            });
+    } else {
+        result.analyses = analysis_engine_.analyze_directory(root_path);
+    }
+    return result;
+}
+
 core::ScanItem Scanner::analyze_file(const std::string& filepath, const std::string& scan_id,
                                       bool compute_hash) {
     core::ScanItem item;

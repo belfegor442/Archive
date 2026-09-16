@@ -12,6 +12,8 @@
 #include "../storage/ClassificationRepository.h"
 #include "../storage/ClassificationRuleRepository.h"
 #include "../storage/ScanItemRepository.h"
+#include "FileAnalysisEngine.h"
+#include "RelationshipEngine.h"
 
 namespace archive::services {
 
@@ -26,6 +28,11 @@ public:
 
     std::vector<core::Classification> classify_scan(const std::string& scan_id, int intensity = 50,
                                                      const ClassifyProgressFn& progress = nullptr);
+    std::vector<core::Classification> classify_with_analyses(
+        const std::string& scan_id,
+        const std::vector<FileAnalysis>& analyses,
+        int intensity = 50,
+        const ClassifyProgressFn& progress = nullptr);
     core::Classification classify_item(const core::ScanItem& item, int intensity = 50);
     void set_rules(const std::vector<core::ClassificationRule>& rules);
     std::vector<std::pair<std::string, int>> get_taxonomy_summary(const std::string& scan_id) const;
@@ -38,6 +45,8 @@ private:
     std::vector<core::ClassificationRule> rules_;
     std::vector<core::ClassificationRule> sorted_rules_;
     bool rules_sorted_ = false;
+    FileAnalysisEngine analysis_engine_;
+    RelationshipEngine relationship_engine_;
 
     std::string try_user_rules(const core::ScanItem& item);
     std::string classify_by_extension(const core::ScanItem& item, int intensity);
