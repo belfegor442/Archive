@@ -160,7 +160,8 @@ private:
       c.severity = 2;
       c.evaluate = [](const SystemSnapshot& snap, const CorrelationEngine&,
                        const AnomalyDetector&, DiagnosticCheck& result) {
-        double usedPct = snap.memory.UsedPct();
+        double usedPct = (snap.memory.totalBytes > 0) ?
+          (static_cast<double>(snap.memory.usedBytes) / static_cast<double>(snap.memory.totalBytes)) * 100.0 : 0.0;
         if (usedPct > 90.0) {
           result.passed = false;
           result.severity = 3;
@@ -187,10 +188,10 @@ private:
       c.severity = 3;
       c.evaluate = [](const SystemSnapshot& snap, const CorrelationEngine&,
                        const AnomalyDetector&, DiagnosticCheck& result) {
-        if (!snap.storage.ready) {
+        if (snap.storage.smartHealthOk == 0) {
           result.passed = false;
           result.severity = 4;
-          result.detail = L"Storage not ready";
+          result.detail = L"Storage health warning";
           result.recommendations.push_back(L"Check disk connection");
           result.recommendations.push_back(L"Run disk diagnostics");
           return;
@@ -213,11 +214,11 @@ private:
             result.detail = L"Disk free: " + std::to_wstring(static_cast<int>(freePct)) + L"%";
           }
         }
-        if (snap.storage.wearPct > 80.0) {
+        if (snap.storage.nvmeTempValid && snap.storage.nvmeTempC > 70.0) {
           result.passed = false;
           result.severity = 2;
-          result.detail += L" | SSD wear: " + std::to_wstring(static_cast<int>(snap.storage.wearPct)) + L"%";
-          result.recommendations.push_back(L"SSD wear high — plan replacement");
+          result.detail += L" | SSD temp: " + std::to_wstring(static_cast<int>(snap.storage.nvmeTempC)) + L"C";
+          result.recommendations.push_back(L"SSD temperature high — check cooling");
         }
       };
       checks_.push_back(c);
@@ -231,25 +232,20 @@ private:
       c.severity = 2;
       c.evaluate = [](const SystemSnapshot& snap, const CorrelationEngine&,
                        const AnomalyDetector&, DiagnosticCheck& result) {
-        if (snap.network.rttMs > 200.0) {
+        int rtt = (snap.network.pingRttMs >= 0) ? snap.network.pingRttMs : snap.network.latencyMs;
+        if (rtt > 200) {
           result.passed = false;
           result.severity = 3;
-          result.detail = L"RTT: " + std::to_wstring(static_cast<int>(snap.network.rttMs)) + L"ms";
+          result.detail = L"RTT: " + std::to_wstring(rtt) + L"ms";
           result.recommendations.push_back(L"Check network connection");
           result.recommendations.push_back(L"Restart network adapter");
-        } else if (snap.network.rttMs > 100.0) {
+        } else if (rtt > 100) {
           result.passed = false;
           result.severity = 1;
-          result.detail = L"RTT: " + std::to_wstring(static_cast<int>(snap.network.rttMs)) + L"ms";
+          result.detail = L"RTT: " + std::to_wstring(rtt) + L"ms";
           result.recommendations.push_back(L"Monitor network latency");
         } else {
-          result.detail = L"RTT: " + std::to_wstring(static_cast<int>(snap.network.rttMs)) + L"ms";
-        }
-        if (snap.network.droppedPktPct > 5.0) {
-          result.passed = false;
-          result.severity = 2;
-          result.detail += L" | Drops: " + std::to_wstring(static_cast<int>(snap.network.droppedPktPct)) + L"%";
-          result.recommendations.push_back(L"Check network stability");
+          result.detail = L"RTT: " + std::to_wstring(rtt) + L"ms";
         }
       };
       checks_.push_back(c);
@@ -264,32 +260,32 @@ private:
       c.evaluate = [](const SystemSnapshot& snap, const CorrelationEngine&,
                        const AnomalyDetector&, DiagnosticCheck& result) {
         bool ok = true;
-        if (snap.security.defenderRealtimePct < 100.0) {
+        if (snap.security.unsignedDriverCount > 0) {
           result.passed = false;
           result.severity = 3;
-          result.detail = L"Defender realtime protection off";
-          result.recommendations.push_back(L"Enable Windows Defender realtime protection");
+          result.detail = L"Unsigned drivers: " + std::to_wstring(snap.security.unsignedDriverCount);
+          result.recommendations.push_back(L"Review unsigned drivers");
           ok = false;
         }
-        if (snap.security.rdpEnabled) {
+        if (snap.security.suspiciousScriptHosts > 0) {
+          result.passed = false;
+          result.severity = 3;
+          result.detail = L"Suspicious script hosts: " + std::to_wstring(snap.security.suspiciousScriptHosts);
+          result.recommendations.push_back(L"Investigate script host activity");
+          ok = false;
+        }
+        if (snap.security.lsassAccessCount > 0) {
+          result.passed = false;
+          result.severity = 4;
+          result.detail = L"LSASS access detected: " + std::to_wstring(snap.security.lsassAccessCount);
+          result.recommendations.push_back(L"Investigate LSASS access — possible credential theft");
+          ok = false;
+        }
+        if (snap.security.debugPortActive) {
           result.passed = false;
           result.severity = 2;
-          result.detail = L"RDP enabled";
-          result.recommendations.push_back(L"Disable RDP if not needed");
-          ok = false;
-        }
-        if (snap.security.sshEnabled) {
-          result.passed = false;
-          result.severity = 1;
-          result.detail = L"SSH enabled";
-          result.recommendations.push_back(L"Review SSH configuration");
-          ok = false;
-        }
-        if (snap.security.failedLoginAttempts > 5) {
-          result.passed = false;
-          result.severity = 3;
-          result.detail = L"Failed logins: " + std::to_wstring(snap.security.failedLoginAttempts);
-          result.recommendations.push_back(L"Investigate failed login attempts");
+          result.detail = L"Debug port active";
+          result.recommendations.push_back(L"Review debug port configuration");
           ok = false;
         }
         if (ok) {
@@ -308,27 +304,26 @@ private:
       c.evaluate = [](const SystemSnapshot& snap, const CorrelationEngine&,
                        const AnomalyDetector&, DiagnosticCheck& result) {
         bool ok = true;
-        if (snap.reliability.crashDumpDetected) {
+        if (snap.reliability.crashEventsToday > 0) {
           result.passed = false;
           result.severity = 4;
-          result.detail = L"Crash dump detected — code 0x" +
-            std::to_wstring(snap.reliability.lastBugCheckCode);
-          result.recommendations.push_back(L"Analyze crash dump");
+          result.detail = L"Crash events today: " + std::to_wstring(snap.reliability.crashEventsToday);
+          result.recommendations.push_back(L"Analyze crash events");
           result.recommendations.push_back(L"Check drivers and hardware");
           ok = false;
         }
-        if (snap.reliability.hardwareErrors > 0) {
+        if (snap.reliability.unhandledExceptionCount > 0) {
           result.passed = false;
           result.severity = 3;
-          result.detail = L"Hardware errors: " + std::to_wstring(snap.reliability.hardwareErrors);
-          result.recommendations.push_back(L"Run hardware diagnostics");
+          result.detail = L"Unhandled exceptions: " + std::to_wstring(snap.reliability.unhandledExceptionCount);
+          result.recommendations.push_back(L"Review exception logs");
           ok = false;
         }
-        if (snap.reliability.storageErrors > 0) {
+        if (snap.reliability.heapCorruptionDetected) {
           result.passed = false;
-          result.severity = 3;
-          result.detail = L"Storage errors: " + std::to_wstring(snap.reliability.storageErrors);
-          result.recommendations.push_back(L"Check disk health");
+          result.severity = 4;
+          result.detail = L"Heap corruption detected";
+          result.recommendations.push_back(L"Run memory diagnostics");
           ok = false;
         }
         if (ok) {
@@ -346,22 +341,24 @@ private:
       c.severity = 2;
       c.evaluate = [](const SystemSnapshot& snap, const CorrelationEngine&,
                        const AnomalyDetector&, DiagnosticCheck& result) {
-        if (snap.power.batteryPresent) {
-          if (snap.power.batteryChargePct < 15.0 && !snap.power.acConnected) {
+        bool hasBattery = (snap.power.batteryFlag != 128);
+        if (hasBattery) {
+          if (snap.power.batteryLifePercent >= 0 && snap.power.batteryLifePercent < 15 &&
+              snap.power.acLineStatus != 1) {
             result.passed = false;
             result.severity = 3;
             result.detail = L"Battery critical: " +
-              std::to_wstring(static_cast<int>(snap.power.batteryChargePct)) + L"%";
+              std::to_wstring(snap.power.batteryLifePercent) + L"%";
             result.recommendations.push_back(L"Connect charger immediately");
-          } else if (snap.power.batteryWearPct > 30.0) {
+          } else if (snap.power.batteryWearLevel > 30) {
             result.passed = false;
             result.severity = 1;
             result.detail = L"Battery wear: " +
-              std::to_wstring(static_cast<int>(snap.power.batteryWearPct)) + L"%";
+              std::to_wstring(snap.power.batteryWearLevel) + L"%";
             result.recommendations.push_back(L"Consider battery replacement");
           } else {
             result.detail = L"Battery: " +
-              std::to_wstring(static_cast<int>(snap.power.batteryChargePct)) + L"%";
+              std::to_wstring(snap.power.batteryChargePercent) + L"%";
           }
         } else {
           result.detail = L"No battery detected";

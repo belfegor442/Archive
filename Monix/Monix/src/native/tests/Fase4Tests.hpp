@@ -109,28 +109,25 @@ inline void TestNetworkHistory() {
   assert(nh.SampleCount() == 0);
 
   NetworkState net;
-  net.upKbps = 500.0;
-  net.downKbps = 2000.0;
-  net.rttMs = 25.0;
-  net.activeConns = 50;
-  net.droppedPktPct = 0.1;
-  net.tcpRetransmitPct = 0.5;
-  net.totalConns = 100;
+  net.upBytesPerSec = 500ULL * 1024;
+  net.downBytesPerSec = 2000ULL * 1024;
+  net.pingRttMs = 25;
+  net.inboundConnections = 50;
+  net.outboundConnections = 50;
 
   nh.RecordSnapshot(net, 1000000, 1);
   assert(nh.SampleCount() == 1);
 
-  net.rttMs = 150.0;
-  net.droppedPktPct = 6.0;
+  net.pingRttMs = 150;
   nh.RecordSnapshot(net, 2000000, 2);
   assert(nh.SampleCount() == 2);
 
   auto recent = nh.RecentSamples(10);
   assert(recent.size() == 2);
-  assert(recent[1].rttMs == 150.0);
+  assert(recent[1].pingRttMs == 150);
 
   auto latest = nh.LatestSample();
-  assert(latest.rttMs == 150.0);
+  assert(latest.pingRttMs == 150);
 
   assert(nh.AvgRtt() == 87.5);
   assert(nh.MaxRtt() == 150.0);
@@ -195,8 +192,6 @@ inline void TestHardwareHistory() {
   snap.id = 1;
   snap.timestampNs = 1000000;
   snap.cpu.pct = 50.0;
-  snap.cpu.coresActive = 4;
-  snap.cpu.packagePowerW = 65.0;
   snap.gpu.pct = 40.0;
   snap.gpu.pctValid = 1;
   snap.gpu.tempC = 65.0;
@@ -210,18 +205,18 @@ inline void TestHardwareHistory() {
   snap.thermal.fanCount = 3;
   snap.thermal.fanSpeeds = {1200, 1100, 1300};
   snap.thermal.cpuThrottling = 0;
-  snap.storage.diskReadMBs = 100.0;
-  snap.storage.diskWriteMBs = 50.0;
-  snap.storage.iops = 500.0;
-  snap.storage.queueDepth = 2.5;
-  snap.storage.activeTimePct = 35.0;
-  snap.storage.ready = 1;
-  snap.storage.wearPct = 10.0;
+  snap.storage.readBytesPerSec = 100ULL * 1024 * 1024;
+  snap.storage.writeBytesPerSec = 50ULL * 1024 * 1024;
+  snap.storage.readIops = 250;
+  snap.storage.writeIops = 250;
+  snap.storage.queueLength = 2.5;
+  snap.storage.totalBytes = 500ULL * 1024 * 1024 * 1024;
+  snap.storage.freeBytes = 200ULL * 1024 * 1024 * 1024;
   snap.storage.tempC = 40.0;
-  snap.power.batteryPresent = 1;
-  snap.power.batteryChargePct = 85.0;
-  snap.power.batteryChargeCycles = 150;
-  snap.power.acConnected = 1;
+  snap.power.batteryFlag = 0;
+  snap.power.batteryChargePercent = 85;
+  snap.power.batteryCycleCount = 150;
+  snap.power.acLineStatus = 1;
 
   hh.RecordSnapshot(snap);
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../telemetry/Snapshot.hpp"
+#include "../../telemetry/Snapshot.hpp"
 #include "SystemSnapshot.hpp"
 
 namespace monix {

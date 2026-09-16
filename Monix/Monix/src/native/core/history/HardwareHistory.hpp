@@ -94,9 +94,7 @@ public:
     CpuHistorySample cpu;
     cpu.timestampNs = snap.timestampNs;
     cpu.overallPct = snap.cpu.pct;
-    memcpy(cpu.perCore, snap.cpu.cores, sizeof(cpu.perCore));
-    cpu.packagePowerW = snap.cpu.packagePowerW;
-    cpu.coresActive = snap.cpu.coresActive;
+    memset(cpu.perCore, 0, sizeof(cpu.perCore));
     cpuSamples_.push_back(cpu);
     if (cpuSamples_.size() > 500) cpuSamples_.pop_front();
 
@@ -104,50 +102,52 @@ public:
     gpu.timestampNs = snap.timestampNs;
     gpu.pct = snap.gpu.pct;
     gpu.tempC = snap.gpu.tempC;
-    gpu.powerW = snap.gpu.powerW;
-    gpu.usedBytes = snap.gpu.usedBytes;
-    gpu.totalBytes = snap.gpu.totalBytes;
+    gpu.powerW = snap.gpu.powerWatts;
+    gpu.usedBytes = snap.gpu.vramUsedBytes;
+    gpu.totalBytes = snap.gpu.vramTotalBytes;
     gpuSamples_.push_back(gpu);
     if (gpuSamples_.size() > 500) gpuSamples_.pop_front();
 
     ThermalHistorySample thermal;
     thermal.timestampNs = snap.timestampNs;
     thermal.cpuCoreTempC = snap.thermal.cpuCoreTempC;
-    thermal.cpuPackageTempC = snap.thermal.cpuPackageTempC;
-    thermal.gpuTempC = snap.thermal.gpuTempC;
-    thermal.ssdTempC = snap.thermal.ssdTempC;
-    memcpy(thermal.fanSpeeds, snap.thermal.fanSpeeds.data(), sizeof(thermal.fanSpeeds));
+    thermal.gpuTempC = 0.0;
+    thermal.ssdTempC = 0.0;
     thermal.fanCount = snap.thermal.fanCount;
+    for (int i = 0; i < snap.thermal.fanCount && i < 10; ++i) {
+      if (i < static_cast<int>(snap.thermal.fanSpeeds.size())) {
+        thermal.fanSpeeds[i] = static_cast<double>(snap.thermal.fanSpeeds[i]);
+      }
+    }
     thermal.cpuThrottling = snap.thermal.cpuThrottling;
-    thermal.thermalLimitReason = snap.thermal.thermalLimitReason;
     thermalSamples_.push_back(thermal);
     if (thermalSamples_.size() > 500) thermalSamples_.pop_front();
 
     StorageHistorySample storage;
     storage.timestampNs = snap.timestampNs;
-    storage.diskReadMBs = snap.storage.diskReadMBs;
-    storage.diskWriteMBs = snap.storage.diskWriteMBs;
-    storage.iops = snap.storage.iops;
-    storage.queueDepth = snap.storage.queueDepth;
-    storage.activeTimePct = snap.storage.activeTimePct;
-    storage.ready = snap.storage.ready;
-    storage.wearPct = snap.storage.wearPct;
+    storage.diskReadMBs = static_cast<double>(snap.storage.readBytesPerSec) / (1024.0 * 1024.0);
+    storage.diskWriteMBs = static_cast<double>(snap.storage.writeBytesPerSec) / (1024.0 * 1024.0);
+    storage.iops = static_cast<double>(snap.storage.readIops + snap.storage.writeIops);
+    storage.queueDepth = snap.storage.queueLength;
+    storage.activeTimePct = 0.0;
+    storage.ready = (snap.storage.smartHealthOk >= 0) ? 1 : 0;
+    storage.wearPct = 0.0;
     storage.tempC = snap.storage.tempC;
     storageSamples_.push_back(storage);
     if (storageSamples_.size() > 500) storageSamples_.pop_front();
 
     PowerHistorySample power;
     power.timestampNs = snap.timestampNs;
-    power.source = snap.power.source;
-    power.batteryPresent = snap.power.batteryPresent;
-    power.batteryChargePct = snap.power.batteryChargePct;
-    power.batteryChargeCycles = snap.power.batteryChargeCycles;
-    power.batteryCapacityMWh = snap.power.batteryCapacityMWh;
-    power.batteryWearPct = snap.power.batteryWearPct;
-    power.acConnected = snap.power.acConnected;
-    power.acOnline = snap.power.acOnline;
-    power.systemLoadW = snap.power.systemLoadW;
-    power.totalPowerW = snap.power.totalPowerW;
+    power.source = snap.power.acLineStatus;
+    power.batteryPresent = (snap.power.batteryFlag != 128) ? 1 : 0;
+    power.batteryChargePct = static_cast<double>(snap.power.batteryChargePercent);
+    power.batteryChargeCycles = snap.power.batteryCycleCount;
+    power.batteryCapacityMWh = 0.0;
+    power.batteryWearPct = static_cast<double>(snap.power.batteryWearLevel);
+    power.acConnected = (snap.power.acLineStatus == 1) ? 1 : 0;
+    power.acOnline = (snap.power.acLineStatus == 1) ? 1 : 0;
+    power.systemLoadW = 0.0;
+    power.totalPowerW = 0.0;
     powerSamples_.push_back(power);
     if (powerSamples_.size() > 500) powerSamples_.pop_front();
 
@@ -318,15 +318,15 @@ private:
       alerts_.push_back(std::move(a));
     }
 
-    if (snap.storage.wearPct > 80.0) {
+    if (snap.storage.nvmeTempValid && snap.storage.nvmeTempC > 70.0) {
       HardwareAlert a;
       a.timestampNs = snap.timestampNs;
       a.component = L"storage";
-      a.type = L"HIGH_WEAR";
-      a.description = L"SSD wear " +
-        std::to_wstring(static_cast<int>(snap.storage.wearPct)) + L"%";
-      a.value = snap.storage.wearPct;
-      a.threshold = 80.0;
+      a.type = L"HIGH_TEMP";
+      a.description = L"SSD temp " +
+        std::to_wstring(static_cast<int>(snap.storage.nvmeTempC)) + L"C";
+      a.value = snap.storage.nvmeTempC;
+      a.threshold = 70.0;
       a.severity = EventSeverity::High;
       alerts_.push_back(std::move(a));
     }

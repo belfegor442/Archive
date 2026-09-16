@@ -178,7 +178,7 @@ private:
 
     for (const auto& s : cluster.signals) {
       if (s.category == EventCategory::Hardware) cpuSignals++;
-      if (s.category == EventCategory::Gpu) gpuSignals++;
+      if (s.category == EventCategory::Hardware) gpuSignals++;
       if (s.category == EventCategory::Network) netSignals++;
       if (s.category == EventCategory::Thermal) thermalSignals++;
       if (s.category == EventCategory::Process) processSignals++;

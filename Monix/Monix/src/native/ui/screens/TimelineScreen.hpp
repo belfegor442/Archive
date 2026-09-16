@@ -77,7 +77,6 @@ public:
       const wchar_t* catStr = L"System";
       switch (e.category) {
         case EventCategory::Hardware: catStr = L"Hardware"; break;
-        case EventCategory::Gpu: catStr = L"GPU"; break;
         case EventCategory::Network: catStr = L"Network"; break;
         case EventCategory::Thermal: catStr = L"Thermal"; break;
         case EventCategory::Process: catStr = L"Process"; break;

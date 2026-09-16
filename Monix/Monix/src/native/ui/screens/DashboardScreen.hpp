@@ -77,9 +77,9 @@ public:
 
     auto cpuR = Win98Theme::R(c, 10, y, 480, 18);
     wchar_t cpuBuf[128];
-    swprintf(cpuBuf, 128, L"CPU: %.1f%% | Cores: %d | Temp: %.0fC | Power: %.1fW",
-      snap_.cpu.pct, snap_.cpu.coresActive,
-      snap_.thermal.cpuCoreTempC, snap_.cpu.packagePowerW);
+    swprintf(cpuBuf, 128, L"CPU: %.1f%% | Cores: %u | Temp: %.0fC",
+      snap_.cpu.pct, snap_.cpu.cores,
+      snap_.thermal.cpuCoreTempC);
     Win98Theme::Text(ctx.dc, cpuR, cpuBuf,
       ctx.canvas.fonts->fontRegular, Win98Theme::kWin98Black,
       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -87,12 +87,13 @@ public:
 
     auto ramR = Win98Theme::R(c, 10, y, 480, 18);
     wchar_t ramBuf[128];
-    double ramPct = snap_.memory.UsedPct();
-    swprintf(ramBuf, 128, L"RAM: %.1f%% | Used: %.1f GB / %.1f GB | Compressed: %.1f GB",
+    double ramPct = (snap_.memory.totalBytes > 0)
+      ? (static_cast<double>(snap_.memory.usedBytes) /
+         static_cast<double>(snap_.memory.totalBytes) * 100.0) : 0.0;
+    swprintf(ramBuf, 128, L"RAM: %.1f%% | Used: %.1f GB / %.1f GB",
       ramPct,
       static_cast<double>(snap_.memory.usedBytes) / (1024.0 * 1024.0 * 1024.0),
-      static_cast<double>(snap_.memory.totalBytes) / (1024.0 * 1024.0 * 1024.0),
-      static_cast<double>(snap_.memory.compressedBytes) / (1024.0 * 1024.0 * 1024.0));
+      static_cast<double>(snap_.memory.totalBytes) / (1024.0 * 1024.0 * 1024.0));
     Win98Theme::Text(ctx.dc, ramR, ramBuf,
       ctx.canvas.fonts->fontRegular, Win98Theme::kWin98Black,
       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -102,9 +103,9 @@ public:
       auto gpuR = Win98Theme::R(c, 10, y, 480, 18);
       wchar_t gpuBuf[128];
       swprintf(gpuBuf, 128, L"GPU: %.1f%% | Temp: %.0fC | Power: %.1fW | VRAM: %.1f/%.1f GB",
-        snap_.gpu.pct, snap_.gpu.tempC, snap_.gpu.powerW,
-        static_cast<double>(snap_.gpu.usedBytes) / (1024.0 * 1024.0 * 1024.0),
-        static_cast<double>(snap_.gpu.totalBytes) / (1024.0 * 1024.0 * 1024.0));
+        snap_.gpu.pct, snap_.gpu.tempC, snap_.gpu.powerWatts,
+        static_cast<double>(snap_.gpu.vramUsedBytes) / (1024.0 * 1024.0 * 1024.0),
+        static_cast<double>(snap_.gpu.vramTotalBytes) / (1024.0 * 1024.0 * 1024.0));
       Win98Theme::Text(ctx.dc, gpuR, gpuBuf,
         ctx.canvas.fonts->fontRegular, Win98Theme::kWin98Black,
         DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -120,9 +121,13 @@ public:
 
     auto netR = Win98Theme::R(c, 10, y, 480, 18);
     wchar_t netBuf[128];
-    swprintf(netBuf, 128, L"Up: %.0f KB/s | Down: %.0f KB/s | RTT: %.0f ms | Conns: %d",
-      snap_.network.upKbps, snap_.network.downKbps,
-      snap_.network.rttMs, snap_.network.activeConns);
+    double upKB = static_cast<double>(snap_.network.upBytesPerSec) / 1024.0;
+    double downKB = static_cast<double>(snap_.network.downBytesPerSec) / 1024.0;
+    int totalConns = snap_.network.inboundConnections + snap_.network.outboundConnections +
+                     snap_.network.udpConnectionCount;
+    swprintf(netBuf, 128, L"Up: %.0f KB/s | Down: %.0f KB/s | RTT: %d ms | Conns: %d",
+      upKB, downKB,
+      snap_.network.pingRttMs, snap_.network.inboundConnections + snap_.network.outboundConnections);
     Win98Theme::Text(ctx.dc, netR, netBuf,
       ctx.canvas.fonts->fontRegular, Win98Theme::kWin98Black,
       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -130,9 +135,8 @@ public:
 
     auto dropR = Win98Theme::R(c, 10, y, 480, 18);
     wchar_t dropBuf[128];
-    swprintf(dropBuf, 128, L"Drops: %.1f%% | Retransmit: %.1f%% | Total: %d",
-      snap_.network.droppedPktPct, snap_.network.tcpRetransmitPct,
-      snap_.network.totalConns);
+    swprintf(dropBuf, 128, L"TCP Retransmits: %llu | Total Conns: %d",
+      snap_.network.tcpRetransmits, totalConns);
     Win98Theme::Text(ctx.dc, dropR, dropBuf,
       ctx.canvas.fonts->fontRegular, Win98Theme::kWin98Black,
       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -146,9 +150,12 @@ public:
 
     auto storR = Win98Theme::R(c, 10, y, 480, 18);
     wchar_t storBuf[128];
+    double readMBs = static_cast<double>(snap_.storage.readBytesPerSec) / (1024.0 * 1024.0);
+    double writeMBs = static_cast<double>(snap_.storage.writeBytesPerSec) / (1024.0 * 1024.0);
+    double totalIops = static_cast<double>(snap_.storage.readIops + snap_.storage.writeIops);
     swprintf(storBuf, 128, L"Read: %.0f MB/s | Write: %.0f MB/s | IOPS: %.0f | Queue: %.1f",
-      snap_.storage.diskReadMBs, snap_.storage.diskWriteMBs,
-      snap_.storage.iops, snap_.storage.queueDepth);
+      readMBs, writeMBs,
+      totalIops, snap_.storage.queueLength);
     Win98Theme::Text(ctx.dc, storR, storBuf,
       ctx.canvas.fonts->fontRegular, Win98Theme::kWin98Black,
       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -159,8 +166,8 @@ public:
       double freePct = (static_cast<double>(snap_.storage.freeBytes) /
         static_cast<double>(snap_.storage.totalBytes)) * 100.0;
       wchar_t freeBuf[128];
-      swprintf(freeBuf, 128, L"Free: %.1f%% | Wear: %.1f%% | Temp: %.0fC",
-        freePct, snap_.storage.wearPct, snap_.storage.tempC);
+      swprintf(freeBuf, 128, L"Free: %.1f%% | Temp: %.0fC",
+        freePct, snap_.storage.tempC);
       Win98Theme::Text(ctx.dc, freeR, freeBuf,
         ctx.canvas.fonts->fontRegular, Win98Theme::kWin98Black,
         DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
@@ -180,16 +187,6 @@ public:
       snap_.processes.count, snap_.processes.threadCount,
       snap_.processes.handleCount);
     Win98Theme::Text(ctx.dc, procR, procBuf,
-      ctx.canvas.fonts->fontRegular, Win98Theme::kWin98Black,
-      DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
-    y += 22;
-
-    auto topR = Win98Theme::R(c, 10, y, 480, 18);
-    wchar_t topBuf[128];
-    swprintf(topBuf, 128, L"Top CPU: %s (%.1f%%) | Top RAM: %s (%.1f%%)",
-      snap_.processes.topCpuName.c_str(), snap_.processes.topCpuPct,
-      snap_.processes.topRamName.c_str(), snap_.processes.topRamPct);
-    Win98Theme::Text(ctx.dc, topR, topBuf,
       ctx.canvas.fonts->fontRegular, Win98Theme::kWin98Black,
       DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
   }

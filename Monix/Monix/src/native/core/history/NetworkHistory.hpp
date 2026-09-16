@@ -73,13 +73,14 @@ public:
     NetworkSample sample;
     sample.timestampNs = timestampNs;
     sample.snapshotId = snapshotId;
-    sample.upKbps = net.upKbps;
-    sample.downKbps = net.downKbps;
-    sample.rttMs = net.rttMs;
-    sample.activeConns = net.activeConns;
-    sample.droppedPktPct = net.droppedPktPct;
-    sample.tcpRetransmitPct = net.tcpRetransmitPct;
-    sample.totalConns = net.totalConns;
+    sample.upKbps = static_cast<double>(net.upBytesPerSec) / 1024.0;
+    sample.downKbps = static_cast<double>(net.downBytesPerSec) / 1024.0;
+    sample.rttMs = (net.pingRttMs >= 0) ? static_cast<double>(net.pingRttMs) :
+                  static_cast<double>(net.latencyMs);
+    sample.activeConns = net.inboundConnections + net.outboundConnections;
+    sample.droppedPktPct = 0.0;
+    sample.tcpRetransmitPct = 0.0;
+    sample.totalConns = net.inboundConnections + net.outboundConnections + net.udpConnectionCount;
 
     samples_.push_back(sample);
     if (samples_.size() > 500) samples_.pop_front();

@@ -186,10 +186,16 @@ private:
       rule->cooldownMinutes = 5;
       rule->debounceRequired = 2;
       rule->evaluate = [](const SystemSnapshot& cur, const SystemSnapshot*, const CorrelationCluster*) {
-        return cur.memory.UsedPct() > 90.0;
+        if (cur.memory.totalBytes == 0) return false;
+        double usedPct = (static_cast<double>(cur.memory.usedBytes) /
+          static_cast<double>(cur.memory.totalBytes)) * 100.0;
+        return usedPct > 90.0;
       };
       rule->message = [](const SystemSnapshot& cur, const SystemSnapshot*) {
-        return L"RAM at " + std::to_wstring(static_cast<int>(cur.memory.UsedPct())) +
+        if (cur.memory.totalBytes == 0) return std::wstring(L"Memory status unknown");
+        double usedPct = (static_cast<double>(cur.memory.usedBytes) /
+          static_cast<double>(cur.memory.totalBytes)) * 100.0;
+        return L"RAM at " + std::to_wstring(static_cast<int>(usedPct)) +
           L"% — memory pressure";
       };
       rules_.push_back(std::move(rule));
@@ -221,10 +227,11 @@ private:
       rule->cooldownMinutes = 5;
       rule->debounceRequired = 3;
       rule->evaluate = [](const SystemSnapshot& cur, const SystemSnapshot*, const CorrelationCluster*) {
-        return cur.network.rttMs > 200.0;
+        return cur.network.pingRttMs > 200;
       };
       rule->message = [](const SystemSnapshot& cur, const SystemSnapshot*) {
-        return L"RTT at " + std::to_wstring(static_cast<int>(cur.network.rttMs)) + L"ms";
+        int rtt = (cur.network.pingRttMs >= 0) ? cur.network.pingRttMs : cur.network.latencyMs;
+        return L"RTT at " + std::to_wstring(rtt) + L"ms";
       };
       rules_.push_back(std::move(rule));
     }
@@ -261,11 +268,14 @@ private:
       rule->cooldownMinutes = 30;
       rule->debounceRequired = 1;
       rule->evaluate = [](const SystemSnapshot& cur, const SystemSnapshot*, const CorrelationCluster*) {
-        return cur.security.defenderThreatsDetected > 0;
+        return cur.security.unsignedDriverCount > 0 ||
+               cur.security.suspiciousScriptHosts > 0 ||
+               cur.security.lsassAccessCount > 0;
       };
       rule->message = [](const SystemSnapshot& cur, const SystemSnapshot*) {
-        return L"Defender detected " + std::to_wstring(cur.security.defenderThreatsDetected) +
-          L" threat(s)";
+        int threats = cur.security.unsignedDriverCount + cur.security.suspiciousScriptHosts +
+                      cur.security.lsassAccessCount;
+        return L"Security issues detected: " + std::to_wstring(threats) + L" suspicious indicators";
       };
       rules_.push_back(std::move(rule));
     }
@@ -279,11 +289,12 @@ private:
       rule->cooldownMinutes = 60;
       rule->debounceRequired = 1;
       rule->evaluate = [](const SystemSnapshot& cur, const SystemSnapshot*, const CorrelationCluster*) {
-        return cur.reliability.crashDumpDetected != 0;
+        return cur.reliability.crashEventsToday > 0 ||
+               cur.reliability.unhandledExceptionCount > 0;
       };
       rule->message = [](const SystemSnapshot& cur, const SystemSnapshot*) {
-        return L"Crash dump detected — code: 0x" +
-          std::to_wstring(cur.reliability.lastBugCheckCode);
+        return L"Crash events today: " + std::to_wstring(cur.reliability.crashEventsToday) +
+          L" | Exceptions: " + std::to_wstring(cur.reliability.unhandledExceptionCount);
       };
       rules_.push_back(std::move(rule));
     }

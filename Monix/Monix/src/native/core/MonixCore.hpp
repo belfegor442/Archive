@@ -105,7 +105,7 @@ public:
     result.pipelineResult = pipeline_.ProcessSnapshot(
       snap, prev, legacyScram, result.legacyScram, timestampMs, snap.snapshotId);
 
-    for (const auto& proc : snap.processes.list) {
+    for (const auto& proc : sysSnap.processes.list) {
       CorrelatedSignal sig;
       sig.timestampNs = tsNs;
       sig.source = L"process";
@@ -113,45 +113,45 @@ public:
       sig.value = proc.cpuPct;
       sig.detail = proc.name;
       sig.category = EventCategory::Process;
-      sig.processId = static_cast<int>(proc.pid);
+      sig.processId = proc.pid;
       sig.processName = proc.name;
       correlationEngine_.AddSignal(sig);
     }
 
-    if (snap.cpu.pct > 80.0) {
+    if (sysSnap.cpu.pct > 80.0) {
       CorrelatedSignal sig;
       sig.timestampNs = tsNs;
       sig.source = L"cpu";
       sig.signalType = L"cpu_spike";
-      sig.value = snap.cpu.pct;
+      sig.value = sysSnap.cpu.pct;
       sig.category = EventCategory::Hardware;
       correlationEngine_.AddSignal(sig);
     }
 
-    if (snap.network.rttMs > 100.0) {
+    if (sysSnap.network.pingRttMs > 100) {
       CorrelatedSignal sig;
       sig.timestampNs = tsNs;
       sig.source = L"network";
       sig.signalType = L"network_spike";
-      sig.value = snap.network.rttMs;
+      sig.value = static_cast<double>(sysSnap.network.pingRttMs);
       sig.category = EventCategory::Network;
       correlationEngine_.AddSignal(sig);
     }
 
-    if (snap.thermal.cpuCoreTempC > 75.0) {
+    if (sysSnap.thermal.cpuCoreTempC > 75.0) {
       CorrelatedSignal sig;
       sig.timestampNs = tsNs;
       sig.source = L"thermal";
       sig.signalType = L"thermal_spike";
-      sig.value = snap.thermal.cpuCoreTempC;
+      sig.value = sysSnap.thermal.cpuCoreTempC;
       sig.category = EventCategory::Thermal;
       correlationEngine_.AddSignal(sig);
     }
 
     result.clusters = correlationEngine_.DetectClusters(tsNs);
 
-    processHistory_.RecordSnapshot(snap.processes, tsNs, snap.snapshotId);
-    networkHistory_.RecordSnapshot(snap.network, tsNs, snap.snapshotId);
+    processHistory_.RecordSnapshot(sysSnap.processes, tsNs, snap.snapshotId);
+    networkHistory_.RecordSnapshot(sysSnap.network, tsNs, snap.snapshotId);
     hardwareHistory_.RecordSnapshot(sysSnap);
 
     auto anomalies = anomalyDetector_.Detect(sysSnap, tsNs);
@@ -167,15 +167,16 @@ public:
       eventBus_.Emit(std::move(evt));
     }
 
-    anomalyDetector_.RecordBaseline(L"cpu.pct", snap.cpu.pct);
-    anomalyDetector_.RecordBaseline(L"memory.usedPct", snap.memory.UsedPct());
-    anomalyDetector_.RecordBaseline(L"gpu.pct", snap.gpu.pct);
-    anomalyDetector_.RecordBaseline(L"thermal.cpuCoreTempC", snap.thermal.cpuCoreTempC);
-    anomalyDetector_.RecordBaseline(L"network.rttMs", snap.network.rttMs);
-    anomalyDetector_.RecordBaseline(L"network.downKbps", snap.network.downKbps);
-    anomalyDetector_.RecordBaseline(L"storage.diskReadMBs", snap.storage.diskReadMBs);
-    anomalyDetector_.RecordBaseline(L"storage.diskWriteMBs", snap.storage.diskWriteMBs);
-    anomalyDetector_.RecordBaseline(L"processes.count", static_cast<double>(snap.processes.count));
+    double memUsedPct = (sysSnap.memory.totalBytes > 0) ?
+      (static_cast<double>(sysSnap.memory.usedBytes) / static_cast<double>(sysSnap.memory.totalBytes)) * 100.0 : 0.0;
+    anomalyDetector_.RecordBaseline(L"cpu.pct", sysSnap.cpu.pct);
+    anomalyDetector_.RecordBaseline(L"memory.usedPct", memUsedPct);
+    anomalyDetector_.RecordBaseline(L"gpu.pct", sysSnap.gpu.pct);
+    anomalyDetector_.RecordBaseline(L"thermal.cpuCoreTempC", sysSnap.thermal.cpuCoreTempC);
+    anomalyDetector_.RecordBaseline(L"network.latencyMs", static_cast<double>(sysSnap.network.latencyMs));
+    anomalyDetector_.RecordBaseline(L"storage.readBytesPerSec", static_cast<double>(sysSnap.storage.readBytesPerSec));
+    anomalyDetector_.RecordBaseline(L"storage.writeBytesPerSec", static_cast<double>(sysSnap.storage.writeBytesPerSec));
+    anomalyDetector_.RecordBaseline(L"processes.count", static_cast<double>(sysSnap.processes.count));
     anomalyDetector_.RecordSnapshot(sysSnap);
 
     CorrelationCluster* clusterPtr = result.clusters.empty() ? nullptr : &result.clusters[0];

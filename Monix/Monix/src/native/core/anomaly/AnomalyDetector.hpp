@@ -54,9 +54,9 @@ public:
     if (value < b.minVal) b.minVal = value;
     if (value > b.maxVal) b.maxVal = value;
     if (b.count > 1000) {
-      double m = b.mean;
+      double m = b.Mean();
       double halfSum = m * 500;
-      double halfSumSq = (b.variance + m * m) * 500;
+      double halfSumSq = (b.Variance() + m * m) * 500;
       b.sum = halfSum + value;
       b.sumSq = halfSumSq + value * value;
       b.count = 501;
@@ -109,8 +109,8 @@ private:
       const auto& b = it->second;
       if (b.count < 10) return;
 
-      double mean = b.mean;
-      double stddev = b.stddev;
+      double mean = b.Mean();
+      double stddev = b.Stddev();
       if (stddev < 0.001) stddev = 1.0;
 
       double deviation = (value - mean) / stddev;
@@ -133,16 +133,17 @@ private:
       }
     };
 
+    double memUsedPct = (snap.memory.totalBytes > 0) ?
+      (static_cast<double>(snap.memory.usedBytes) / static_cast<double>(snap.memory.totalBytes)) * 100.0 : 0.0;
     check(L"cpu.pct", snap.cpu.pct, 80.0, 95.0);
-    check(L"memory.usedPct", snap.memory.UsedPct(), 85.0, 95.0);
+    check(L"memory.usedPct", memUsedPct, 85.0, 95.0);
     check(L"gpu.pct", snap.gpu.pct, 80.0, 95.0);
     check(L"gpu.tempC", snap.gpu.tempC, 80.0, 90.0);
     check(L"thermal.cpuCoreTempC", snap.thermal.cpuCoreTempC, 75.0, 85.0);
-    check(L"thermal.cpuPackageTempC", snap.thermal.cpuPackageTempC, 80.0, 90.0);
-    check(L"network.rttMs", snap.network.rttMs, 100.0, 200.0);
-    check(L"network.downKbps", snap.network.downKbps, 5000.0, 10000.0);
-    check(L"storage.diskReadMBs", snap.storage.diskReadMBs, 500.0, 1000.0);
-    check(L"storage.diskWriteMBs", snap.storage.diskWriteMBs, 500.0, 1000.0);
+    check(L"network.latencyMs", static_cast<double>(snap.network.latencyMs), 100.0, 200.0);
+    check(L"network.pingRttMs", static_cast<double>(snap.network.pingRttMs), 100.0, 200.0);
+    check(L"storage.readBytesPerSec", static_cast<double>(snap.storage.readBytesPerSec), 50000000.0, 100000000.0);
+    check(L"storage.writeBytesPerSec", static_cast<double>(snap.storage.writeBytesPerSec), 50000000.0, 100000000.0);
     check(L"processes.count", static_cast<double>(snap.processes.count), 500.0, 1000.0);
   }
 

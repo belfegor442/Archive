@@ -64,20 +64,18 @@ inline void TestMonixCoreProcess() {
   prev.gpuPct = 40.0;
   prev.gpuTempC = 65.0;
   prev.cpuCoreTempC = 65.0;
-  prev.rttMs = 20.0;
-  prev.downKbps = 1000.0;
-  prev.activeConns = 50;
-  prev.droppedPktPct = 0.1;
-  prev.tcpRetransmitPct = 0.5;
-  prev.diskReadMBs = 100.0;
-  prev.diskWriteMBs = 50.0;
+  prev.latencyMs = 20;
+  prev.netDownBytesPerSec = 1000ULL * 1024;
+  prev.inboundConnections = 50;
+  prev.diskReadBytesPerSec = 100ULL * 1024 * 1024;
+  prev.diskWriteBytesPerSec = 50ULL * 1024 * 1024;
   prev.processCount = 180;
 
   telemetry::Snapshot snap = prev;
   snap.snapshotId = 2;
   snap.cpuPct = 92.0;
   snap.cpuCoreTempC = 82.0;
-  snap.rttMs = 150.0;
+  snap.latencyMs = 150;
   snap.processCount = 200;
 
   ScramEngine legacyScram;
@@ -112,13 +110,11 @@ inline void TestMonixCoreHistory() {
   prev.gpuPct = 40.0;
   prev.gpuTempC = 65.0;
   prev.cpuCoreTempC = 65.0;
-  prev.rttMs = 20.0;
-  prev.downKbps = 1000.0;
-  prev.activeConns = 50;
-  prev.droppedPktPct = 0.1;
-  prev.tcpRetransmitPct = 0.5;
-  prev.diskReadMBs = 100.0;
-  prev.diskWriteMBs = 50.0;
+  prev.latencyMs = 20;
+  prev.netDownBytesPerSec = 1000ULL * 1024;
+  prev.inboundConnections = 50;
+  prev.diskReadBytesPerSec = 100ULL * 1024 * 1024;
+  prev.diskWriteBytesPerSec = 50ULL * 1024 * 1024;
   prev.processCount = 180;
 
   telemetry::Snapshot snap = prev;
@@ -161,13 +157,11 @@ inline void TestMonixCoreEvents() {
   prev.gpuPct = 40.0;
   prev.gpuTempC = 65.0;
   prev.cpuCoreTempC = 65.0;
-  prev.rttMs = 20.0;
-  prev.downKbps = 1000.0;
-  prev.activeConns = 50;
-  prev.droppedPktPct = 0.1;
-  prev.tcpRetransmitPct = 0.5;
-  prev.diskReadMBs = 100.0;
-  prev.diskWriteMBs = 50.0;
+  prev.latencyMs = 20;
+  prev.netDownBytesPerSec = 1000ULL * 1024;
+  prev.inboundConnections = 50;
+  prev.diskReadBytesPerSec = 100ULL * 1024 * 1024;
+  prev.diskWriteBytesPerSec = 50ULL * 1024 * 1024;
   prev.processCount = 180;
 
   telemetry::Snapshot snap = prev;
@@ -204,7 +198,7 @@ inline void TestCollectorBridge() {
     s.ramUsedBytes = 10ULL * 1024 * 1024 * 1024;
   });
   bridge.RegisterCollector(L"Network", [](telemetry::Snapshot& s) {
-    s.rttMs = 25.0;
+    s.latencyMs = 25;
   });
 
   assert(bridge.CollectorCount() == 3);
@@ -220,7 +214,7 @@ inline void TestCollectorBridge() {
 
   assert(snap.cpuPct == 75.0);
   assert(snap.ramUsedBytes == 10ULL * 1024 * 1024 * 1024);
-  assert(snap.rttMs == 25.0);
+  assert(snap.latencyMs == 25);
   assert(eventCount == 3);
 
   bridge.NotifyCollectorState(L"CPU", L"DEGRADED");
@@ -250,13 +244,11 @@ inline void TestMonixCoreSessions() {
   snap.gpuPct = 40.0;
   snap.gpuTempC = 65.0;
   snap.cpuCoreTempC = 65.0;
-  snap.rttMs = 20.0;
-  snap.downKbps = 1000.0;
-  snap.activeConns = 50;
-  snap.droppedPktPct = 0.1;
-  snap.tcpRetransmitPct = 0.5;
-  snap.diskReadMBs = 100.0;
-  snap.diskWriteMBs = 50.0;
+  snap.latencyMs = 20;
+  snap.netDownBytesPerSec = 1000ULL * 1024;
+  snap.inboundConnections = 50;
+  snap.diskReadBytesPerSec = 100ULL * 1024 * 1024;
+  snap.diskWriteBytesPerSec = 50ULL * 1024 * 1024;
   snap.processCount = 180;
 
   ScramEngine legacyScram;
