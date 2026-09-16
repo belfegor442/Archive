@@ -315,7 +315,7 @@ void DatabaseManager::Statement::reset() {
     sqlite3_clear_bindings(stmt_);
 }
 
-DatabaseManager::Statement DatabaseManager::prepare(const std::string& sql) {
+DatabaseManager::Statement DatabaseManager::prepare(const std::string& sql) const {
     return Statement(db_, sql);
 }
 

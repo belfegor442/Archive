@@ -152,6 +152,20 @@ std::string FileUtils::sanitize_relative_path(const std::string& relative) {
     return result;
 }
 
+std::string FileUtils::sanitize_filename(const std::string& name) {
+    std::string safe;
+    safe.reserve(name.size());
+    for (char c : name) {
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
+            c == '"' || c == '<' || c == '>' || c == '|') {
+            safe += '_';
+        } else {
+            safe += c;
+        }
+    }
+    return safe;
+}
+
 bool FileUtils::is_path_within(const std::string& path, const std::string& base) {
     auto is_sep = [](char c) { return c == '/' || c == '\\'; };
 

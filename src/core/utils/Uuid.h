@@ -11,9 +11,9 @@
 namespace archive::core::utils {
 
 inline std::string generate_id() {
-    static std::random_device rd;
-    static std::mt19937 gen(rd());
-    static std::uniform_int_distribution<int> dis(0, 255);
+    static thread_local std::random_device rd;
+    static thread_local std::mt19937 gen(rd());
+    static thread_local std::uniform_int_distribution<int> dis(0, 255);
 
     std::ostringstream oss;
     oss << std::hex << std::setfill('0');

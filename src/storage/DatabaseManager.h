@@ -60,7 +60,7 @@ public:
         int last_rc_ = SQLITE_OK;
     };
 
-    Statement prepare(const std::string& sql);
+    Statement prepare(const std::string& sql) const;
 
     static std::string rc_to_string(int rc);
 

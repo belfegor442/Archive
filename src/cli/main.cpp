@@ -13,6 +13,8 @@
 #include "services/VersionService.h"
 #include "services/IntegrityService.h"
 #include "services/UpdateService.h"
+
+static constexpr const char* APP_VERSION = "0.1.0";
 #include "services/SearchService.h"
 #include "services/ProjectDetector.h"
 #include "core/utils/Logger.h"
@@ -65,7 +67,7 @@ static void print_usage() {
 }
 
 static void print_version() {
-    std::cout << "Archive v0.1.0\n";
+    std::cout << "Archive v" << APP_VERSION << "\n";
 }
 
 struct CliContext {

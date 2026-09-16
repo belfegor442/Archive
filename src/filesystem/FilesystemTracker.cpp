@@ -1,4 +1,5 @@
 #include "FilesystemTracker.h"
+#include "FileUtils.h"
 
 #include <algorithm>
 
@@ -77,15 +78,7 @@ void FilesystemTracker::backup_original(const std::string& dest_path, const std:
     if (!std::filesystem::exists(original_path)) return;
 
     std::error_code ec;
-    std::string safe_name;
-    for (char c : dest_path) {
-        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
-            c == '"' || c == '<' || c == '>' || c == '|') {
-            safe_name += '_';
-        } else {
-            safe_name += c;
-        }
-    }
+    std::string safe_name = FileUtils::sanitize_filename(dest_path);
     auto backup_path = std::filesystem::path(backup_dir_) / safe_name;
 
     std::filesystem::create_directories(backup_dir_, ec);

@@ -28,8 +28,12 @@
 #include "services/IntegrityService.h"
 #include "services/UpdateService.h"
 #include "services/ProjectDetector.h"
+#include <memory>
 
 using namespace archive;
+
+static constexpr const wchar_t* APP_TITLE = L"Archive v0.1.0";
+static constexpr const wchar_t* APP_ABOUT = L"Archive v0.1.0\n\nFile archiving & version management.\nSHA-256 integrity. Atomic rollback.\n\nMIT License";
 
 enum MenuCmd {
     CMD_IMPORT     = 1001,
@@ -52,6 +56,23 @@ static HWND g_hStatus = nullptr;
 static app::AppConfig g_config;
 static std::vector<core::ArchiveItem> g_items;
 
+struct Svc {
+    storage::DatabaseManager db;
+    storage::ArchiveItemRepository items;
+    storage::CategoryRepository categories;
+    storage::TagRepository tags;
+    storage::ActivityRepository activities;
+    storage::VersionRepository versions;
+    storage::StoredObjectRepository stored;
+    filesystem::StorageManager storage;
+    services::ProjectDetector detector;
+    Svc() : db(g_config.db_path), items(db), categories(db), tags(db),
+            activities(db), versions(db), stored(db),
+            storage(g_config.data_dir, g_config.items_dir) { db.initialize(); }
+};
+
+static std::unique_ptr<Svc> g_svc;
+
 static std::wstring ToW(const std::string& s) {
     if (s.empty()) return L"";
     int len = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), (int)s.size(), nullptr, 0);
@@ -72,26 +93,10 @@ static void Status(const wchar_t* txt) {
     SendMessageW(g_hStatus, SB_SETTEXTW, 0, (LPARAM)txt);
 }
 
-struct Svc {
-    storage::DatabaseManager db;
-    storage::ArchiveItemRepository items;
-    storage::CategoryRepository categories;
-    storage::TagRepository tags;
-    storage::ActivityRepository activities;
-    storage::VersionRepository versions;
-    storage::StoredObjectRepository stored;
-    filesystem::StorageManager storage;
-    services::ProjectDetector detector;
-    Svc() : db(g_config.db_path), items(db), categories(db), tags(db),
-            activities(db), versions(db), stored(db),
-            storage(g_config.data_dir, g_config.items_dir) { db.initialize(); }
-};
-
 static void RefreshList() {
     ListView_DeleteAllItems(g_hList);
     try {
-        Svc s;
-        g_items = s.items.find_all();
+        g_items = g_svc->items.find_all();
     } catch (...) { Status(L"Error loading items"); return; }
 
     for (int i = 0; i < (int)g_items.size(); i++) {
@@ -150,9 +155,8 @@ static void DoImport(HWND h, bool dir) {
     Status(L"Importing...");
     UpdateWindow(h);
     try {
-        Svc s;
-        services::ImportService imp(s.db, s.items, s.categories, s.tags,
-                                    s.activities, s.versions, s.stored, s.storage, s.detector);
+        services::ImportService imp(g_svc->db, g_svc->items, g_svc->categories, g_svc->tags,
+                                    g_svc->activities, g_svc->versions, g_svc->stored, g_svc->storage, g_svc->detector);
         core::ImportRequest req;
         req.paths.push_back(FromW(path));
         auto res = imp.import(req);
@@ -185,14 +189,13 @@ static void DoDetails(HWND h) {
     info += L"Created:   " + ToW(it.created_at) + L"\n";
     info += L"Archived:  " + ToW(it.archived_at) + L"\n";
     try {
-        Svc s;
-        auto vers = s.versions.find_by_item(it.id);
+        auto vers = g_svc->versions.find_by_item(it.id);
         if (!vers.empty()) {
             info += L"\nVersions (" + std::to_wstring(vers.size()) + L"):\n";
             for (const auto& v : vers)
                 info += L"  v" + std::to_wstring(v.version_number) + L"  " + std::to_wstring(v.size) + L" B  " + ToW(v.created_at) + L"\n";
         }
-    } catch (...) {}
+    } catch (const std::exception& e) { info += L"\nError loading versions: " + ToW(e.what()); }
     MessageBoxW(h, info.c_str(), L"Details", MB_ICONINFORMATION);
 }
 
@@ -200,8 +203,7 @@ static void DoVerify(HWND h) {
     Status(L"Verifying...");
     UpdateWindow(h);
     try {
-        Svc s;
-        services::IntegrityService integ(s.items, s.versions, s.stored, s.activities, s.storage);
+        services::IntegrityService integ(g_svc->items, g_svc->versions, g_svc->stored, g_svc->activities, g_svc->storage);
         auto r = integ.verify_all();
         std::wstring m = L"Valid: " + std::to_wstring(r.valid_count);
         if (r.modified_count) m += L", Modified: " + std::to_wstring(r.modified_count);
@@ -221,9 +223,8 @@ static void DoRestore(HWND h) {
     Status(L"Restoring...");
     UpdateWindow(h);
     try {
-        Svc s;
-        services::VersionService vs(s.db, s.versions, s.items, s.activities, s.stored, s.storage);
-        auto lv = s.versions.find_latest(it.id);
+        services::VersionService vs(g_svc->db, g_svc->versions, g_svc->items, g_svc->activities, g_svc->stored, g_svc->storage);
+        auto lv = g_svc->versions.find_latest(it.id);
         if (!lv) { MessageBoxW(h, L"No versions", L"Error", MB_ICONERROR); return; }
         vs.restore(it.id, lv->id);
         MessageBoxW(h, (L"Restored v" + std::to_wstring(lv->version_number)).c_str(), L"Done", MB_ICONINFORMATION);
@@ -238,7 +239,7 @@ static void DoTrash(HWND h) {
     if (i < 0 || i >= (int)g_items.size()) return;
     const auto& it = g_items[i];
     if (MessageBoxW(h, (L"Trash \"" + ToW(it.name) + L"\"?").c_str(), L"Trash", MB_YESNO | MB_ICONQUESTION) != IDYES) return;
-    try { Svc s; services::UpdateService u(s.items, s.activities, s.storage); u.move_to_trash(it.id); RefreshList(); }
+    try { services::UpdateService u(g_svc->items, g_svc->activities, g_svc->storage); u.move_to_trash(it.id); RefreshList(); }
     catch (const std::exception& e) { MessageBoxW(h, ToW(e.what()).c_str(), L"Error", MB_ICONERROR); }
 }
 
@@ -246,7 +247,7 @@ static void DoUntrash(HWND h) {
     int i = SelIdx();
     if (i < 0 || i >= (int)g_items.size()) return;
     const auto& it = g_items[i];
-    try { Svc s; services::UpdateService u(s.items, s.activities, s.storage); u.restore_from_trash(it.id); RefreshList(); }
+    try { services::UpdateService u(g_svc->items, g_svc->activities, g_svc->storage); u.restore_from_trash(it.id); RefreshList(); }
     catch (const std::exception& e) { MessageBoxW(h, ToW(e.what()).c_str(), L"Error", MB_ICONERROR); }
 }
 
@@ -255,7 +256,7 @@ static void DoDelete(HWND h) {
     if (i < 0 || i >= (int)g_items.size()) return;
     const auto& it = g_items[i];
     if (MessageBoxW(h, (L"PERMANENTLY delete \"" + ToW(it.name) + L"\"?").c_str(), L"Delete", MB_YESNO | MB_ICONWARNING) != IDYES) return;
-    try { Svc s; services::UpdateService u(s.items, s.activities, s.storage); u.permanent_delete(it.id); RefreshList(); }
+    try { services::UpdateService u(g_svc->items, g_svc->activities, g_svc->storage); u.permanent_delete(it.id); RefreshList(); }
     catch (const std::exception& e) { MessageBoxW(h, ToW(e.what()).c_str(), L"Error", MB_ICONERROR); }
 }
 
@@ -298,7 +299,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             case CMD_UNTRASH:    DoUntrash(h); break;
             case CMD_DELETE:     DoDelete(h); break;
             case CMD_DETAILS:    DoDetails(h); break;
-            case CMD_ABOUT:      MessageBoxW(h, L"Archive v0.1.0\n\nFile archiving & version management.\nSHA-256 integrity. Atomic rollback.\n\nMIT License", L"About", MB_ICONINFORMATION); break;
+            case CMD_ABOUT:      MessageBoxW(h, APP_ABOUT, L"About", MB_ICONINFORMATION); break;
             case CMD_EXIT:       DestroyWindow(h); break;
         }
         break;
@@ -307,7 +308,7 @@ static LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         if (nm->hwndFrom == g_hList && nm->code == NM_DBLCLK) DoDetails(h);
         break;
     }
-    case WM_DESTROY: PostQuitMessage(0); break;
+    case WM_DESTROY: g_svc.reset(); PostQuitMessage(0); break;
     default: return DefWindowProcW(h, m, w, l);
     }
     return 0;
@@ -317,6 +318,7 @@ int WINAPI wWinMain(HINSTANCE hI, HINSTANCE, LPWSTR, int nS) {
     g_hInst = hI;
     g_config = app::AppConfig::default_config();
     g_config.ensure_directories();
+    g_svc = std::make_unique<Svc>();
 
     INITCOMMONCONTROLSEX ic = { sizeof(ic), ICC_LISTVIEW_CLASSES | ICC_BAR_CLASSES };
     InitCommonControlsEx(&ic);
@@ -356,7 +358,7 @@ int WINAPI wWinMain(HINSTANCE hI, HINSTANCE, LPWSTR, int nS) {
     AppendMenuW(hHelp, MF_STRING, CMD_ABOUT, L"&About");
     AppendMenuW(hBar, MF_POPUP, (UINT_PTR)hHelp, L"&Help");
 
-    g_hWnd = CreateWindowExW(0, L"ArchiveWnd", L"Archive v0.1.0",
+    g_hWnd = CreateWindowExW(0, L"ArchiveWnd", APP_TITLE,
         WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 920, 560,
         nullptr, hBar, hI, nullptr);
 

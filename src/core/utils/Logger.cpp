@@ -12,10 +12,12 @@ Logger& Logger::instance() {
 }
 
 void Logger::set_level(LogLevel level) {
+    std::lock_guard lock(mutex_);
     level_ = level;
 }
 
 LogLevel Logger::level() const {
+    std::lock_guard lock(mutex_);
     return level_;
 }
 
@@ -32,16 +34,18 @@ const char* Logger::level_name(LogLevel level) {
 }
 
 void Logger::log(LogLevel level, const char* file, int line, const std::string& msg) {
+    std::lock_guard lock(mutex_);
     if (level < level_) return;
 
     auto now = std::chrono::system_clock::now();
     auto time_t = std::chrono::system_clock::to_time_t(now);
-    auto tm = *std::localtime(&time_t);
+    std::tm utc{};
+    gmtime_s(&utc, &time_t);
 
     char timestamp[20];
     std::snprintf(timestamp, sizeof(timestamp), "%04d-%02d-%02d %02d:%02d:%02d",
-                  tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-                  tm.tm_hour, tm.tm_min, tm.tm_sec);
+                  utc.tm_year + 1900, utc.tm_mon + 1, utc.tm_mday,
+                  utc.tm_hour, utc.tm_min, utc.tm_sec);
 
     std::cerr << "[" << timestamp << "] [" << level_name(level) << "] " << msg;
     if (file) {

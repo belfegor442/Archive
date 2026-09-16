@@ -5,6 +5,11 @@
 
 namespace archive::storage {
 
+static constexpr const char* ARCHIVE_ITEM_COLUMNS =
+    "id, name, type, status, description, original_path, storage_path, "
+    "size, file_count, category_id, created_at, archived_at, "
+    "last_modified_at, checksum, current_version, is_favorite";
+
 ArchiveItemRepository::ArchiveItemRepository(DatabaseManager& db)
     : db_(db)
 {}
@@ -81,12 +86,8 @@ void ArchiveItemRepository::remove(const std::string& id) {
 }
 
 std::optional<core::ArchiveItem> ArchiveItemRepository::find_by_id(const std::string& id) {
-    auto stmt = db_.prepare(R"(
-        SELECT id, name, type, status, description, original_path, storage_path,
-               size, file_count, category_id, created_at, archived_at,
-               last_modified_at, checksum, current_version, is_favorite
-        FROM archive_items WHERE id=?
-    )");
+    auto stmt = db_.prepare(
+        "SELECT " + std::string(ARCHIVE_ITEM_COLUMNS) + " FROM archive_items WHERE id=?");
     stmt.bind_text(1, id);
 
     if (stmt.step()) {
@@ -99,12 +100,8 @@ std::optional<core::ArchiveItem> ArchiveItemRepository::find_by_id(const std::st
 
 std::vector<core::ArchiveItem> ArchiveItemRepository::find_all() {
     std::vector<core::ArchiveItem> items;
-    auto stmt = db_.prepare(R"(
-        SELECT id, name, type, status, description, original_path, storage_path,
-               size, file_count, category_id, created_at, archived_at,
-               last_modified_at, checksum, current_version, is_favorite
-        FROM archive_items ORDER BY archived_at DESC
-    )");
+    auto stmt = db_.prepare(
+        "SELECT " + std::string(ARCHIVE_ITEM_COLUMNS) + " FROM archive_items ORDER BY archived_at DESC");
     while (stmt.step()) {
         auto item = read_item(stmt);
         load_tags(item);
@@ -115,12 +112,8 @@ std::vector<core::ArchiveItem> ArchiveItemRepository::find_all() {
 
 std::vector<core::ArchiveItem> ArchiveItemRepository::find_by_status(core::ItemStatus status) {
     std::vector<core::ArchiveItem> items;
-    auto stmt = db_.prepare(R"(
-        SELECT id, name, type, status, description, original_path, storage_path,
-               size, file_count, category_id, created_at, archived_at,
-               last_modified_at, checksum, current_version, is_favorite
-        FROM archive_items WHERE status=? ORDER BY archived_at DESC
-    )");
+    auto stmt = db_.prepare(
+        "SELECT " + std::string(ARCHIVE_ITEM_COLUMNS) + " FROM archive_items WHERE status=? ORDER BY archived_at DESC");
     stmt.bind_text(1, core::to_string(status));
     while (stmt.step()) {
         auto item = read_item(stmt);
@@ -132,12 +125,8 @@ std::vector<core::ArchiveItem> ArchiveItemRepository::find_by_status(core::ItemS
 
 std::vector<core::ArchiveItem> ArchiveItemRepository::find_by_category(const std::string& category_id) {
     std::vector<core::ArchiveItem> items;
-    auto stmt = db_.prepare(R"(
-        SELECT id, name, type, status, description, original_path, storage_path,
-               size, file_count, category_id, created_at, archived_at,
-               last_modified_at, checksum, current_version, is_favorite
-        FROM archive_items WHERE category_id=? ORDER BY archived_at DESC
-    )");
+    auto stmt = db_.prepare(
+        "SELECT " + std::string(ARCHIVE_ITEM_COLUMNS) + " FROM archive_items WHERE category_id=? ORDER BY archived_at DESC");
     stmt.bind_text(1, category_id);
     while (stmt.step()) {
         auto item = read_item(stmt);
@@ -149,12 +138,8 @@ std::vector<core::ArchiveItem> ArchiveItemRepository::find_by_category(const std
 
 std::vector<core::ArchiveItem> ArchiveItemRepository::find_favorites() {
     std::vector<core::ArchiveItem> items;
-    auto stmt = db_.prepare(R"(
-        SELECT id, name, type, status, description, original_path, storage_path,
-               size, file_count, category_id, created_at, archived_at,
-               last_modified_at, checksum, current_version, is_favorite
-        FROM archive_items WHERE is_favorite=1 ORDER BY archived_at DESC
-    )");
+    auto stmt = db_.prepare(
+        "SELECT " + std::string(ARCHIVE_ITEM_COLUMNS) + " FROM archive_items WHERE is_favorite=1 ORDER BY archived_at DESC");
     while (stmt.step()) {
         auto item = read_item(stmt);
         load_tags(item);
@@ -166,14 +151,10 @@ std::vector<core::ArchiveItem> ArchiveItemRepository::find_favorites() {
 std::vector<core::ArchiveItem> ArchiveItemRepository::search(const std::string& query) {
     std::vector<core::ArchiveItem> items;
     std::string pattern = "%" + query + "%";
-    auto stmt = db_.prepare(R"(
-        SELECT id, name, type, status, description, original_path, storage_path,
-               size, file_count, category_id, created_at, archived_at,
-               last_modified_at, checksum, current_version, is_favorite
-        FROM archive_items
-        WHERE name LIKE ? OR description LIKE ? OR original_path LIKE ?
-        ORDER BY archived_at DESC
-    )");
+    auto stmt = db_.prepare(
+        "SELECT " + std::string(ARCHIVE_ITEM_COLUMNS) + " FROM archive_items"
+        " WHERE name LIKE ? OR description LIKE ? OR original_path LIKE ?"
+        " ORDER BY archived_at DESC");
     stmt.bind_text(1, pattern);
     stmt.bind_text(2, pattern);
     stmt.bind_text(3, pattern);
@@ -276,12 +257,9 @@ core::DashboardStats ArchiveItemRepository::get_stats() {
     auto stmt_size = db_.prepare("SELECT COALESCE(SUM(size), 0) FROM archive_items WHERE status='archived'");
     if (stmt_size.step()) stats.total_size = static_cast<uint64_t>(stmt_size.column_int64(0));
 
-    auto stmt_recent = db_.prepare(R"(
-        SELECT id, name, type, status, description, original_path, storage_path,
-               size, file_count, category_id, created_at, archived_at,
-               last_modified_at, checksum, current_version, is_favorite
-        FROM archive_items WHERE status='archived' ORDER BY archived_at DESC LIMIT 10
-    )");
+    auto stmt_recent = db_.prepare(
+        "SELECT " + std::string(ARCHIVE_ITEM_COLUMNS) + " FROM archive_items"
+        " WHERE status='archived' ORDER BY archived_at DESC LIMIT 10");
     while (stmt_recent.step()) {
         stats.recent_items.push_back(read_item(stmt_recent));
     }

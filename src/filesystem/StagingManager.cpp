@@ -118,7 +118,6 @@ std::string find_json_value(const std::string& obj, const std::string& key) {
             return "";
         }
 
-        bool in_string = false;
         if (key_pos > 0) {
             char before = obj[key_pos - 1];
             if (before != ' ' && before != '\n' && before != '\r' && before != '\t' && before != ',' && before != '{') {
@@ -622,15 +621,7 @@ void StagingManager::append_backup_entry(const std::string& operation_id,
 
 std::string StagingManager::get_backup_path(const std::string& operation_id,
                                              const std::string& relative) const {
-    std::string safe_name;
-    for (char c : relative) {
-        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' ||
-            c == '"' || c == '<' || c == '>' || c == '|') {
-            safe_name += '_';
-        } else {
-            safe_name += c;
-        }
-    }
+    std::string safe_name = FileUtils::sanitize_filename(relative);
     return get_staging_path(operation_id) + "/.meta/backups/" + safe_name;
 }
 
