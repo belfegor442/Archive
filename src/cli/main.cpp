@@ -7,6 +7,14 @@
 #include "storage/NoteRepository.h"
 #include "storage/ActivityRepository.h"
 #include "storage/StoredObjectRepository.h"
+#include "storage/ScanRepository.h"
+#include "storage/ScanItemRepository.h"
+#include "storage/ClassificationRepository.h"
+#include "storage/ClassificationRuleRepository.h"
+#include "storage/TaxonomyRepository.h"
+#include "storage/OrgPlanRepository.h"
+#include "storage/OrgMoveRepository.h"
+#include "storage/UndoRepository.h"
 #include "filesystem/StorageManager.h"
 #include "hashing/FileHasher.h"
 #include "services/ImportService.h"
@@ -20,12 +28,30 @@
 #include "services/TagService.h"
 #include "services/NoteService.h"
 #include "services/DashboardService.h"
+#include "services/Scanner.h"
+#include "services/Classifier.h"
+#include "services/OrganizationPlanner.h"
+#include "services/OrganizationExecutor.h"
 #include "core/utils/Logger.h"
+#include "core/types/AnalysisResult.h"
+#include "core/types/OrgPlanSummary.h"
+#include "core/types/MoveDetail.h"
+#include "core/models/ClassificationRule.h"
+#include "core/models/TaxonomyNode.h"
+#include "core/models/OrgPlan.h"
+#include "core/models/UndoRecord.h"
+#include "core/models/OrgMove.h"
+#include "core/enums/PlanStatus.h"
+#include "core/enums/MoveStatus.h"
+#include "core/enums/UndoStatus.h"
 
 #include <iostream>
 #include <string>
 #include <vector>
 #include <cstdlib>
+#include <iomanip>
+#include <algorithm>
+#include <chrono>
 
 static constexpr const char* APP_VERSION = "0.2.0";
 
@@ -36,6 +62,10 @@ struct CliContext {
     std::string command;
     std::vector<std::string> sub_args;
     std::vector<std::string> positional;
+    int intensity = 50;
+    bool skip_hash = false;
+    bool dry_run = false;
+    bool yes = false;
 };
 
 static bool parse_args(int argc, char* argv[], CliContext& ctx) {
@@ -59,6 +89,14 @@ static bool parse_args(int argc, char* argv[], CliContext& ctx) {
             if (i + 1 < argc) ctx.sub_args.push_back(argv[++i]);
         } else if (arg == "--favorite") {
             ctx.sub_args.push_back("--favorite");
+        } else if (arg == "--skip-hash") {
+            ctx.skip_hash = true;
+        } else if (arg == "--dry-run") {
+            ctx.dry_run = true;
+        } else if (arg == "--yes" || arg == "-y") {
+            ctx.yes = true;
+        } else if (arg == "--intensity" && i + 1 < argc) {
+            ctx.intensity = std::atoi(argv[++i]);
         } else if (arg[0] != '-' || ctx.command.empty()) {
             if (ctx.command.empty()) {
                 ctx.command = arg;
@@ -134,6 +172,18 @@ static void print_usage() {
         "  verify [id]              Verify checksum integrity\n"
         "  consistency              Run deep consistency check\n"
         "\n"
+        "Organizer Commands:\n"
+        "  analyze <path>           Scan and classify a directory\n"
+        "  plan <path>              Generate an organization plan\n"
+        "  preview <plan_id>        Show detailed plan moves\n"
+        "  organize <plan_id>       Execute a plan\n"
+        "  undo <operation_id>      Undo an operation\n"
+        "  list-plans               List all plans\n"
+        "  list-undos               List undo records\n"
+        "  rules                    List classification rules\n"
+        "  add-rule <pattern> <target>  Add a classification rule\n"
+        "  taxonomy                 Show taxonomy tree\n"
+        "\n"
         "Info Commands:\n"
         "  stats                    Show archive statistics\n"
         "  history [limit]          Show recent activity\n"
@@ -148,6 +198,10 @@ static void print_usage() {
         "  --version-num <N>        Restore specific version number\n"
         "  --color <hex>            Color for tag/category creation\n"
         "  --limit <N>              Limit results\n"
+        "  --skip-hash              Skip SHA-256 hashing for faster scanning\n"
+        "  --intensity <0-100>      Classification depth (default: 50)\n"
+        "  --dry-run                Show what would be done without doing it\n"
+        "  --yes, -y                Skip confirmations\n"
         "  --help                   Show this help\n"
         "\n"
         "Exit Codes:\n"
@@ -665,6 +719,322 @@ static int cmd_history(CliContext& ctx) {
     return 0;
 }
 
+static bool confirm(const std::string& message, bool skip) {
+    if (skip) return true;
+    std::cout << message << " [y/N] ";
+    std::string input;
+    std::getline(std::cin, input);
+    return input == "y" || input == "Y" || input == "yes" || input == "YES";
+}
+
+// ============================================================
+// Organizer commands
+// ============================================================
+
+static int cmd_analyze(CliContext& ctx) {
+    if (ctx.positional.empty()) { std::cerr << "Error: analyze requires a path\n"; return 2; }
+    ctx.config.ensure_directories();
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::ScanRepository scans(db);
+    storage::ScanItemRepository scan_items(db);
+    services::Scanner scanner(db, scans, scan_items);
+
+    auto start = std::chrono::steady_clock::now();
+    try {
+        auto scan = scanner.scan_directory(ctx.positional[0], !ctx.skip_hash,
+            [](int files, int folders, int64_t bytes) {
+                double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
+                std::cout << "\r  Scanning... " << files << " files, "
+                          << folders << " folders, "
+                          << std::fixed << std::setprecision(1) << mb << " MB"
+                          << std::flush;
+            });
+        std::cout << "\n";
+
+        auto result = scanner.analyze(scan.id);
+        auto elapsed = std::chrono::steady_clock::now() - start;
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+
+        std::cout << "Analysis for: " << result.root_path << "\n\n"
+                  << "  Files:     " << result.total_files << "\n"
+                  << "  Folders:   " << result.total_folders << "\n"
+                  << "  Total:     " << result.total_files + result.total_folders << "\n\n";
+
+        if (!result.by_extension.empty()) {
+            std::cout << "By extension:\n";
+            std::vector<std::pair<std::string, int>> sorted_ext(result.by_extension.begin(), result.by_extension.end());
+            std::sort(sorted_ext.begin(), sorted_ext.end(), [](const auto& a, const auto& b) { return a.second > b.second; });
+            for (const auto& [ext, count] : sorted_ext)
+                std::cout << "  " << std::setw(20) << std::left << ext << std::setw(6) << std::right << count << "\n";
+            std::cout << "\n";
+        }
+
+        std::cout << "Scan ID: " << scan.id << "\n"
+                  << "Time:    " << ms << "ms";
+        if (ctx.skip_hash) std::cout << " (SHA-256 skipped)";
+        std::cout << "\n";
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "\nError: " << e.what() << "\n";
+        return 6;
+    }
+}
+
+static int cmd_plan(CliContext& ctx) {
+    if (ctx.positional.empty()) { std::cerr << "Error: plan requires a path\n"; return 2; }
+    ctx.config.ensure_directories();
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::ScanRepository scans(db);
+    storage::ScanItemRepository scan_items(db);
+    storage::ClassificationRepository classifications(db);
+    storage::ClassificationRuleRepository rules(db);
+    storage::OrgPlanRepository plans(db);
+    storage::OrgMoveRepository moves(db);
+    services::Scanner scanner(db, scans, scan_items);
+    services::Classifier classifier(db, classifications, rules, scan_items);
+    services::OrganizationPlanner planner(db, scans, scan_items, classifications, plans, moves);
+
+    auto start = std::chrono::steady_clock::now();
+    try {
+        auto scan = scanner.scan_directory(ctx.positional[0], !ctx.skip_hash,
+            [](int files, int folders, int64_t bytes) {
+                double mb = static_cast<double>(bytes) / (1024.0 * 1024.0);
+                std::cout << "\r  Scanning... " << files << " files, "
+                          << folders << " folders, "
+                          << std::fixed << std::setprecision(1) << mb << " MB"
+                          << std::flush;
+            });
+        std::cout << "\n";
+
+        classifier.classify_scan(scan.id, ctx.intensity,
+            [](int done, int total) {
+                std::cout << "\r  Classifying... " << done << "/" << total << " items" << std::flush;
+            });
+        std::cout << "\n";
+
+        auto plan = planner.create_plan(scan.id, ctx.positional[0], ctx.intensity);
+        planner.approve_plan(plan.id);
+        auto summary = planner.get_summary(plan.id);
+
+        auto elapsed = std::chrono::steady_clock::now() - start;
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+
+        std::cout << "Organization Plan: " << plan.id << "\n\n"
+                  << "  Total files:     " << summary.total_files << "\n"
+                  << "  Moves planned:   " << summary.moves_planned << "\n"
+                  << "  Unchanged:       " << summary.unchanged << "\n"
+                  << "  Avg confidence:  " << std::fixed << std::setprecision(1)
+                  << (summary.avg_confidence * 100.0) << "%\n\n";
+
+        if (!summary.by_category.empty()) {
+            std::cout << "By category:\n";
+            for (const auto& [cat, count] : summary.by_category)
+                std::cout << "  " << std::setw(30) << std::left << cat << std::setw(6) << std::right << count << "\n";
+            std::cout << "\n";
+        }
+
+        std::cout << "Plan ID: " << plan.id << "\n"
+                  << "Time:    " << ms << "ms";
+        if (ctx.skip_hash) std::cout << " (SHA-256 skipped)";
+        std::cout << "\n"
+                  << "Use 'archive preview " << plan.id << "' to see detailed moves.\n";
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "\nError: " << e.what() << "\n";
+        return 1;
+    }
+}
+
+static int cmd_preview(CliContext& ctx) {
+    if (ctx.positional.empty()) { std::cerr << "Error: preview requires a plan ID\n"; return 2; }
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::OrgPlanRepository plans(db);
+    storage::OrgMoveRepository moves(db);
+    storage::ScanRepository scans(db);
+    storage::ScanItemRepository scan_items(db);
+    storage::ClassificationRepository classifications(db);
+    services::OrganizationPlanner planner(db, scans, scan_items, classifications, plans, moves);
+
+    auto plan = plans.find_by_id(ctx.positional[0]);
+    if (!plan) { std::cerr << "Error: plan not found: " << ctx.positional[0] << "\n"; return 3; }
+
+    auto summary = planner.get_summary(plan->id);
+    auto move_details = planner.get_moves(plan->id);
+
+    std::cout << "Plan: " << plan->id << "\n"
+              << "  Root:     " << plan->root_path << "\n"
+              << "  Status:   " << core::to_string(plan->status) << "\n"
+              << "  Intensity:" << plan->intensity << "\n"
+              << "  Created:  " << plan->created_at << "\n\n"
+              << "  Total files:     " << summary.total_files << "\n"
+              << "  Moves planned:   " << summary.moves_planned << "\n"
+              << "  Unchanged:       " << summary.unchanged << "\n"
+              << "  Avg confidence:  " << std::fixed << std::setprecision(1)
+              << (summary.avg_confidence * 100.0) << "%\n\n";
+
+    if (move_details.empty()) { std::cout << "No moves in this plan.\n"; return 0; }
+
+    std::cout << "Moves (" << move_details.size() << "):\n\n";
+    for (const auto& m : move_details) {
+        std::string src = m.source.size() > 50 ? "..." + m.source.substr(m.source.size() - 47) : m.source;
+        std::string dst = m.destination.size() > 50 ? "..." + m.destination.substr(m.destination.size() - 47) : m.destination;
+        std::cout << "  " << src << "  ->  " << dst
+                  << "  [" << std::fixed << std::setprecision(0) << (m.confidence * 100.0) << "%]"
+                  << "  " << m.reason << "\n";
+    }
+    std::cout << "\n";
+    return 0;
+}
+
+static int cmd_organize(CliContext& ctx) {
+    if (ctx.positional.empty()) { std::cerr << "Error: organize requires a plan ID\n"; return 2; }
+    ctx.config.ensure_directories();
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::OrgPlanRepository plans(db);
+    storage::OrgMoveRepository moves(db);
+    storage::UndoRepository undo(db);
+    services::OrganizationExecutor executor(db, plans, moves, undo);
+
+    auto plan = plans.find_by_id(ctx.positional[0]);
+    if (!plan) { std::cerr << "Error: plan not found: " << ctx.positional[0] << "\n"; return 3; }
+
+    auto plan_moves = moves.find_by_plan(plan->id);
+    std::cout << "Executing plan: " << plan->id << "\n"
+              << "  Moves: " << plan_moves.size() << "\n"
+              << "  Root:  " << plan->root_path << "\n\n";
+
+    if (ctx.dry_run) {
+        std::cout << "[dry-run] No changes made.\n";
+        for (const auto& m : plan_moves)
+            std::cout << "  " << m.source_path << " -> " << m.dest_path << "\n";
+        return 0;
+    }
+
+    if (!confirm("Execute this plan?", ctx.yes)) { std::cout << "Cancelled.\n"; return 0; }
+
+    try {
+        auto record = executor.execute(plan->id);
+        std::cout << "Plan executed successfully.\n"
+                  << "  Moves completed: " << record.moves_count << "\n"
+                  << "  Undo ID:         " << record.id << "\n";
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 4;
+    }
+}
+
+static int cmd_undo(CliContext& ctx) {
+    if (ctx.positional.empty()) { std::cerr << "Error: undo requires an operation ID\n"; return 2; }
+    ctx.config.ensure_directories();
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::OrgPlanRepository plans(db);
+    storage::OrgMoveRepository moves(db);
+    storage::UndoRepository undo_repo(db);
+    services::OrganizationExecutor executor(db, plans, moves, undo_repo);
+
+    auto record = undo_repo.find_record_by_id(ctx.positional[0]);
+    if (!record) { std::cerr << "Error: undo record not found: " << ctx.positional[0] << "\n"; return 5; }
+    if (record->status == core::UndoStatus::Used) { std::cerr << "Error: undo already applied\n"; return 5; }
+
+    std::cout << "Undo operation: " << record->id << "\n"
+              << "  Moves: " << record->moves_count << "\n"
+              << "  Root:  " << record->root_path << "\n\n";
+
+    if (!confirm("Undo this operation?", ctx.yes)) { std::cout << "Cancelled.\n"; return 0; }
+
+    try {
+        executor.undo(record->id);
+        std::cout << "Undo completed successfully.\n";
+        return 0;
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 5;
+    }
+}
+
+static int cmd_list_plans(CliContext& ctx) {
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::OrgPlanRepository plans(db);
+    auto all = plans.find_all();
+    if (all.empty()) { std::cout << "No organization plans.\n"; return 0; }
+    std::cout << "Organization plans (" << all.size() << "):\n\n";
+    for (const auto& p : all) {
+        std::string root = p.root_path.size() > 40 ? "..." + p.root_path.substr(p.root_path.size() - 37) : p.root_path;
+        std::cout << "  " << std::setw(12) << std::left << p.id
+                  << "  " << std::setw(40) << std::left << root
+                  << "  " << std::setw(10) << std::left << core::to_string(p.status)
+                  << "  " << std::setw(4) << std::right << p.moves_planned << " moves"
+                  << "  " << p.created_at << "\n";
+    }
+    std::cout << "\n";
+    return 0;
+}
+
+static int cmd_list_undos(CliContext& ctx) {
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::UndoRepository undo_repo(db);
+    auto all = undo_repo.find_all();
+    if (all.empty()) { std::cout << "No undo operations available.\n"; return 0; }
+    std::cout << "Undo operations (" << all.size() << "):\n\n";
+    for (const auto& r : all) {
+        std::cout << "  " << std::setw(12) << std::left << r.id
+                  << "  " << std::setw(10) << std::left << core::to_string(r.status)
+                  << "  " << std::setw(4) << std::right << r.moves_count << " moves"
+                  << "  " << r.created_at << "\n";
+    }
+    std::cout << "\n";
+    return 0;
+}
+
+static int cmd_rules(CliContext& ctx) {
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::ClassificationRuleRepository rules(db);
+    auto all = rules.find_all();
+    if (all.empty()) { std::cout << "No classification rules defined.\n"; return 0; }
+    std::cout << "Classification rules (" << all.size() << "):\n\n";
+    for (const auto& r : all) {
+        std::string state = r.enabled ? "enabled" : "disabled";
+        std::cout << "  " << std::setw(12) << std::left << r.id
+                  << "  " << std::setw(20) << std::left << r.name
+                  << "  " << std::setw(20) << std::left << r.pattern
+                  << "  -> " << r.target_path << "  [" << state << "]\n";
+    }
+    std::cout << "\n";
+    return 0;
+}
+
+static int cmd_add_rule(CliContext& ctx) {
+    if (ctx.positional.size() < 2) { std::cerr << "Error: add-rule requires <pattern> <target>\n"; return 2; }
+    ctx.config.ensure_directories();
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::ClassificationRuleRepository rules(db);
+    core::ClassificationRule rule;
+    rule.name = "user-rule";
+    rule.pattern = ctx.positional[0];
+    rule.target_path = ctx.positional[1];
+    rule.priority = 100;
+    rule.enabled = true;
+    rules.insert(rule);
+    std::cout << "Rule added: " << rule.pattern << " -> " << rule.target_path << "\n  ID: " << rule.id << "\n";
+    return 0;
+}
+
+static int cmd_taxonomy(CliContext& ctx) {
+    storage::DatabaseManager db(ctx.config.db_path); db.initialize();
+    storage::TaxonomyRepository taxonomy(db);
+    auto nodes = taxonomy.find_all();
+    if (nodes.empty()) { std::cout << "Taxonomy is empty.\n"; return 0; }
+    std::cout << "Taxonomy (" << nodes.size() << " nodes):\n\n";
+    for (const auto& n : nodes) {
+        std::string indent(n.level * 2, ' ');
+        std::string count_str = n.file_count > 0 ? " (" + std::to_string(n.file_count) + ")" : "";
+        std::cout << indent << n.name << count_str << "\n";
+    }
+    std::cout << "\n";
+    return 0;
+}
+
 int main(int argc, char* argv[]) {
     CliContext ctx;
     if (!parse_args(argc, argv, ctx)) return 2;
@@ -689,6 +1059,16 @@ int main(int argc, char* argv[]) {
     if (ctx.command == "consistency")    return cmd_consistency(ctx);
     if (ctx.command == "stats")          return cmd_stats(ctx);
     if (ctx.command == "history")        return cmd_history(ctx);
+    if (ctx.command == "analyze")        return cmd_analyze(ctx);
+    if (ctx.command == "plan")           return cmd_plan(ctx);
+    if (ctx.command == "preview")        return cmd_preview(ctx);
+    if (ctx.command == "organize")       return cmd_organize(ctx);
+    if (ctx.command == "undo")           return cmd_undo(ctx);
+    if (ctx.command == "list-plans")     return cmd_list_plans(ctx);
+    if (ctx.command == "list-undos")     return cmd_list_undos(ctx);
+    if (ctx.command == "rules")          return cmd_rules(ctx);
+    if (ctx.command == "add-rule")       return cmd_add_rule(ctx);
+    if (ctx.command == "taxonomy")       return cmd_taxonomy(ctx);
     std::cerr << "Unknown command: " << ctx.command << "\nRun 'archive help' for usage.\n";
     return 2;
 }

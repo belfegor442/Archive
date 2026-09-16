@@ -34,7 +34,7 @@ MainWindow::MainWindow(const archive::app::AppConfig& config, QWidget* parent)
     activity_svc_ = std::make_unique<archive::services::ActivityService>(*activities_);
     integrity_svc_ = std::make_unique<archive::services::IntegrityService>(*items_, *versions_, *stored_objects_, *activities_, *storage_);
     category_svc_ = std::make_unique<archive::services::CategoryService>(*categories_, *items_, *activities_);
-    update_svc_ = std::make_unique<archive::services::UpdateService>(*items_, *activities_, *storage_);
+    update_svc_ = std::make_unique<archive::services::UpdateService>(*db_, *items_, *activities_, *storage_);
 
     setup_ui();
     setup_connections();

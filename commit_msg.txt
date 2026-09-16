@@ -1,6 +1,8 @@
-fix(build): embed longPathAware manifest for Windows MAX_PATH support
+fix: restore organizer CLI commands after remote merge, fix UpdateService in Qt MainWindow
 
-- archive-gui.manifest declares <longPathAware>true</longPathAware>
-- Embedded via .rc resource in both GUI and CLI executables
-- Enables paths up to 32767 chars on Windows 10 1607+
-- Fixes crash when importing deeply nested folders (e.g. Monix with zig-dist)
+- Re-added all 11 organizer CLI commands (analyze, plan, preview, organize, undo,
+  list-plans, list-undos, rules, add-rule, taxonomy) to the rewritten remote CLI
+- Re-applied --skip-hash, --intensity, --dry-run, --yes flags
+- Fixed Qt MainWindow.cpp:37 UpdateService constructor now takes 4 params (added db_)
+- Full flow verified: analyze -> plan -> preview -> organize -> undo (5/5 moves, 9ms)
+- 369/369 tests passing
